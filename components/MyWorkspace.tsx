@@ -30,12 +30,12 @@ const PAYMENTS = [
 // ---- bill (multi-item) types ----
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
-type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any };
+type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any };
 type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number };
 const DEFAULT_DISCOUNT_PCT = 5;
 let itemKey = 0;
-const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, ...patch });
+const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
 const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
@@ -152,11 +152,13 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     return { ok: false, label: `บาร์โค้ด ${code}`, sub: "" };
   };
 
-  // bill-level extra discount (%), distributed to each line
+  // per-item discount (baht) + a bill-level extra discount (%) on top
   const pct = Math.min(100, Math.max(0, Number(state.discount_pct) || 0));
   const lines = state.items.map((it) => {
     const sub = (Number(it.qty) || 0) * (Number(it.unit_price) || 0);
-    const discount = Math.round((sub * pct) / 100);
+    const itemDisc = Math.min(sub, Number(it.discount) || 0);
+    const billDisc = Math.round(((sub - itemDisc) * pct) / 100);
+    const discount = itemDisc + billDisc;   // total discount stored on this line
     return { it, sub, discount, total: sub - discount };
   });
   const subtotal = lines.reduce((s, l) => s + l.sub, 0);
@@ -245,7 +247,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       <div className="border-t border-line pt-3">
         <div className="space-y-0.5 text-sm mb-3">
           <div className="flex justify-between text-muted"><span>ยอดรวม</span><span>{baht(subtotal)}</span></div>
-          {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด {pct}%</span><span>−{baht(discountTotal)}</span></div>}
+          {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
           <div className="flex justify-between items-baseline font-semibold text-ink pt-0.5"><span>รวมสุทธิ</span><span className="text-brand-dark text-2xl">{baht(net)}</span></div>
         </div>
         <div className="flex gap-2 justify-end">
@@ -264,10 +266,11 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
-  const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
-  const line = q * up;
+  const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0, dc = Number(it.discount) || 0;
+  const line = q * up - dc;
   return (
     <div className="rounded-xl border border-line bg-white p-3">
+      {/* name + size */}
       <div className="flex items-start gap-2">
         <span className="text-xs text-muted mt-2.5 w-4 shrink-0">{index + 1}</span>
         <div className="flex-1 relative min-w-0">
@@ -276,18 +279,20 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
             {res.map((p) => <button key={p.id} onMouseDown={() => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
-        <button onClick={onRemove} className="p-2 -mr-1 text-muted hover:text-red-600 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
+        <input className={inp + " w-[74px] shrink-0 text-center px-1"} value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
+        <button onClick={onRemove} className="p-2 -mr-1 text-muted hover:text-red-600 shrink-0 self-start" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
       </div>
+      {/* qty + price + discount */}
       <div className="flex items-center gap-2 mt-2 pl-6">
         <div className="flex items-center rounded-lg border border-line overflow-hidden shrink-0">
-          <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-          <input inputMode="numeric" className="w-9 text-center py-2 text-sm outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
-          <button onClick={() => onChange({ qty: q + 1 })} className="px-3 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+          <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="px-2.5 py-2 hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
+          <input inputMode="numeric" className="w-8 text-center py-2 text-sm outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
+          <button onClick={() => onChange({ qty: q + 1 })} className="px-2.5 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
         </div>
-        <input inputMode="numeric" className={inp + " text-right flex-1 min-w-0"} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} placeholder="ราคา/ชิ้น" />
-        <div className="text-sm font-semibold text-ink whitespace-nowrap shrink-0">{baht(line)}</div>
+        <input inputMode="numeric" className={inp + " text-right flex-1 min-w-0 px-2"} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} placeholder="ราคา" />
+        <input inputMode="numeric" className={inp + " text-right flex-1 min-w-0 px-2"} value={it.discount} onChange={(e) => onChange({ discount: e.target.value })} placeholder="ส่วนลด" />
       </div>
-      {it.size && <div className="text-xs text-muted mt-1 pl-6">{it.size}</div>}
+      <div className="text-right text-sm mt-1.5 pl-6">รวม <b className="text-ink">{baht(line)}</b></div>
     </div>
   );
 }
