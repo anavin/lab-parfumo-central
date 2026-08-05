@@ -203,7 +203,17 @@ function usePg() {
 async function getPgPool() {
   if (!gp._pgPool) {
     const { Pool } = await import("pg");
-    gp._pgPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+    // Serverless-friendly: keep few connections per instance (Supabase NANO has
+    // a small direct-connection limit), release idle ones, and fail fast on a
+    // stuck connect instead of hanging a Server Component render.
+    gp._pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 3,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+      allowExitOnIdle: true,
+    });
+    gp._pgPool.on("error", (e: any) => console.error("[pg pool] idle client error:", e?.message));
   }
   return gp._pgPool;
 }

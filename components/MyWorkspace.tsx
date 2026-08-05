@@ -18,7 +18,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type SaleState = { id?: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
 type CustState = { id?: number; cust_date: string; customers: any; thai: any; foreign: any; sell_amount: any };
 
-const blankSale = (date: string): SaleState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, payment_channel: "Cash", nation: "" });
+const blankSale = (date: string): SaleState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, payment_channel: "", nation: "" });
 const blankCust = (date: string): CustState => ({ cust_date: date, customers: 0, thai: 0, foreign: 0, sell_amount: 0 });
 
 // payment channels — values match the existing sales data so the dashboard groups correctly
@@ -159,6 +159,17 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
 
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
 
+  const [missing, setMissing] = useState<string[]>([]);
+  const clearMiss = (f: string) => setMissing((m) => m.filter((x) => x !== f));
+  const handleSave = () => {
+    const m: string[] = [];
+    if (!String(state.payment_channel || "").trim()) m.push("ช่องทางชำระ");
+    if (!String(state.nation || "").trim()) m.push("สัญชาติลูกค้า");
+    setMissing(m);
+    if (m.length === 0) onSave();
+  };
+  const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-red-400 border-red-400" : "");
+
   return (
     <div className="card p-5 mb-4">
       <div className="flex items-center justify-between mb-4">
@@ -192,13 +203,14 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
 
       {/* 4 — payment (dropdown) + customer + receipt */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-        <Field label="ช่องทางชำระ">
-          <select className={inp} value={state.payment_channel} onChange={(e) => s("payment_channel", e.target.value)}>
+        <Field label="ช่องทางชำระ *">
+          <select className={inp + errRing("ช่องทางชำระ")} value={state.payment_channel} onChange={(e) => { s("payment_channel", e.target.value); clearMiss("ช่องทางชำระ"); }}>
+            <option value="">- เลือกช่องทางชำระ -</option>
             {!payKnown && state.payment_channel && <option value={state.payment_channel}>{state.payment_channel}</option>}
             {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
           </select>
         </Field>
-        <Field label="สัญชาติลูกค้า"><select className={inp} value={state.nation} onChange={(e) => s("nation", e.target.value)}><option value="">- ไม่ระบุ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
+        <Field label="สัญชาติลูกค้า *"><select className={inp + errRing("สัญชาติลูกค้า")} value={state.nation} onChange={(e) => { s("nation", e.target.value); clearMiss("สัญชาติลูกค้า"); }}><option value="">- เลือกสัญชาติ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
       </div>
 
@@ -210,11 +222,16 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       </div>
 
       {/* 6 — summary + actions, at the very bottom */}
+      {missing.length > 0 && (
+        <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">
+          กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="text-sm text-muted">รวมทั้งสิ้น <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => setState(null)} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={onSave} disabled={pending || !state.item} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "ส่งให้ตรวจสอบ"}</button>
+          <button onClick={handleSave} disabled={pending || !state.item} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "ส่งให้ตรวจสอบ"}</button>
         </div>
       </div>
 

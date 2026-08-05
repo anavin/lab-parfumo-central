@@ -10,11 +10,18 @@ import { requireUser, requireAdmin } from "@/lib/auth/require-user";
 // Staff entries land in `submissions` (status='pending'). Nothing touches the
 // live sales/daily_customers tables until an admin approves.
 
+// Shared required-field guard for staff sale entry.
+function requireSaleFields(d: { payment_channel?: string; nation?: string }) {
+  if (!d.payment_channel?.trim()) throw new Error("กรุณาเลือกช่องทางชำระ");
+  if (!d.nation?.trim()) throw new Error("กรุณาเลือกสัญชาติลูกค้า");
+}
+
 export async function submitSale(input: unknown) {
   const user = await requireUser();
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
+  requireSaleFields(d);
   const total = d.qty * (d.unit_price ?? 0) - (d.discount ?? 0);
   const [row] = await q<{ id: number }>(
     `insert into submissions
@@ -62,6 +69,7 @@ export async function updateMySale(id: number, input: unknown) {
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
+  requireSaleFields(d);
   const total = d.qty * (d.unit_price ?? 0) - (d.discount ?? 0);
   await q(
     `update submissions set
