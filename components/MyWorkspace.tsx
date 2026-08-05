@@ -74,7 +74,12 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
     } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
   });
 
-  const editRow = (r: SubmissionRow) => { setBill(null); setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" }); };
+  const editRow = (r: SubmissionRow) => {
+    setBill(null);
+    setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" });
+    // jump up to the edit form once it has rendered (reliable on mobile)
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
 
   // group today's entries into bills (items that share a receipt/bill ref)
   const bills: { key: string; rows: SubmissionRow[] }[] = [];
