@@ -106,11 +106,11 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
       <div ref={formRef} className="scroll-mt-16" />
 
       {!busy && (
-        <div className="flex gap-2.5 flex-wrap mb-4">
-          <button onClick={startScan} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-brand text-white text-base font-semibold shadow-sm hover:bg-brand-dark active:scale-[.99] transition">
+        <div className="flex gap-2.5 mb-4">
+          <button onClick={startScan} className="flex-[2] inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-brand text-white text-base font-semibold shadow-sm hover:bg-brand-dark active:scale-[.99] transition">
             <ScanLine className="w-5 h-5" /> สแกนบาร์โค้ด
           </button>
-          <button onClick={startManual} className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-white text-sm font-medium hover:bg-canvas">
+          <button onClick={startManual} className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl border border-line bg-white text-sm font-medium hover:bg-canvas active:scale-[.99] transition">
             <Plus className="w-4 h-4" /> เพิ่มเอง
           </button>
         </div>
