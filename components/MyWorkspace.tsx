@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, Clock, XCircle, ScanLine, Minus } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus } from "lucide-react";
 import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -74,6 +74,17 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
     } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
   });
 
+  const editRow = (r: SubmissionRow) => { setBill(null); setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" }); };
+
+  // group today's entries into bills (items that share a receipt/bill ref)
+  const bills: { key: string; rows: SubmissionRow[] }[] = [];
+  for (const r of rows) {
+    const key = r.receipt_no || `id:${r.id}`;
+    let g = bills.find((b) => b.key === key);
+    if (!g) { g = { key, rows: [] }; bills.push(g); }
+    g.rows.push(r);
+  }
+
   const busy = bill !== null || edit !== null;
 
   return (
@@ -105,19 +116,15 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
       {/* list */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-line flex items-center justify-between">
-          <span className="text-sm font-semibold text-ink">รายการที่กรอกวันนี้</span>
-          <span className="text-xs text-muted">{rows.length} รายการ</span>
+          <span className="text-sm font-semibold text-ink">บิลวันนี้</span>
+          <span className="text-xs text-muted">{bills.length} บิล</span>
         </div>
-        {rows.length === 0 ? (
+        {bills.length === 0 ? (
           <div className="px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
         ) : (
-          <ul className="divide-y divide-line">
-            {rows.map((r) => (
-              <SubmissionItem key={r.id} r={r} pending={pending}
-                onEdit={() => { setBill(null); setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" }); }}
-                onDelete={() => setDel(r)} />
-            ))}
-          </ul>
+          <div className="divide-y divide-line">
+            {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending} onEdit={editRow} onDelete={setDel} />)}
+          </div>
         )}
       </div>
 
@@ -252,7 +259,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         </div>
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">ส่งให้ตรวจสอบ</button>
+          <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
         </div>
       </div>
 
@@ -269,6 +276,13 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0, dc = Number(it.discount) || 0;
   const line = q * up - dc;
   const fld = "w-full border border-line rounded-lg px-1.5 py-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
+  // numeric field: select-all on focus + strip leading zeros so a leading 0 disappears when typing
+  const numAttrs = (k: "qty" | "unit_price" | "discount") => ({
+    value: it[k] as any,
+    inputMode: "numeric" as const,
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange({ [k]: e.target.value.replace(/^0+(?=\d)/, "") }),
+  });
   const Cell = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div><span className="block text-[10px] text-muted text-center mb-0.5">{label}</span>{children}</div>
   );
@@ -291,12 +305,12 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
         <Cell label="จำนวน">
           <div className="flex items-stretch rounded-lg border border-line overflow-hidden">
             <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-7 flex items-center justify-center text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input inputMode="numeric" className="w-full min-w-0 text-center text-sm py-1.5 tabular-nums outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
+            <input {...numAttrs("qty")} className="w-full min-w-0 text-center text-sm py-1.5 tabular-nums outline-none" />
             <button onClick={() => onChange({ qty: q + 1 })} className="w-7 flex items-center justify-center text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
         </Cell>
-        <Cell label="ราคา"><input inputMode="numeric" className={fld} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} /></Cell>
-        <Cell label="ส่วนลด"><input inputMode="numeric" className={fld} value={it.discount} onChange={(e) => onChange({ discount: e.target.value })} /></Cell>
+        <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
+        <Cell label="ส่วนลด"><input {...numAttrs("discount")} className={fld} /></Cell>
       </div>
       <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">รวม <b className="text-ink text-base">{baht(line)}</b></div>
     </div>
@@ -307,35 +321,46 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
 function StatusPill({ status }: { status: string }) {
   if (status === "approved") return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700"><Check className="w-3 h-3" /> เข้าระบบแล้ว</span>;
   if (status === "rejected") return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700"><XCircle className="w-3 h-3" /> ตีกลับ</span>;
-  return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><Clock className="w-3 h-3" /> รอตรวจ</span>;
+  return null; // pending — not shown
 }
 
-function SubmissionItem({ r, onEdit, onDelete, pending }: { r: SubmissionRow; onEdit: () => void; onDelete: () => void; pending: boolean }) {
-  const editable = r.status === "pending";
-  const realReceipt = r.receipt_no && !/^B[0-9A-Z]+$/.test(r.receipt_no) ? r.receipt_no : null; // hide generated bill refs
+// one bill = the item lines a customer bought together
+function BillGroupCard({ index, rows, onEdit, onDelete, pending }: { index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; pending: boolean }) {
+  const first = rows[0];
+  const total = rows.reduce((s, r) => s + (r.total ?? 0), 0);
+  const status = rows.every((r) => r.status === "approved") ? "approved" : rows.some((r) => r.status === "rejected") ? "rejected" : "pending";
+  const note = rows.find((r) => r.status === "rejected" && r.review_note)?.review_note;
   return (
-    <li className="px-4 py-3 flex items-start gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-ink truncate">{r.item} <span className="text-muted font-normal">{r.size}</span></div>
-        <div className="text-xs text-muted mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-          <span>{num(r.qty ?? 0)} ชิ้น · {baht(r.total ?? 0)}</span>
-          {r.sale_time && <span>{r.sale_time.slice(0, 5)}</span>}
-          {r.payment_channel && <span>{r.payment_channel}</span>}
-          {r.nation && <span>{r.nation === "Foreign" ? "ต่างชาติ" : r.nation === "Thai" ? "ไทย" : r.nation}</span>}
-          {realReceipt && <span>#{realReceipt}</span>}
+    <div className="px-4 py-3">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="text-xs text-muted flex flex-wrap items-center gap-x-2">
+          <span className="font-semibold text-ink/70">บิล #{index}</span>
+          {first.sale_time && <span>· {first.sale_time.slice(0, 5)}</span>}
+          {first.payment_channel && <span>· {first.payment_channel}</span>}
+          {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
         </div>
-        {r.status === "rejected" && r.review_note && <div className="text-xs text-red-600 mt-1">เหตุผล: {r.review_note}</div>}
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusPill status={status} />
+          <span className="text-sm font-bold text-ink">{baht(total)}</span>
+        </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <StatusPill status={r.status} />
-        {editable && (
-          <>
-            <button onClick={onEdit} disabled={pending} className="p-1.5 rounded-lg text-muted hover:bg-canvas hover:text-ink disabled:opacity-50" aria-label="แก้ไข"><Pencil className="w-4 h-4" /></button>
-            <button onClick={onDelete} disabled={pending} className="p-1.5 rounded-lg text-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-50" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
-          </>
-        )}
-      </div>
-    </li>
+      <ul className="space-y-1">
+        {rows.map((r) => (
+          <li key={r.id} className="flex items-center gap-2 text-sm">
+            <span className="text-muted text-xs w-7 shrink-0 text-right">{num(r.qty ?? 0)}×</span>
+            <span className="flex-1 min-w-0 truncate text-ink">{r.item} <span className="text-muted text-xs">{r.size}</span></span>
+            <span className="text-ink whitespace-nowrap tabular-nums">{baht(r.total ?? 0)}</span>
+            {r.status === "pending" && (
+              <span className="flex items-center shrink-0">
+                <button onClick={() => onEdit(r)} disabled={pending} className="p-1 rounded text-muted hover:text-ink disabled:opacity-50" aria-label="แก้ไข"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => onDelete(r)} disabled={pending} className="p-1 rounded text-muted hover:text-red-600 disabled:opacity-50" aria-label="ลบ"><Trash2 className="w-3.5 h-3.5" /></button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {note && <div className="text-xs text-red-600 mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
+    </div>
   );
 }
 
