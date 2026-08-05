@@ -49,6 +49,7 @@ export const returnSchema = z.object({
 
 export const saleSchema = z.object({
   sale_date: dateStr,
+  sale_time: z.string().trim().max(8).optional(),   // 'HH:MM' from the entry form
   source: z.string().trim().max(40).default("CTW"),
   ba: z.string().trim().max(120).optional(),
   receipt_no: z.string().trim().max(60).optional(),

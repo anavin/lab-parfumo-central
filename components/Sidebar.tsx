@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import type { User } from "@/lib/auth/constants";
 
-type Item = { href: string; label: string; icon: any };
-const GROUPS: { title: string; items: Item[]; adminOnly?: boolean }[] = [
+type Item = { href: string; label: string; icon: any; badge?: number };
+type Group = { title: string; items: Item[] };
+
+const ADMIN_GROUPS = (pending: number): Group[] => [
   { title: "ภาพรวม", items: [{ href: "/", label: "แดชบอร์ด", icon: LayoutDashboard }] },
   { title: "ปฏิบัติการ", items: [
     { href: "/requisitions", label: "ใบเบิกสินค้า", icon: ClipboardList },
@@ -22,16 +24,22 @@ const GROUPS: { title: string; items: Item[]; adminOnly?: boolean }[] = [
     { href: "/products", label: "สินค้า", icon: FlaskConical },
     { href: "/cash", label: "เงินสด", icon: Wallet },
   ]},
-  { title: "ผู้ดูแล", adminOnly: true, items: [
+  { title: "ผู้ดูแล", items: [
+    { href: "/review", label: "ตรวจสอบยอดขาย", icon: ClipboardCheck, badge: pending },
     { href: "/users", label: "จัดการผู้ใช้", icon: Users },
     { href: "/audit", label: "บันทึกกิจกรรม", icon: ScrollText },
     { href: "/trash", label: "ถังขยะ", icon: Trash2 },
   ]},
 ];
 
-export function Sidebar({ user }: { user: User }) {
+const STAFF_GROUPS: Group[] = [
+  { title: "พนักงานขาย", items: [{ href: "/my", label: "ยอดขายของฉัน", icon: Store }] },
+];
+
+export function Sidebar({ user, pending = 0 }: { user: User; pending?: number }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const groups = user.role === "admin" ? ADMIN_GROUPS(pending) : STAFF_GROUPS;
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
   // close the mobile drawer whenever the route changes
@@ -60,7 +68,7 @@ export function Sidebar({ user }: { user: User }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
-        {GROUPS.filter((g) => !g.adminOnly || user.role === "admin").map((g) => (
+        {groups.map((g) => (
           <div key={g.title}>
             <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">{g.title}</div>
             <div className="space-y-0.5">
@@ -73,7 +81,9 @@ export function Sidebar({ user }: { user: User }) {
                       on ? "bg-white/[0.09] text-white font-medium" : "text-white/70 hover:bg-white/[0.05] hover:text-white"}`}>
                     <Icon className={`w-[18px] h-[18px] ${on ? "text-brand" : "text-white/45 group-hover:text-white/70"}`} strokeWidth={2} />
                     <span>{n.label}</span>
-                    {on && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand" />}
+                    {n.badge ? (
+                      <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">{n.badge}</span>
+                    ) : on ? <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand" /> : null}
                   </Link>
                 );
               })}

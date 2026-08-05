@@ -227,3 +227,48 @@ create index if not exists idx_audit_user on audit_log (user_name);
 alter table purchase_orders add column if not exists deleted_at timestamptz;
 create index if not exists idx_po_deleted on purchase_orders (deleted_at);
 
+-- ============================================================================
+-- Staff sales entry + admin review queue (migration 0004)
+-- ============================================================================
+alter table sales           add column if not exists created_by bigint references users(id);
+alter table daily_customers add column if not exists created_by bigint references users(id);
+create index if not exists idx_sales_created_by on sales (created_by);
+create index if not exists idx_dc_created_by    on daily_customers (created_by);
+
+create table if not exists submissions (
+  id               bigint generated always as identity primary key,
+  kind             text   not null,                     -- 'sale' | 'customer'
+  status           text   not null default 'pending',   -- pending | approved | rejected
+  created_by       bigint not null references users(id),
+  ba               text,
+  entry_date       date   not null,
+  source           text,
+  sale_time        time,
+  receipt_no       text,
+  item             text,
+  barcode          text,
+  product_id       bigint references products(id),
+  grade            text,
+  size             text,
+  qty              numeric(12,2) default 0,
+  unit_price       numeric(12,2),
+  discount         numeric(12,2) default 0,
+  total            numeric(12,2),
+  payment_channel  text,
+  nation           text,
+  note             text,
+  customers        int,
+  thai             numeric(12,2),
+  foreign_cnt      numeric(12,2),
+  sell_amount      numeric(12,2),
+  reviewed_by      bigint references users(id),
+  reviewed_at      timestamptz,
+  review_note      text,
+  approved_id      bigint,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now()
+);
+create index if not exists idx_sub_status  on submissions (status);
+create index if not exists idx_sub_creator on submissions (created_by, entry_date);
+create index if not exists idx_sub_pending on submissions (status, created_at);
+

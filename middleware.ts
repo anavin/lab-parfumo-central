@@ -16,7 +16,11 @@ export function middleware(req: NextRequest) {
     if (pathname !== "/") url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
-  return NextResponse.next();
+  // expose the path to the (app) layout so it can enforce role-based access
+  // (role needs a DB lookup, which the Edge runtime can't do here).
+  const headers = new Headers(req.headers);
+  headers.set("x-pathname", pathname);
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {

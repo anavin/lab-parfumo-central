@@ -1,8 +1,8 @@
 import { q } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 
-export type AuditAction = "create" | "update" | "delete" | "restore" | "purge" | "login" | "logout" | "login_failed" | "password";
-export type AuditEntity = "requisition" | "sale" | "cash" | "customer" | "shipment" | "return" | "user" | "auth";
+export type AuditAction = "create" | "update" | "delete" | "restore" | "purge" | "login" | "logout" | "login_failed" | "password" | "submit" | "approve" | "reject";
+export type AuditEntity = "requisition" | "sale" | "cash" | "customer" | "shipment" | "return" | "user" | "auth" | "submission";
 
 type Actor = { id?: number | null; username?: string; role?: string; full_name?: string };
 

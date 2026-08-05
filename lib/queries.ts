@@ -231,3 +231,103 @@ export function shipmentSummary() {
     from shipment_items where po_number is not null
     group by po_number order by max(ship_date) desc nulls last, po_number desc`);
 }
+
+// ============================================================================
+// Staff sales entry + admin review queue
+// ============================================================================
+
+export type SubmissionRow = {
+  id: number; kind: "sale" | "customer"; status: string;
+  created_by: number; author: string; ba: string; entry_date: string;
+  source: string | null; sale_time: string | null; receipt_no: string | null;
+  item: string | null; barcode: string | null; size: string | null;
+  qty: number | null; unit_price: number | null; discount: number | null;
+  total: number | null; payment_channel: string | null; nation: string | null;
+  customers: number | null; thai: number | null; foreign_cnt: number | null; sell_amount: number | null;
+  review_note: string | null; reviewer: string | null; reviewed_at: string | null;
+  created_at: string;
+};
+
+const SUB_COLS = `
+  s.id, s.kind, s.status, s.created_by, u.full_name author, s.ba, s.entry_date,
+  s.source, s.sale_time::text sale_time, s.receipt_no, s.item, s.barcode, s.size,
+  s.qty::float qty, s.unit_price::float unit_price, s.discount::float discount, s.total::float total,
+  s.payment_channel, s.nation, s.customers, s.thai::float thai, s.foreign_cnt::float foreign_cnt,
+  s.sell_amount::float sell_amount, s.review_note, r.full_name reviewer, s.reviewed_at, s.created_at`;
+
+/** Pending queue for the admin review page (oldest first = FIFO). */
+export function pendingSubmissions() {
+  return q<SubmissionRow>(`
+    select ${SUB_COLS}
+    from submissions s
+    join users u on u.id = s.created_by
+    left join users r on r.id = s.reviewed_by
+    where s.status = 'pending'
+    order by s.created_by, s.entry_date, s.created_at`);
+}
+
+/** Count of pending items — drives the sidebar badge. */
+export function pendingCount() {
+  return q<{ n: number }>(`select count(*)::int n from submissions where status='pending'`).then((r) => r[0].n);
+}
+
+/** One staff member's submissions for a given day (all statuses). */
+export function mySubmissions(userId: number, date: string) {
+  return q<SubmissionRow>(`
+    select ${SUB_COLS}
+    from submissions s
+    join users u on u.id = s.created_by
+    left join users r on r.id = s.reviewed_by
+    where s.created_by = $1 and s.entry_date = $2
+    order by s.created_at desc`, [userId, date]);
+}
+
+/** Personal daily KPIs for a staff member — counts pending + approved (i.e.
+ * everything they entered that has not been rejected), so their view reflects
+ * their own work regardless of review state. */
+export async function myDayKpis(userId: number, date: string) {
+  const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number }>(`
+    select coalesce(sum(total),0)::float revenue,
+           coalesce(sum(qty),0)::float qty,
+           count(distinct receipt_no)::int bills,
+           count(*) filter (where status='pending')::int pending
+    from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2`,
+    [userId, date]);
+  const [cust] = await q<{ customers: number }>(`
+    select coalesce(sum(customers),0)::int customers
+    from submissions where kind='customer' and status<>'rejected' and created_by=$1 and entry_date=$2`,
+    [userId, date]);
+  const aov = sale.bills ? sale.revenue / sale.bills : 0;
+  return { revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: cust.customers, aov };
+}
+
+/** Last `days` days of a staff member's own revenue (for the mini trend). */
+export function myTrend(userId: number, days = 14) {
+  return q<{ d: string; revenue: number }>(`
+    select entry_date::text as d, coalesce(sum(total),0)::float revenue
+    from submissions
+    where kind='sale' and status<>'rejected' and created_by=$1
+      and entry_date >= (current_date - ($2::int - 1))
+    group by entry_date order by entry_date`, [userId, days]);
+}
+
+/** Days a staff member has any submission — for the day switcher. */
+export function myEntryDays(userId: number, limit = 30) {
+  return q<{ d: string; n: number; pending: number }>(`
+    select entry_date::text as d, count(*)::int n,
+           count(*) filter (where status='pending')::int pending
+    from submissions where created_by=$1
+    group by entry_date order by entry_date desc limit $2`, [userId, limit]);
+}
+
+/** Dashboard: revenue/bills/qty broken down by salesperson (live sales). */
+export function salesByPerson(f: Filter = ALL) {
+  return q<{ person: string; revenue: number; qty: number; bills: number }>(`
+    select coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ') person,
+           sum(s.total)::float revenue, sum(s.qty)::float qty,
+           count(distinct s.receipt_no)::int bills
+    from sales s left join users u on u.id = s.created_by
+    where ${SWs}
+    group by coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ')
+    order by revenue desc`, [f.months, f.source]);
+}
