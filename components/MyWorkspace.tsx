@@ -51,6 +51,15 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
   const formRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
+  // In production a server action's error is a generic "Server Components render"
+  // message with a digest — usually a transient revalidation/render blip AFTER
+  // the write already succeeded. Recover quietly (close + refresh) instead of a
+  // scary alert; only show real (client-visible) messages.
+  const onActionError = (e: any, close?: () => void) => {
+    console.error("[action]", e?.digest, e?.message, e);
+    if (e?.digest || /Server Components render/i.test(String(e?.message || ""))) { close?.(); refresh(); }
+    else alert(e?.message ?? "ทำรายการไม่สำเร็จ");
+  };
 
   const startScan = () => { setEdit(null); setAutoScan(true); setBill(blankBill(date, false)); };
   const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(date, true)); };
@@ -71,7 +80,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
         items,
       });
       setBill(null); refresh();
-    } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
+    } catch (e: any) { onActionError(e, () => setBill(null)); }
   });
 
   const editRow = (r: SubmissionRow) => {
@@ -115,7 +124,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
           try {
             await updateMySale(edit.id, { ...edit, qty: Number(edit.qty), unit_price: Number(edit.unit_price), discount: Number(edit.discount) });
             setEdit(null); refresh();
-          } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
+          } catch (e: any) { onActionError(e, () => setEdit(null)); }
         })} />}
 
       {/* list */}
@@ -136,7 +145,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
       <ConfirmDialog open={!!del} title="ลบรายการนี้?" danger confirmLabel="ลบ" pending={pending}
         message={del ? `${del.item}${del.size ? ` ${del.size}` : ""}` : ""}
         onCancel={() => setDel(null)}
-        onConfirm={() => { const id = del?.id; setDel(null); if (id != null) start(async () => { try { await deleteMySubmission(id); refresh(); } catch (e: any) { alert(e?.message ?? "ลบไม่สำเร็จ"); } }); }} />
+        onConfirm={() => { const id = del?.id; setDel(null); if (id != null) start(async () => { try { await deleteMySubmission(id); refresh(); } catch (e: any) { onActionError(e); } }); }} />
     </div>
   );
 }
