@@ -25,12 +25,15 @@ export async function signIn(_prev: unknown, formData: FormData) {
   const token = await createSession(res.user.id);
   await setSessionCookie(token);
   await logAudit("login", "auth", res.user.username, "เข้าสู่ระบบ", res.user);
-  // Return success and let the client do a full navigation (window.location).
-  // A server-action redirect() does a soft navigation that can render blank
-  // right after the session cookie is set (esp. with the staff -> /my layout
-  // redirect), forcing a manual refresh. A full load always renders with the
-  // new cookie.
-  return { ok: true as const, next: next.startsWith("/") ? next : "/" };
+  // Return success and let the client do a full navigation (window.location) so
+  // the page always renders with the new cookie (a server-action redirect()'s
+  // soft navigation can render blank right after login). Also resolve the FINAL
+  // destination here by role, so staff go straight to /my instead of hitting "/"
+  // and bouncing through the layout's staff -> /my redirect (that extra hop is
+  // what left staff on a blank page needing a manual refresh).
+  let dest = next.startsWith("/") ? next : "/";
+  if (res.user.role !== "admin" && !(dest === "/my" || dest.startsWith("/my/"))) dest = "/my";
+  return { ok: true as const, next: dest };
 }
 
 export async function signOut() {
