@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
 
-// Cost factor 14 ≈ 1s/hash (matches lab-parfumo-next).
-const BCRYPT_ROUNDS = 14;
+// Cost factor 12 ≈ ~0.25s/hash — strong enough for an internal tool, and ~4×
+// faster to verify than 14 (login latency matters on serverless).
+const BCRYPT_ROUNDS = 12;
 
 export async function hashBcrypt(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);

@@ -17,7 +17,7 @@ export default async function CashPage() {
     from cash_entries group by 1 order by total desc`);
 
   return (
-    <div className="p-8 max-w-[1000px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1000px] mx-auto">
       <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" />
       <AddCash />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

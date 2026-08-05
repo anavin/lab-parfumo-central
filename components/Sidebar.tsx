@@ -1,9 +1,10 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2,
+  ScrollText, Trash2, Menu, X,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import type { User } from "@/lib/auth/constants";
@@ -30,16 +31,32 @@ const GROUPS: { title: string; items: Item[]; adminOnly?: boolean }[] = [
 
 export function Sidebar({ user }: { user: User }) {
   const path = usePathname();
+  const [open, setOpen] = useState(false);
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
-  return (
-    <aside className="no-print w-60 shrink-0 bg-nav text-white/85 flex flex-col sticky top-0 h-screen">
+  // close the mobile drawer whenever the route changes
+  useEffect(() => { setOpen(false); }, [path]);
+  // lock body scroll while the drawer is open
+  useEffect(() => {
+    if (open) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [open]);
+
+  const Panel = (
+    <>
       <div className="px-5 py-5 flex items-center gap-3 border-b border-white/[0.07]">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white font-bold shadow-sm">LP</div>
-        <div>
+        <div className="min-w-0">
           <div className="text-[15px] font-semibold text-white leading-tight">Lab Parfumo</div>
           <div className="text-[11px] text-brand">centralwOrld</div>
         </div>
+        <button onClick={() => setOpen(false)}
+          className="lg:hidden ml-auto -mr-1 p-1.5 rounded-lg text-white/60 hover:bg-white/[0.06] hover:text-white" aria-label="ปิดเมนู">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
@@ -72,7 +89,7 @@ export function Sidebar({ user }: { user: User }) {
           </div>
           <div className="min-w-0">
             <div className="text-[13px] text-white font-medium truncate">{user.full_name}</div>
-            <div className="text-[10.5px] text-white/40">{user.role === "admin" ? "ผู้ดูแลระบบ" : "พนักงาน"} · @{user.username}</div>
+            <div className="text-[10.5px] text-white/40 truncate">{user.role === "admin" ? "ผู้ดูแลระบบ" : "พนักงาน"} · @{user.username}</div>
           </div>
         </div>
         <form action={signOut}>
@@ -81,6 +98,33 @@ export function Sidebar({ user }: { user: User }) {
           </button>
         </form>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <header className="no-print lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-nav text-white flex items-center gap-3 px-4 shadow-sm">
+        <button onClick={() => setOpen(true)} className="-ml-1 p-1.5 rounded-lg text-white/80 hover:bg-white/[0.08]" aria-label="เปิดเมนู">
+          <Menu className="w-6 h-6" />
+        </button>
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white text-[12px] font-bold">LP</div>
+        <span className="text-[15px] font-semibold">Lab Parfumo</span>
+      </header>
+
+      {/* Mobile drawer + backdrop */}
+      <div className={`no-print lg:hidden fixed inset-0 z-50 ${open ? "" : "pointer-events-none"}`}>
+        <div onClick={() => setOpen(false)}
+          className={`absolute inset-0 bg-black/50 transition-opacity ${open ? "opacity-100" : "opacity-0"}`} />
+        <aside className={`absolute left-0 top-0 h-full w-64 max-w-[82%] bg-nav text-white/85 flex flex-col shadow-xl transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+          {Panel}
+        </aside>
+      </div>
+
+      {/* Desktop static sidebar */}
+      <aside className="no-print hidden lg:flex w-60 shrink-0 bg-nav text-white/85 flex-col sticky top-0 h-screen">
+        {Panel}
+      </aside>
+    </>
   );
 }

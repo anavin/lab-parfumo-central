@@ -12,7 +12,7 @@ export default async function UsersPage() {
     `select id, username, full_name, role, is_active, last_login_at from users order by role, username`);
 
   return (
-    <div className="p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
       <PageHeader icon={Users} title="จัดการผู้ใช้" subtitle={`${users.length} บัญชี · เฉพาะผู้ดูแลระบบ`} />
       <Card bodyClass="p-0">
         <UsersManager users={users} meId={me.id} />

@@ -1,6 +1,8 @@
-import { PGlite } from "@electric-sql/pglite";
+import type { PGlite } from "@electric-sql/pglite";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+// PGlite is imported dynamically inside init() so the Supabase (pg) path on
+// Vercel never bundles/loads its WASM — smaller function, faster cold start.
 
 // Local dev uses an embedded Postgres (PGlite) persisted to ./.pgdata.
 // To move to Supabase later: run migrations/0001_init.sql there, seed once,
@@ -168,6 +170,7 @@ async function ensureAdmin(db: PGlite) {
 }
 
 async function init(): Promise<PGlite> {
+  const { PGlite } = await import("@electric-sql/pglite");
   const db = new PGlite(DATA_DIR);
   await db.waitReady;
   await migrate(db);

@@ -28,7 +28,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
 
   return (
-    <div className="p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
       <div className="no-print flex items-center justify-between mb-5">
         <Link href="/requisitions" className="text-sm text-black/50 hover:text-ink">← กลับ</Link>
         <div className="flex gap-2 items-center">

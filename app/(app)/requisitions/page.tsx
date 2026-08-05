@@ -28,11 +28,12 @@ export default async function Requisitions() {
     order by po.order_date desc nulls last, po.po_number desc`);
 
   return (
-    <div className="p-8 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <PageHeader icon={ClipboardList} title="ใบเบิกสินค้า" subtitle={`${rows.length} รายการ`}
         action={<LinkBtn href="/requisitions/new">+ สร้างใบเบิกใหม่</LinkBtn>} />
       <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-canvas border-b border-line">
             <tr>
               <th className="th px-4 py-3">PO Number</th>
@@ -62,6 +63,7 @@ export default async function Requisitions() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

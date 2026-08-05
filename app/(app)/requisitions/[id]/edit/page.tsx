@@ -16,7 +16,7 @@ export default async function EditRequisition({ params }: { params: Promise<{ id
   const branches = await listBranches();
 
   return (
-    <div className="p-8 max-w-[1000px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1000px] mx-auto">
       <PageHeader title={`แก้ไขใบเบิก ${po.po_number}`} subtitle={po.version ?? ""} />
       <RequisitionForm
         branches={branches}

@@ -15,7 +15,7 @@ export default async function ProductsPage() {
     `select count(*)::int n, count(distinct grade)::int grades from products`);
 
   return (
-    <div className="p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
       <PageHeader icon={FlaskConical} title="สินค้า" subtitle="มาสเตอร์สินค้าจาก Main Data Base" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Stat label="จำนวนสินค้า" value={num(agg.n)} tone="brand" />

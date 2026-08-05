@@ -13,7 +13,7 @@ if (!pw || pw.length < 8) {
   console.error("  ADMIN_PASSWORD='YourStrongPass1' node scripts/gen-admin-sql.mts admin");
   process.exit(1);
 }
-const hash = await bcrypt.hash(pw, 14);
+const hash = await bcrypt.hash(pw, 12);
 const esc = (s: string) => s.replace(/'/g, "''");
 console.log(
   `insert into users (username, password_hash, full_name, role)\n` +

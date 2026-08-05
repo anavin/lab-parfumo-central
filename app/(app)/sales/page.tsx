@@ -20,7 +20,7 @@ export default async function SalesPage() {
     `select coalesce(sum(total),0)::float revenue, coalesce(sum(qty),0)::float qty from sales`);
 
   return (
-    <div className="p-8 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <PageHeader icon={Receipt} title="การขาย" subtitle="รายเดือน + รายการล่าสุด" />
       <div className="flex gap-3 flex-wrap"><AddSale /><AddCustomerDay /></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

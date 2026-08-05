@@ -10,7 +10,7 @@ export default async function TrashPage() {
   await requireAdmin();
   const rows = await trashedRequisitions();
   return (
-    <div className="p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
       <PageHeader icon={Trash2} title="ถังขยะ" subtitle={`ใบเบิกที่ถูกลบ ${rows.length} รายการ · กู้คืนหรือลบถาวรได้`} />
       <Card bodyClass="p-0">
         <TrashManager rows={rows} />
