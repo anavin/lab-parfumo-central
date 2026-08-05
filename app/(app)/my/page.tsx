@@ -29,6 +29,12 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       <PageHeader icon={Store} title="ยอดขายของฉัน" subtitle={`สวัสดี ${user.full_name} · ${thaiDay(date)}`}
         action={<DateNav date={date} today={today} />} />
 
+      {/* data entry first */}
+      <MyWorkspace date={date} fullName={user.full_name} rows={rows} />
+
+      {/* daily summary — below the entry */}
+      <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>
+
       {kpi.pending > 0 && (
         <div className="mb-4 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2.5">
           มี <b>{kpi.pending}</b> รายการรอผู้ดูแลตรวจสอบ — จะขึ้นแดชบอร์ดรวมหลังได้รับอนุมัติ
@@ -42,8 +48,6 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <Stat label="ลูกค้า" value={num(kpi.customers)} sub="ราย" />
         <Stat label="เฉลี่ย/บิล" value={baht(kpi.aov)} />
       </div>
-
-      <MyWorkspace date={date} fullName={user.full_name} rows={rows} />
 
       <Card title="ยอดขายของฉัน 14 วันล่าสุด">
         {trend.every((t) => t.revenue === 0) ? (

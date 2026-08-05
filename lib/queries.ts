@@ -295,12 +295,9 @@ export async function myDayKpis(userId: number, date: string) {
            count(*) filter (where status='pending')::int pending
     from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2`,
     [userId, date]);
-  const [cust] = await q<{ customers: number }>(`
-    select coalesce(sum(customers),0)::int customers
-    from submissions where kind='customer' and status<>'rejected' and created_by=$1 and entry_date=$2`,
-    [userId, date]);
+  // customers is derived from bills (one bill ≈ one customer) — no separate entry
   const aov = sale.bills ? sale.revenue / sale.bills : 0;
-  return { revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: cust.customers, aov };
+  return { revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: sale.bills, aov };
 }
 
 /** Last `days` days of a staff member's own revenue (for the mini trend). */

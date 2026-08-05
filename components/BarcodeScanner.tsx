@@ -1,8 +1,25 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { DecodeHintType, BarcodeFormat } from "@zxing/library";
+import { DecodeHintType, BarcodeFormat, EAN13Reader } from "@zxing/library";
 import { X, Camera } from "lucide-react";
+
+// The shop's EAN-13 labels were generated with non-standard check digits, so
+// ZXing's strict checksum rejects most of them. Relax EAN/UPC checksum
+// validation (correctness is enforced afterwards by exact product lookup — a
+// misread simply won't match a product). Patches the static once.
+let checksumRelaxed = false;
+function relaxUpcEanChecksum() {
+  if (checksumRelaxed) return;
+  checksumRelaxed = true;
+  const yes = () => true;
+  let C: any = EAN13Reader;
+  for (let depth = 0; C && depth < 8; depth++) {
+    if (Object.prototype.hasOwnProperty.call(C, "checkChecksum")) C.checkChecksum = yes;
+    if (Object.prototype.hasOwnProperty.call(C, "checkStandardUPCEANChecksum")) C.checkStandardUPCEANChecksum = yes;
+    C = Object.getPrototypeOf(C);
+  }
+}
 
 // Camera barcode scanner. Uses ZXing (works on iOS Safari + Android Chrome),
 // prefers the rear camera, and calls onDetected once with the decoded string.
@@ -12,6 +29,7 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
   const doneRef = useRef(false);
 
   useEffect(() => {
+    relaxUpcEanChecksum();
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,

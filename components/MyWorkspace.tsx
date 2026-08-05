@@ -1,9 +1,9 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, Clock, XCircle, Users, ScanLine } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, Clock, XCircle, ScanLine } from "lucide-react";
 import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
-import { submitSale, submitCustomerDay, updateMySale, updateMyCustomerDay, deleteMySubmission } from "@/lib/actions/submissions";
+import { submitSale, updateMySale, deleteMySubmission } from "@/lib/actions/submissions";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow } from "@/lib/queries";
@@ -16,10 +16,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 type SaleState = { id?: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
-type CustState = { id?: number; cust_date: string; customers: any; thai: any; foreign: any; sell_amount: any };
 
 const blankSale = (date: string): SaleState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, payment_channel: "", nation: "" });
-const blankCust = (date: string): CustState => ({ cust_date: date, customers: 0, thai: 0, foreign: 0, sell_amount: 0 });
 
 // payment channels — values match the existing sales data so the dashboard groups correctly
 const PAYMENTS = [
@@ -36,23 +34,45 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
   const router = useRouter();
   const [pending, start] = useTransition();
   const [sale, setSale] = useState<SaleState | null>(null);
-  const [cust, setCust] = useState<CustState | null>(null);
+  const [topScan, setTopScan] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
 
   const refresh = () => router.refresh();
 
+  // scan straight from the main view: open camera, then open the sale form
+  // pre-filled with the scanned product
+  const openScannedSale = async (code: string) => {
+    setTopScan(false);
+    const base = blankSale(date);
+    const p = await findProductByBarcode(code);
+    if (p) setSale({ ...base, item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 });
+    else { setSale({ ...base, barcode: code }); alert(`ไม่พบสินค้าบาร์โค้ดนี้ในระบบ (${code}) — กรอกกลิ่นเองได้`); }
+  };
+
+  // when the form opens (add or edit), scroll it into view so the user lands on
+  // the fields to fill/edit right away
+  useEffect(() => {
+    const open = sale !== null;
+    if (open && !wasOpen.current) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    wasOpen.current = open;
+  });
+
   return (
     <div className="mb-6">
-      {/* action buttons */}
-      {!sale && !cust && (
+      <div ref={formRef} className="scroll-mt-16" />
+      {/* action buttons — scan is the primary, fast path */}
+      {!sale && (
         <div className="flex gap-2.5 flex-wrap mb-4">
-          <button onClick={() => setSale(blankSale(date))} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark">
-            <Plus className="w-4 h-4" /> เพิ่มรายการขาย
+          <button onClick={() => setTopScan(true)} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-brand text-white text-base font-semibold shadow-sm hover:bg-brand-dark active:scale-[.99] transition">
+            <ScanLine className="w-5 h-5" /> สแกนบาร์โค้ด
           </button>
-          <button onClick={() => setCust(blankCust(date))} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-line bg-white text-sm font-medium hover:bg-canvas">
-            <Users className="w-4 h-4" /> บันทึกจำนวนลูกค้า
+          <button onClick={() => setSale(blankSale(date))} className="inline-flex items-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-white text-sm font-medium hover:bg-canvas">
+            <Plus className="w-4 h-4" /> เพิ่มเอง
           </button>
         </div>
       )}
+      {topScan && <BarcodeScanner onDetected={openScannedSale} onClose={() => setTopScan(false)} />}
 
       {sale && <SaleForm state={sale} setState={setSale} pending={pending} fullName={fullName}
         onSave={() => start(async () => {
@@ -63,15 +83,6 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
           } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
         })} />}
 
-      {cust && <CustForm state={cust} setState={setCust} pending={pending} fullName={fullName}
-        onSave={() => start(async () => {
-          try {
-            const payload = { cust_date: cust.cust_date, customers: Number(cust.customers), thai: Number(cust.thai), foreign: Number(cust.foreign), sell_amount: Number(cust.sell_amount) };
-            if (cust.id) await updateMyCustomerDay(cust.id, payload); else await submitCustomerDay(payload);
-            setCust(null); refresh();
-          } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
-        })} />}
-
       {/* list */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-line flex items-center justify-between">
@@ -79,14 +90,13 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
           <span className="text-xs text-muted">{rows.length} รายการ</span>
         </div>
         {rows.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “เพิ่มรายการขาย” เพื่อเริ่ม</div>
+          <div className="px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
         ) : (
           <ul className="divide-y divide-line">
             {rows.map((r) => (
               <SubmissionItem key={r.id} r={r} pending={pending}
                 onEdit={() => {
-                  if (r.kind === "sale") setSale({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "เงินสด", nation: r.nation || "" });
-                  else setCust({ id: r.id, cust_date: r.entry_date, customers: r.customers ?? 0, thai: r.thai ?? 0, foreign: r.foreign_cnt ?? 0, sell_amount: r.sell_amount ?? 0 });
+                  if (r.kind === "sale") setSale({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" });
                 }}
                 onDelete={() => start(async () => { try { await deleteMySubmission(r.id); refresh(); } catch (e: any) { alert(e?.message ?? "ลบไม่สำเร็จ"); } })} />
             ))}
@@ -214,9 +224,8 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
       </div>
 
-      {/* 5 — rarely-changed defaults, tucked lower */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <Field label="วันที่"><input type="date" className={inp} value={state.sale_date} onChange={(e) => s("sale_date", e.target.value)} /></Field>
+      {/* 5 — time + sale channel (date follows the selected day automatically) */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Field>
         <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
       </div>
@@ -236,30 +245,6 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       </div>
 
       {scanning && <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- customer form
-function CustForm({ state, setState, onSave, pending, fullName }: { state: CustState; setState: (s: CustState | null) => void; onSave: () => void; pending: boolean; fullName: string }) {
-  const s = (k: keyof CustState, v: any) => setState({ ...state, [k]: v });
-  return (
-    <div className="card p-5 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-ink">{state.id ? "แก้ไขจำนวนลูกค้า" : "บันทึกจำนวนลูกค้า"}</h3>
-        <span className="text-xs text-muted">ผู้กรอก: {fullName}</span>
-      </div>
-      <div className="grid md:grid-cols-5 gap-3">
-        <Field label="วันที่"><input type="date" className={inp} value={state.cust_date} onChange={(e) => s("cust_date", e.target.value)} /></Field>
-        <Field label="ลูกค้าทั้งหมด"><input type="number" min="0" className={inp} value={state.customers} onChange={(e) => s("customers", e.target.value)} /></Field>
-        <Field label="ไทย"><input type="number" min="0" className={inp} value={state.thai} onChange={(e) => s("thai", e.target.value)} /></Field>
-        <Field label="ต่างชาติ"><input type="number" min="0" className={inp} value={state.foreign} onChange={(e) => s("foreign", e.target.value)} /></Field>
-        <Field label="ยอดขาย (ถ้ามี)"><input type="number" min="0" className={inp} value={state.sell_amount} onChange={(e) => s("sell_amount", e.target.value)} /></Field>
-        <div className="md:col-span-5 flex justify-end gap-2 border-t border-line pt-3">
-          <button onClick={() => setState(null)} className="px-4 py-2 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={onSave} disabled={pending} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "ส่งให้ตรวจสอบ"}</button>
-        </div>
-      </div>
     </div>
   );
 }
