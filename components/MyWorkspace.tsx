@@ -18,8 +18,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type SaleState = { id?: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
 type CustState = { id?: number; cust_date: string; customers: any; thai: any; foreign: any; sell_amount: any };
 
-const blankSale = (date: string): SaleState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, payment_channel: "เงินสด", nation: "" });
+const blankSale = (date: string): SaleState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, payment_channel: "Cash", nation: "" });
 const blankCust = (date: string): CustState => ({ cust_date: date, customers: 0, thai: 0, foreign: 0, sell_amount: 0 });
+
+// payment channels — values match the existing sales data so the dashboard groups correctly
+const PAYMENTS = [
+  { v: "Cash", label: "เงินสด" },
+  { v: "EDC Credit Card", label: "บัตรเครดิต (EDC)" },
+  { v: "K Shop", label: "K SHOP" },
+  { v: "K Shop Credit Card", label: "K SHOP บัตรเครดิต" },
+  { v: "EDC Alipay/WeChat", label: "Alipay / WeChat" },
+  { v: "EDC Thai QR Payment", label: "Thai QR" },
+  { v: "EDC PromptCard", label: "PromptCard" },
+];
 
 export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: string; rows: SubmissionRow[] }) {
   const router = useRouter();
@@ -146,43 +157,67 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
     else { setState({ ...state, barcode: code }); alert(`ไม่พบสินค้าบาร์โค้ดนี้ในระบบ (${code}) — กรอกกลิ่นเองได้`); }
   };
 
+  const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
+
   return (
     <div className="card p-5 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-ink">{state.id ? "แก้ไขรายการขาย" : "เพิ่มรายการขาย"}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-base font-semibold text-ink">{state.id ? "แก้ไขรายการขาย" : "เพิ่มรายการขาย"}</h3>
         <span className="text-xs text-muted">ผู้กรอก: {fullName}</span>
       </div>
-      <div className="grid md:grid-cols-4 gap-3">
+
+      {/* 1 — scan first (big, on top) */}
+      <button type="button" onClick={() => setScanning(true)}
+        className="w-full mb-4 inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-brand text-white text-base font-semibold shadow-sm hover:bg-brand-dark active:scale-[.99] transition">
+        <ScanLine className="w-5 h-5" /> สแกนบาร์โค้ดสินค้า
+      </button>
+
+      {/* 2 — product (auto-filled by scan) */}
+      <div className="relative mb-3">
+        <Field label="สินค้า">
+          <input className={inp} value={state.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
+        </Field>
+        {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-white border border-line rounded-lg shadow-lg text-sm">
+          {res.map((p) => <button key={p.id} onMouseDown={() => { setState({ ...state, item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
+        </div>}
+      </div>
+
+      {/* 3 — the numbers */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <Field label="จำนวน"><input type="number" min="0" inputMode="numeric" className={inp} value={state.qty} onChange={(e) => s("qty", e.target.value)} /></Field>
+        <Field label="ราคา/หน่วย"><input type="number" min="0" inputMode="numeric" className={inp} value={state.unit_price} onChange={(e) => s("unit_price", e.target.value)} /></Field>
+        <Field label="ส่วนลด"><input type="number" min="0" inputMode="numeric" className={inp} value={state.discount} onChange={(e) => s("discount", e.target.value)} /></Field>
+        <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
+      </div>
+
+      {/* 4 — payment (dropdown) + customer + receipt */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <Field label="ช่องทางชำระ">
+          <select className={inp} value={state.payment_channel} onChange={(e) => s("payment_channel", e.target.value)}>
+            {!payKnown && state.payment_channel && <option value={state.payment_channel}>{state.payment_channel}</option>}
+            {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
+          </select>
+        </Field>
+        <Field label="สัญชาติลูกค้า"><select className={inp} value={state.nation} onChange={(e) => s("nation", e.target.value)}><option value="">- ไม่ระบุ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
+        <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
+      </div>
+
+      {/* 5 — rarely-changed defaults, tucked lower */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
         <Field label="วันที่"><input type="date" className={inp} value={state.sale_date} onChange={(e) => s("sale_date", e.target.value)} /></Field>
         <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Field>
-        <Field label="ช่องทาง"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option>CTW</option><option>EVENT_SCS</option></select></Field>
-        <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
-        <div className="md:col-span-2 relative"><Field label="สินค้า">
-          <div className="flex gap-2">
-            <input className={inp} value={state.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="ค้นหากลิ่น หรือสแกนบาร์โค้ด" />
-            <button type="button" onClick={() => setScanning(true)} title="สแกนบาร์โค้ด"
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 rounded-lg border border-line bg-white text-sm font-medium hover:bg-canvas">
-              <ScanLine className="w-4 h-4" /> สแกน
-            </button>
-          </div></Field>
-          {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-white border border-line rounded-lg shadow-lg text-sm">
-            {res.map((p) => <button key={p.id} onMouseDown={() => { setState({ ...state, item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
-          </div>}
-        </div>
-        <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
-        <Field label="สัญชาติลูกค้า"><select className={inp} value={state.nation} onChange={(e) => s("nation", e.target.value)}><option value="">- ไม่ระบุ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
-        <Field label="จำนวน"><input type="number" min="0" className={inp} value={state.qty} onChange={(e) => s("qty", e.target.value)} /></Field>
-        <Field label="ราคา/หน่วย"><input type="number" min="0" className={inp} value={state.unit_price} onChange={(e) => s("unit_price", e.target.value)} /></Field>
-        <Field label="ส่วนลด"><input type="number" min="0" className={inp} value={state.discount} onChange={(e) => s("discount", e.target.value)} /></Field>
-        <Field label="ช่องทางชำระ"><input className={inp} value={state.payment_channel} onChange={(e) => s("payment_channel", e.target.value)} /></Field>
-        <div className="md:col-span-4 flex items-center justify-between border-t border-line pt-3">
-          <span className="text-sm">รวม: <b className="text-brand-dark">{baht(total)}</b></span>
-          <div className="flex gap-2">
-            <button onClick={() => setState(null)} className="px-4 py-2 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-            <button onClick={onSave} disabled={pending || !state.item} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "ส่งให้ตรวจสอบ"}</button>
-          </div>
+        <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
+      </div>
+
+      {/* 6 — summary + actions, at the very bottom */}
+      <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
+        <div className="text-sm text-muted">รวมทั้งสิ้น <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => setState(null)} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
+          <button onClick={onSave} disabled={pending || !state.item} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "ส่งให้ตรวจสอบ"}</button>
         </div>
       </div>
+
       {scanning && <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
   );

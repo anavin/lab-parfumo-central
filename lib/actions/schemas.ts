@@ -72,6 +72,15 @@ export const customerDaySchema = z.object({
   foreign: z.coerce.number().min(0).max(999999).optional(),
 });
 
+export const productSchema = z.object({
+  barcode: z.string().trim().min(1, "กรุณาระบุบาร์โค้ด").max(64),
+  scent: z.string().trim().min(1, "กรุณาระบุชื่อกลิ่น").max(200),
+  grade: z.string().trim().max(40).optional(),
+  size: z.string().trim().max(40).optional(),
+  sku: z.string().trim().max(60).optional(),
+  price: z.coerce.number().min(0).max(9999999).optional(),
+});
+
 export const cashSchema = z.object({
   cash_date: dateStr,
   description: z.string().trim().min(1, "กรุณาระบุรายละเอียด").max(200),
