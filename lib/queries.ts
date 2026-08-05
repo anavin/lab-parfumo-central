@@ -174,7 +174,8 @@ const STOCK_CTE = `
     select p.barcode, p.scent, p.size,
            coalesce(ship.q,0) shipped, coalesce(sold.q,0) sold,
            coalesce(ret.q,0) returned,
-           coalesce(ship.q,0) - coalesce(sold.q,0) remaining
+           -- returns go back to HQ (leave the branch), so subtract them from stock
+           coalesce(ship.q,0) - coalesce(sold.q,0) - coalesce(ret.q,0) remaining
     from products p
     left join ship on ship.barcode = p.barcode
     left join sold on sold.barcode = p.barcode
