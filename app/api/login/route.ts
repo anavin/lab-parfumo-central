@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { loginWithPassword } from "@/lib/auth/login";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
-import { can, landingFor, permissionForPath } from "@/lib/auth/permissions";
+import { can, landingFor, permissionForPath, isSafeNext } from "@/lib/auth/permissions";
 
 // Login via a plain route handler (not a Server Action). A server action's
 // implicit post-action router refresh races with the client's hard navigation
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   // Resolve the final destination by the user's permissions so they land on a
   // page they can actually see.
-  const wanted = next.startsWith("/") ? next : "/";
+  const wanted = isSafeNext(next) ? next : "/";
   const wantedPerm = permissionForPath(wanted);
   const dest = wantedPerm == null || can(res.user, wantedPerm) ? wanted : landingFor(res.user);
   return NextResponse.json({ ok: true, next: dest });

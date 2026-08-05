@@ -100,6 +100,8 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
     if (!g) { g = { key, rows: [] }; bills.push(g); }
     g.rows.push(r);
   }
+  // count only bills that aren't fully rejected, to match the daily-summary KPI
+  const activeBillCount = bills.filter((b) => b.rows.some((r) => r.status !== "rejected")).length;
 
   const busy = bill !== null || edit !== null;
 
@@ -133,7 +135,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-line flex items-center justify-between">
           <span className="text-sm font-semibold text-ink">บิลวันนี้</span>
-          <span className="text-xs text-muted">{bills.length} บิล</span>
+          <span className="text-xs text-muted">{activeBillCount} บิล</span>
         </div>
         {bills.length === 0 ? (
           <div className="px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
@@ -302,7 +304,10 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
-  const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0, dc = Number(it.discount) || 0;
+  const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
+  // clamp per-item discount to the line subtotal so the card never shows a
+  // misleading negative total (mirrors the authoritative BillForm math).
+  const dc = Math.min(q * up, Number(it.discount) || 0);
   const line = q * up - dc;
   const fld = "w-full border border-line rounded-lg px-1.5 py-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
   // numeric field: select-all on focus + strip leading zeros so a leading 0 disappears when typing
@@ -387,7 +392,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending }: { index: numb
               <span className="flex-1 min-w-0 truncate text-ink">{r.item} <span className="text-muted text-xs">{r.size}</span></span>
             )}
             <span className="text-ink whitespace-nowrap tabular-nums">{baht(r.total ?? 0)}</span>
-            {r.status === "pending" && (
+            {r.status !== "approved" && (
               <button onClick={() => onDelete(r)} disabled={pending} className="p-1 rounded text-muted hover:text-red-600 disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-3.5 h-3.5" /></button>
             )}
           </li>

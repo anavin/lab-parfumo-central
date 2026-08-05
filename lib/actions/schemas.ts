@@ -7,7 +7,7 @@ import { z } from "zod";
 const dateStr = z.string().min(8, "กรุณาระบุวันที่");
 
 export const reqItemSchema = z.object({
-  barcode: z.string().trim().max(32).optional().default(""),
+  barcode: z.string().trim().max(64).optional().default(""),
   scent: z.string().trim().max(200),
   size: z.string().trim().max(40).optional().default(""),
   qty: z.coerce.number().min(0, "จำนวนต้องไม่ติดลบ").max(999999),
@@ -32,7 +32,7 @@ export const shipmentSchema = z.object({
   ship_date: dateStr,
   branch_label: z.string().trim().max(120).optional().default(""),
   lines: z.array(z.object({
-    barcode: z.string().trim().max(32).optional().default(""),
+    barcode: z.string().trim().max(64).optional().default(""),
     name: z.string().trim().max(200).optional().default(""),
     grade: z.string().trim().max(40).optional().default(""),
     size: z.string().trim().max(40).optional().default(""),
@@ -54,9 +54,9 @@ export const saleSchema = z.object({
   ba: z.string().trim().max(120).optional(),
   receipt_no: z.string().trim().max(60).optional(),
   item: z.string().trim().min(1, "กรุณาระบุสินค้า").max(200),
-  barcode: z.string().trim().max(32).optional(),
+  barcode: z.string().trim().max(64).optional(),
   size: z.string().trim().max(40).optional(),
-  qty: z.coerce.number().min(0).max(999999),
+  qty: z.coerce.number().min(1, "จำนวนต้องอย่างน้อย 1").max(999999),
   unit_price: z.coerce.number().min(0).max(99999999).optional(),
   discount: z.coerce.number().min(0).max(99999999).optional(),
   payment_channel: z.string().trim().max(60).optional(),
@@ -84,7 +84,7 @@ export const billSchema = z.object({
     item: z.string().trim().min(1, "กรุณาระบุสินค้า").max(200),
     barcode: z.string().trim().max(64).optional(),
     size: z.string().trim().max(40).optional(),
-    qty: z.coerce.number().min(0).max(999999),
+    qty: z.coerce.number().min(1, "จำนวนต้องอย่างน้อย 1").max(999999),
     unit_price: z.coerce.number().min(0).max(99999999).optional(),
     discount: z.coerce.number().min(0).max(99999999).optional(),
   })).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(50),

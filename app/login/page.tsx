@@ -1,12 +1,14 @@
 import { getCurrentUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
+import { isSafeNext } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function Login({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
-  if (await getCurrentUser()) redirect(next && next.startsWith("/") ? next : "/");
+  const safeNext = next && isSafeNext(next) ? next : "/";
+  if (await getCurrentUser()) redirect(safeNext);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-nav p-4">
@@ -23,7 +25,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         <div className="bg-surface rounded-2xl p-7 shadow-pop">
           <h1 className="text-[17px] font-bold text-ink mb-1">เข้าสู่ระบบ</h1>
           <p className="text-[12.5px] text-muted mb-5">กรอกชื่อผู้ใช้และรหัสผ่าน</p>
-          <LoginForm next={next ?? "/"} />
+          <LoginForm next={safeNext} />
         </div>
       </div>
     </div>

@@ -234,10 +234,19 @@ function isTransientDbError(e: any): boolean {
   return /terminat|connection|timeout|reset by peer|server closed|too many clients|ECONNRESET|socket hang up/i.test(String(e?.message || ""));
 }
 
-/** Convenience: run a query and return rows (with transient-error retry on pg). */
+// Only read-only statements are safe to auto-retry. A write (INSERT/UPDATE/
+// DELETE) can commit on the server and then have its ack lost on a dropped
+// socket; retrying it would duplicate the row (double-counted sales/cash/etc.),
+// so writes must fail fast instead.
+function isRetryableStatement(sql: string): boolean {
+  return /^\s*(select|with)\b/i.test(sql) && !/\b(insert|update|delete)\b/i.test(sql);
+}
+
+/** Convenience: run a query and return rows. Reads get transient-error retry on
+ * pg; writes never auto-retry (see isRetryableStatement). */
 export async function q<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   if (usePg()) {
-    const MAX = 4;
+    const MAX = isRetryableStatement(sql) ? 4 : 1;
     let lastErr: any;
     for (let attempt = 0; attempt < MAX; attempt++) {
       try {

@@ -57,12 +57,20 @@ function presetFor(role: string): PermKey[] {
   return p[0] === "*" ? [...ALL_PERM_KEYS] : (p as PermKey[]);
 }
 
-/** The permission keys a user actually has (custom override wins over preset). */
+/** The permission keys a user actually has (custom override wins over preset).
+ * null = inherit the role preset; a set array (incl. empty) = use it exactly. */
 export function effectivePermissions(user: Pick<User, "role" | "permissions">): PermKey[] {
   if (user.role === "admin") return [...ALL_PERM_KEYS];
   const custom = user.permissions;
-  if (custom && custom.length) return custom.filter((k): k is PermKey => (ALL_PERM_KEYS as string[]).includes(k));
+  if (custom !== null && custom !== undefined)
+    return custom.filter((k): k is PermKey => (ALL_PERM_KEYS as string[]).includes(k));
   return presetFor(user.role);
+}
+
+/** A `next` redirect target is safe only if it's a same-site absolute path —
+ * reject protocol-relative ("//evil.com") and backslash tricks. */
+export function isSafeNext(path: string): boolean {
+  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\");
 }
 
 export function can(user: Pick<User, "role" | "permissions">, key: PermKey): boolean {

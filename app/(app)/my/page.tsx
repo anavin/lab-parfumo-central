@@ -17,11 +17,21 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const today = bkkToday();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date || "") ? sp.date! : today;
 
-  const [kpi, rows, trend] = await Promise.all([
+  const [kpi, rows, trendRows] = await Promise.all([
     myDayKpis(user.id, date),
     mySubmissions(user.id, date),
     myTrend(user.id, 14),
   ]);
+  // Fill every day in the 14-day window (including zero-sale days) so the chart
+  // is a true timeline, not just the scattered days that had sales. UTC math so
+  // the day keys never drift across the timezone boundary.
+  const revByDay = new Map(trendRows.map((t) => [t.d, t.revenue]));
+  const [ty, tm, td] = today.split("-").map(Number);
+  const trend = Array.from({ length: 14 }, (_, i) => {
+    const dt = new Date(Date.UTC(ty, tm - 1, td - (13 - i)));
+    const d = dt.toISOString().slice(0, 10);
+    return { d, revenue: revByDay.get(d) ?? 0 };
+  });
   const maxRev = Math.max(1, ...trend.map((t) => t.revenue));
 
   return (

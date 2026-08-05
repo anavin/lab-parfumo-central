@@ -19,15 +19,15 @@ export type ReqInput = {
   items: ReqItemInput[];
 };
 
-/** Generate WPO{yy}{mm}{dd}{seq3} unique per day. */
+/** Generate WPO{yy}{mm}{dd}{seq3} unique per day. Uses MAX(sequence)+1 (not
+ * count) so a purge or a gap never reuses an existing number; date parts come
+ * from the string to stay timezone-stable. */
 async function nextPoNumber(orderDate: string): Promise<string> {
-  const d = new Date(orderDate);
-  const yy = String(d.getFullYear()).slice(2);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const prefix = `WPO${yy}${mm}${dd}`;
+  const [y, m, dd] = orderDate.split("-");
+  const prefix = `WPO${y.slice(2)}${(m || "").padStart(2, "0")}${(dd || "").padStart(2, "0")}`;
   const [row] = await q<{ n: number }>(
-    `select count(*)::int n from purchase_orders where po_number like $1`, [`${prefix}%`]);
+    `select coalesce(max(substring(po_number from '[0-9]{3}$')::int), 0) n
+     from purchase_orders where po_number like $1`, [`${prefix}%`]);
   const seq = String((row?.n ?? 0) + 1).padStart(3, "0");
   return `${prefix}${seq}`;
 }
@@ -51,15 +51,28 @@ export async function createRequisition(input: ReqInput) {
   const parsed = requisitionSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const data = parsed.data;
-  const po_number = await nextPoNumber(data.order_date);
-  const version = `${po_number}-1`;
-  const [po] = await q<{ id: number }>(
-    `insert into purchase_orders
-       (po_number, version, order_date, branch_label, store_no, delivery_number, phone, shipping_name, address, remark, status)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
-    [po_number, version, data.order_date, data.branch_label, data.store_no || null,
-     data.delivery_number || null, data.phone || null, data.shipping_name || null,
-     data.address || null, data.remark || null, data.status || "issued"]);
+  // Two same-day requisitions can compute the same next number concurrently;
+  // the unique(po_number,version) constraint then throws 23505. Retry with a
+  // freshly-computed number a few times instead of surfacing a raw DB error.
+  let po: { id: number } | undefined;
+  let po_number = "";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    po_number = await nextPoNumber(data.order_date);
+    try {
+      [po] = await q<{ id: number }>(
+        `insert into purchase_orders
+           (po_number, version, order_date, branch_label, store_no, delivery_number, phone, shipping_name, address, remark, status)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+        [po_number, `${po_number}-1`, data.order_date, data.branch_label, data.store_no || null,
+         data.delivery_number || null, data.phone || null, data.shipping_name || null,
+         data.address || null, data.remark || null, data.status || "issued"]);
+      break;
+    } catch (e: any) {
+      if (e?.code === "23505" && attempt < 5) continue;   // number taken → try next
+      throw e;
+    }
+  }
+  if (!po) throw new Error("สร้างเลขใบเบิกไม่สำเร็จ กรุณาลองใหม่");
   await replaceItems(po.id, data.items);
   await logAudit("create", "requisition", po.id, `${po_number} · ${data.branch_label} · ${data.items.length} รายการ`);
   revalidatePath("/requisitions");

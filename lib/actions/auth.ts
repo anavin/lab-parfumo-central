@@ -52,16 +52,21 @@ function normRole(role: string): RoleKey {
   return (ROLE_PRESETS as any)[role] ? (role as RoleKey) : "staff";
 }
 
+const ADMIN_ONLY = "การจัดการบัญชีผู้ดูแลหรือให้สิทธิ์ระดับผู้ดูแล ทำได้เฉพาะผู้ดูแลระบบ";
+
 export async function createUser(input: { username: string; full_name: string; role: string; password: string }) {
-  await requirePermission("users");
+  const me = await requirePermission("users");
   const username = input.username.trim().toLowerCase();
   if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw new Error("username ใช้ได้เฉพาะ a-z 0-9 . _ - (3-40 ตัว)");
   if (!input.full_name.trim()) throw new Error("กรุณากรอกชื่อ-นามสกุล");
   const v = validatePassword(input.password, username);
   if (!v.ok) throw new Error(v.message);
+  const role = normRole(input.role);
+  // Only a real admin may mint another admin (otherwise the 'users' menu would
+  // be a backdoor to full control).
+  if (role === "admin" && me.role !== "admin") throw new Error(ADMIN_ONLY);
   const [dup] = await q<{ id: number }>(`select id from users where username = $1`, [username]);
   if (dup) throw new Error("username นี้มีอยู่แล้ว");
-  const role = normRole(input.role);
   const hash = await hashBcrypt(input.password);
   await q(`insert into users (username, password_hash, full_name, role) values ($1,$2,$3,$4)`,
     [username, hash, input.full_name.trim(), role]);
@@ -76,42 +81,61 @@ export async function updateUserAccess(id: number, role: string, permissions: st
   const nextRole = normRole(role);
   const nextPerms = permissions == null
     ? null
-    : permissions.filter((k) => (ALL_PERM_KEYS as string[]).includes(k)) as PermKey[];
+    : (permissions.filter((k) => (ALL_PERM_KEYS as string[]).includes(k)) as PermKey[]);
 
-  // Don't let an admin lock themselves out of user management.
+  const [target] = await q<{ username: string; role: string }>(`select username, role from users where id = $1`, [id]);
+  if (!target) throw new Error("ไม่พบผู้ใช้");
+
+  // Escalation guards — only a real admin may touch admin accounts, promote to
+  // admin, or hand out the user-management menu.
+  if (me.role !== "admin") {
+    if (target.role === "admin") throw new Error(ADMIN_ONLY);
+    if (nextRole === "admin") throw new Error(ADMIN_ONLY);
+    if (nextPerms ? nextPerms.includes("users") : (ROLE_PRESETS[nextRole] as string[]).includes("users")) throw new Error(ADMIN_ONLY);
+  }
+
+  // A non-admin role with an explicit but empty permission set can access
+  // nothing (and would bounce in a redirect loop) — block it; use ปิดบัญชี to
+  // suspend instead.
+  if (nextRole !== "admin" && nextPerms !== null && nextPerms.length === 0)
+    throw new Error("เลือกสิทธิ์อย่างน้อย 1 เมนู หรือใช้ “ปิดบัญชี” เพื่อระงับการใช้งาน");
+
+  // Don't let a user lock themselves out of user management.
   if (me.id === id) {
-    const stillAdmin = nextRole === "admin";
-    const keepsUsers = stillAdmin || (nextPerms ? nextPerms.includes("users") : (ROLE_PRESETS[nextRole] as string[]).includes("users"));
+    const keepsUsers = nextRole === "admin" ||
+      (nextPerms ? nextPerms.includes("users") : (ROLE_PRESETS[nextRole] as string[]).includes("users"));
     if (!keepsUsers) throw new Error("เปลี่ยนสิทธิ์ตัวเองจนออกจากการจัดการผู้ใช้ไม่ได้");
   }
 
-  const [u] = await q<{ username: string }>(`select username from users where id = $1`, [id]);
-  if (!u) throw new Error("ไม่พบผู้ใช้");
   await q(`update users set role = $2, permissions = $3 where id = $1`, [id, nextRole, nextPerms]);
   // changing access invalidates the cached role in live sessions → force re-login
   await q(`delete from user_sessions where user_id = $1 and $1 <> $2`, [id, me.id]);
-  await logAudit("update", "user", u.username, `สิทธิ์: ${ROLE_LABEL[nextRole] ?? nextRole}${nextPerms ? ` · กำหนดเอง ${nextPerms.length} เมนู` : ""}`);
+  await logAudit("update", "user", target.username, `สิทธิ์: ${ROLE_LABEL[nextRole] ?? nextRole}${nextPerms ? ` · กำหนดเอง ${nextPerms.length} เมนู` : ""}`);
   revalidatePath("/users");
 }
 
 export async function setUserActive(id: number, active: boolean) {
   const me = await requirePermission("users");
   if (me.id === id && !active) throw new Error("ปิดบัญชีตัวเองไม่ได้");
-  const [u] = await q<{ username: string }>(`select username from users where id = $1`, [id]);
+  const [u] = await q<{ username: string; role: string }>(`select username, role from users where id = $1`, [id]);
+  if (!u) throw new Error("ไม่พบผู้ใช้");
+  if (u.role === "admin" && me.role !== "admin") throw new Error(ADMIN_ONLY);
   await q(`update users set is_active = $2 where id = $1`, [id, active]);
   if (!active) await q(`delete from user_sessions where user_id = $1`, [id]); // kick out
-  await logAudit("update", "user", u?.username, active ? "เปิดบัญชี" : "ปิดบัญชี");
+  await logAudit("update", "user", u.username, active ? "เปิดบัญชี" : "ปิดบัญชี");
   revalidatePath("/users");
 }
 
 export async function resetPassword(id: number, password: string) {
-  await requirePermission("users");
-  const [u] = await q<{ username: string }>(`select username from users where id = $1`, [id]);
-  const v = validatePassword(password, u?.username ?? "");
+  const me = await requirePermission("users");
+  const [u] = await q<{ username: string; role: string }>(`select username, role from users where id = $1`, [id]);
+  if (!u) throw new Error("ไม่พบผู้ใช้");
+  if (u.role === "admin" && me.role !== "admin") throw new Error(ADMIN_ONLY);
+  const v = validatePassword(password, u.username);
   if (!v.ok) throw new Error(v.message);
   await q(`update users set password_hash = $2 where id = $1`, [id, await hashBcrypt(password)]);
   await q(`delete from user_sessions where user_id = $1`, [id]); // force re-login
-  await logAudit("password", "user", u?.username, "รีเซ็ตรหัสผ่าน");
+  await logAudit("password", "user", u.username, "รีเซ็ตรหัสผ่าน");
   revalidatePath("/users");
 }
 
