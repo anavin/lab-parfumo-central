@@ -1,7 +1,7 @@
 "use server";
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { saleSchema, customerDaySchema } from "./schemas";
+import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
 import { requireUser, requireAdmin } from "@/lib/auth/require-user";
@@ -33,6 +33,35 @@ export async function submitSale(input: unknown) {
      d.qty, d.unit_price ?? 0, d.discount ?? 0, total, d.payment_channel || null, d.nation || null, (d as any).note || null]);
   await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
   await logAudit("submit", "submission", row.id, `ขาย: ${d.item} · ${d.qty} ชิ้น · ฿${Math.round(total).toLocaleString()}`);
+  revalidatePath("/my"); revalidatePath("/review");
+}
+
+// One bill = one customer buying one or more items. All lines share a bill
+// reference (the entered receipt no., or a generated one) so they count as a
+// single bill/customer, plus shared payment/nationality/time.
+export async function submitBill(input: unknown) {
+  const user = await requireUser();
+  const parsed = billSchema.safeParse(input);
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
+  const d = parsed.data;
+  if (!d.payment_channel?.trim()) throw new Error("กรุณาเลือกช่องทางชำระ");
+  if (!d.nation?.trim()) throw new Error("กรุณาเลือกสัญชาติลูกค้า");
+  const ref = d.receipt_no?.trim() || ("B" + Date.now().toString(36).toUpperCase());
+  let count = 0, sum = 0;
+  for (const it of d.items) {
+    const total = it.qty * (it.unit_price ?? 0) - (it.discount ?? 0);
+    const [row] = await q<{ id: number }>(
+      `insert into submissions
+         (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
+       values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       returning id`,
+      [user.id, user.full_name, d.sale_date, d.source || "CTW", d.sale_time || null, ref,
+       it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, it.discount ?? 0, total,
+       d.payment_channel, d.nation]);
+    await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
+    count++; sum += total;
+  }
+  await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}`);
   revalidatePath("/my"); revalidatePath("/review");
 }
 

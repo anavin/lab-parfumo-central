@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { DecodeHintType, BarcodeFormat, EAN13Reader } from "@zxing/library";
-import { X, Camera } from "lucide-react";
+import { X, Camera, Check } from "lucide-react";
 
 // The shop's EAN-13 labels were generated with non-standard check digits, so
 // ZXing's strict checksum rejects most of them. Relax EAN/UPC checksum
@@ -21,29 +21,43 @@ function relaxUpcEanChecksum() {
   }
 }
 
-// Camera barcode scanner. Uses ZXing (works on iOS Safari + Android Chrome),
-// prefers the rear camera, and calls onDetected once with the decoded string.
-export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: string) => void; onClose: () => void }) {
+// Camera barcode scanner. Works on iOS Safari + Android Chrome, prefers the rear
+// camera. In `continuous` mode it keeps scanning (for building a multi-item
+// bill) and stays open until the user taps เสร็จ; otherwise it fires once.
+export function BarcodeScanner({ onDetected, onClose, continuous = false }: { onDetected: (code: string) => void; onClose: () => void; continuous?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [count, setCount] = useState(0);
+  const [flash, setFlash] = useState(false);
   const doneRef = useRef(false);
+  const last = useRef<{ code: string; t: number }>({ code: "", t: 0 });
 
   useEffect(() => {
     relaxUpcEanChecksum();
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-      BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.QR_CODE, BarcodeFormat.ITF,
+      BarcodeFormat.CODE_128, BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_39, BarcodeFormat.QR_CODE, BarcodeFormat.ITF,
     ]);
     const reader = new BrowserMultiFormatReader(hints);
     let controls: { stop: () => void } | null = null;
 
     reader
       .decodeFromConstraints({ video: { facingMode: { ideal: "environment" } } }, videoRef.current!, (result) => {
-        if (result && !doneRef.current) {
+        if (!result) return;
+        const code = result.getText();
+        const now = Date.now();
+        if (continuous) {
+          if (code === last.current.code && now - last.current.t < 1500) return; // debounce same code
+          last.current = { code, t: now };
+          setCount((c) => c + 1);
+          setFlash(true);
+          setTimeout(() => setFlash(false), 220);
+          onDetected(code);
+        } else if (!doneRef.current) {
           doneRef.current = true;
           controls?.stop();
-          onDetected(result.getText());
+          onDetected(code);
         }
       })
       .then((c) => { controls = c; })
@@ -56,10 +70,10 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
       });
 
     return () => { controls?.stop(); };
-  }, [onDetected]);
+  }, [onDetected, continuous]);
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-ink rounded-2xl overflow-hidden w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 text-white">
           <span className="text-sm font-semibold flex items-center gap-2"><Camera className="w-4 h-4" /> สแกนบาร์โค้ด</span>
@@ -69,12 +83,22 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
           <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
           {!error && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="w-[72%] h-[34%] border-2 border-white/80 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+              <div className={`w-[72%] h-[32%] border-2 rounded-xl transition-colors ${flash ? "border-green-400" : "border-white/80"}`} style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }} />
             </div>
           )}
+          {flash && <div className="pointer-events-none absolute inset-0 bg-green-400/20" />}
           {error && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/90">{error}</div>}
         </div>
-        <div className="px-4 py-3 text-center text-[12px] text-white/60">เล็งกล้องไปที่บาร์โค้ดสินค้า</div>
+        {continuous ? (
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-white/80">{count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b> รายการ</> : "เล็งกล้องที่บาร์โค้ด"}</span>
+            <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">
+              <Check className="w-4 h-4" /> เสร็จ
+            </button>
+          </div>
+        ) : (
+          <div className="px-4 py-3 text-center text-[12px] text-white/60">เล็งกล้องไปที่บาร์โค้ดสินค้า</div>
+        )}
       </div>
     </div>
   );

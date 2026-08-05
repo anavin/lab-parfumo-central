@@ -289,9 +289,8 @@ export async function myDayKpis(userId: number, date: string) {
   const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float qty,
-           -- each distinct receipt = 1 bill; entries with no receipt no. each count as their own bill
-           (count(distinct receipt_no) filter (where receipt_no is not null and receipt_no <> '')
-            + count(*) filter (where receipt_no is null or receipt_no = ''))::int bills,
+           -- one bill per shared receipt/bill-ref; legacy rows with none count individually
+           count(distinct coalesce(nullif(receipt_no,''), 'i'||id))::int bills,
            count(*) filter (where status='pending')::int pending
     from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2`,
     [userId, date]);

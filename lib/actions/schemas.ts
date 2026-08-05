@@ -72,6 +72,24 @@ export const customerDaySchema = z.object({
   foreign: z.coerce.number().min(0).max(999999).optional(),
 });
 
+// One bill = one customer, one or more item lines sharing payment/nationality/receipt.
+export const billSchema = z.object({
+  sale_date: dateStr,
+  sale_time: z.string().trim().max(8).optional(),
+  source: z.string().trim().max(40).default("CTW"),
+  receipt_no: z.string().trim().max(60).optional(),
+  payment_channel: z.string().trim().max(60).optional(),
+  nation: z.string().trim().max(20).optional(),
+  items: z.array(z.object({
+    item: z.string().trim().min(1, "กรุณาระบุสินค้า").max(200),
+    barcode: z.string().trim().max(64).optional(),
+    size: z.string().trim().max(40).optional(),
+    qty: z.coerce.number().min(0).max(999999),
+    unit_price: z.coerce.number().min(0).max(99999999).optional(),
+    discount: z.coerce.number().min(0).max(99999999).optional(),
+  })).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(50),
+});
+
 export const productSchema = z.object({
   barcode: z.string().trim().min(1, "กรุณาระบุบาร์โค้ด").max(64),
   scent: z.string().trim().min(1, "กรุณาระบุชื่อกลิ่น").max(200),
