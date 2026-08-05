@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, Clock, XCircle, ScanLine, Minus } from "lucide-react";
 import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission } from "@/lib/actions/submissions";
-import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow } from "@/lib/queries";
 
@@ -134,10 +134,15 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const removeItem = (key: number) => setState({ ...state, items: state.items.filter((it) => it.key !== key) });
   const clearMiss = (f: string) => setMissing((m) => m.filter((x) => x !== f));
 
-  const onScanned = async (code: string) => {
+  const onScanned = async (code: string): Promise<ScanResult> => {
     const p = await findProductByBarcode(code);
-    if (p) addItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 });
-    else addItem({ barcode: code });
+    if (p) {
+      addItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 });
+      const price = p.price ? ` · ฿${Number(p.price).toLocaleString()}` : "";
+      return { ok: true, label: `${p.scent}${p.size ? ` ${p.size}` : ""}${price}` };
+    }
+    addItem({ barcode: code });
+    return { ok: false, label: `บาร์โค้ด ${code}` };
   };
 
   // bill-level extra discount (%), distributed to each line
