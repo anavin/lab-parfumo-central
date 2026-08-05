@@ -1,31 +1,40 @@
 "use client";
-import { useActionState, useEffect } from "react";
-import { useFormStatus } from "react-dom";
-import { signIn } from "@/lib/actions/auth";
-
-function Submit({ redirecting }: { redirecting: boolean }) {
-  const { pending } = useFormStatus();
-  const busy = pending || redirecting;
-  return (
-    <button disabled={busy}
-      className="w-full bg-ink text-white rounded-lg py-2.5 text-sm font-medium hover:bg-black disabled:opacity-50 transition-colors">
-      {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
-    </button>
-  );
-}
+import { useState } from "react";
 
 export function LoginForm({ next }: { next: string }) {
-  const [state, action] = useActionState(signIn, null);
-  const ok = !!(state && (state as any).ok);
+  const [busy, setBusy] = useState(false);          // covers both request + redirect
+  const [error, setError] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState<number | undefined>(undefined);
 
-  // full navigation on success so the page renders with the new session cookie
-  useEffect(() => {
-    if (ok) window.location.assign((state as any).next || "/");
-  }, [ok, state]);
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (busy) return;
+    const fd = new FormData(e.currentTarget);
+    setBusy(true); setError(null); setRemaining(undefined);
+    try {
+      const r = await fetch("/api/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username: fd.get("username"), password: fd.get("password"), next }),
+      });
+      const data = await r.json();
+      if (data.ok) {
+        // Plain fetch → no server-action router refresh to race with, so this hard
+        // navigation lands cleanly (no blank page). Keep busy=true while it loads.
+        window.location.assign(data.next || "/");
+        return;
+      }
+      setError(data.error || "เข้าสู่ระบบไม่สำเร็จ");
+      setRemaining(typeof data.attemptsRemaining === "number" ? data.attemptsRemaining : undefined);
+      setBusy(false);
+    } catch {
+      setError("เชื่อมต่อไม่ได้ กรุณาลองใหม่อีกครั้ง");
+      setBusy(false);
+    }
+  };
 
   return (
-    <form action={action} className="space-y-3.5">
-      <input type="hidden" name="next" value={next} />
+    <form onSubmit={onSubmit} className="space-y-3.5">
       <div>
         <label className="block text-xs text-muted mb-1">ชื่อผู้ใช้</label>
         <input name="username" autoFocus autoComplete="username"
@@ -36,14 +45,17 @@ export function LoginForm({ next }: { next: string }) {
         <input name="password" type="password" autoComplete="current-password"
           className="w-full border border-line rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand" />
       </div>
-      {state?.error && (
+      {error && (
         <div className="text-xs text-danger bg-danger-soft border border-danger/20 rounded-lg px-3 py-2">
-          {state.error}
-          {typeof state.attemptsRemaining === "number" && state.attemptsRemaining > 0 &&
-            <span className="text-muted"> · เหลือ {state.attemptsRemaining} ครั้ง</span>}
+          {error}
+          {typeof remaining === "number" && remaining > 0 &&
+            <span className="text-muted"> · เหลือ {remaining} ครั้ง</span>}
         </div>
       )}
-      <Submit redirecting={ok} />
+      <button type="submit" disabled={busy}
+        className="w-full bg-ink text-white rounded-lg py-2.5 text-sm font-medium hover:bg-black disabled:opacity-50 transition-colors">
+        {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
+      </button>
     </form>
   );
 }

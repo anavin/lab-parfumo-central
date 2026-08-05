@@ -3,7 +3,7 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 // Edge middleware only checks that a session cookie exists; the real DB verify
 // happens in the (app) layout via requireUser(). Mirrors lab-parfumo-next.
-const PUBLIC = new Set(["/login"]);
+const PUBLIC = new Set(["/login", "/api/login"]);
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
