@@ -9,11 +9,13 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow } from "@/lib/queries";
 
-const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
+const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
 const nowHM = () => new Date().toTimeString().slice(0, 5);
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="text-xs text-muted mb-1 block">{label}</span>{children}</label>;
+  // min-w-0 lets the field shrink inside a grid/flex cell — without it iOS native
+  // <input type="time"/date"> keep their intrinsic width and overflow onto the neighbour.
+  return <label className="block min-w-0"><span className="text-xs text-muted mb-1 block">{label}</span>{children}</label>;
 }
 
 // payment channels — values match the existing sales data so the dashboard groups correctly
