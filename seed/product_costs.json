@@ -1,0 +1,29 @@
+[
+ {
+  "cost_date": "2025-11-21",
+  "scent": "1000 Thousand",
+  "size": "50 ml.",
+  "barcode": "8857128011188",
+  "unit_cost": 179.0,
+  "qty": 7.0,
+  "total_cost": 1253.0
+ },
+ {
+  "cost_date": "2025-11-21",
+  "scent": "Zeus",
+  "size": "30 ml.",
+  "barcode": "8857128011843",
+  "unit_cost": 179.0,
+  "qty": 7.0,
+  "total_cost": 1253.0
+ },
+ {
+  "cost_date": "2025-11-21",
+  "scent": "Secret of Peach",
+  "size": "30 ml.",
+  "barcode": "8857128011850",
+  "unit_cost": 179.0,
+  "qty": 2.0,
+  "total_cost": 358.0
+ }
+]

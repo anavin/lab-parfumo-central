@@ -1,0 +1,1178 @@
+[
+ {
+  "scent": "1000 Thousand",
+  "size": "50 ml.",
+  "barcode": "8857128011188",
+  "shipped": 5.0,
+  "sold": 1.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "1000 Thousand",
+  "size": "30 ml.",
+  "barcode": "8857128012050",
+  "shipped": 5.0,
+  "sold": 2.0,
+  "remaining": 3.0
+ },
+ {
+  "scent": "1000 Thousand",
+  "size": "10 ml.",
+  "barcode": "8857128012051",
+  "shipped": 9.0,
+  "sold": 5.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "1000 Thousand",
+  "size": "4 ml.",
+  "barcode": "8857128012052",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Aqua",
+  "size": "50 ml.",
+  "barcode": "8857128012018",
+  "shipped": 37.0,
+  "sold": 28.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Aqua",
+  "size": "30 ml.",
+  "barcode": "8857128012022",
+  "shipped": 40.0,
+  "sold": 23.0,
+  "remaining": 17.0
+ },
+ {
+  "scent": "Aqua",
+  "size": "10 ml.",
+  "barcode": "8857128012026",
+  "shipped": 101.0,
+  "sold": 83.0,
+  "remaining": 18.0
+ },
+ {
+  "scent": "Aqua",
+  "size": "4 ml.",
+  "barcode": "8857128012044",
+  "shipped": 20.0,
+  "sold": 19.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Beyond",
+  "size": "50 ml.",
+  "barcode": "8857128011072",
+  "shipped": 13.0,
+  "sold": 8.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Beyond",
+  "size": "30 ml.",
+  "barcode": "8857128012031",
+  "shipped": 10.0,
+  "sold": 3.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Beyond",
+  "size": "10 ml.",
+  "barcode": "8857128012032",
+  "shipped": 56.0,
+  "sold": 49.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Beyond",
+  "size": "4 ml.",
+  "barcode": "8857128012033",
+  "shipped": 20.0,
+  "sold": 18.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "Blackest Black",
+  "size": "50 ml.",
+  "barcode": "8857128011669",
+  "shipped": 16.0,
+  "sold": 10.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Blackest Black",
+  "size": "30 ml.",
+  "barcode": "8857128012005",
+  "shipped": 22.0,
+  "sold": 16.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Blackest Black",
+  "size": "10 ml.",
+  "barcode": "8857128012101",
+  "shipped": 57.0,
+  "sold": 36.0,
+  "remaining": 21.0
+ },
+ {
+  "scent": "Blackest Black",
+  "size": "4 ml.",
+  "barcode": "8857128012102",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Blind Magnolia",
+  "size": "50 ml.",
+  "barcode": "8857128011225",
+  "shipped": 7.0,
+  "sold": 2.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Blind Magnolia",
+  "size": "30 ml.",
+  "barcode": "8857128012064",
+  "shipped": 10.0,
+  "sold": 5.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Blind Magnolia",
+  "size": "10 ml.",
+  "barcode": "8857128012065",
+  "shipped": 15.0,
+  "sold": 9.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Blind Magnolia",
+  "size": "4 ml.",
+  "barcode": "8857128012066",
+  "shipped": 25.0,
+  "sold": 19.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Buoyant",
+  "size": "50 ml.",
+  "barcode": "8857128012021",
+  "shipped": 7.0,
+  "sold": 2.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Buoyant",
+  "size": "30 ml.",
+  "barcode": "8857128012025",
+  "shipped": 7.0,
+  "sold": 2.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Buoyant",
+  "size": "10 ml.",
+  "barcode": "8857128012077",
+  "shipped": 29.0,
+  "sold": 24.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Buoyant",
+  "size": "4 ml.",
+  "barcode": "8857128012078",
+  "shipped": 10.0,
+  "sold": 9.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Dionysus X",
+  "size": "50 ml.",
+  "barcode": "8857128011331",
+  "shipped": 5.0,
+  "sold": 2.0,
+  "remaining": 3.0
+ },
+ {
+  "scent": "Dionysus X",
+  "size": "30 ml.",
+  "barcode": "8857128012086",
+  "shipped": 5.0,
+  "sold": 0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Dionysus X",
+  "size": "10 ml.",
+  "barcode": "8857128012087",
+  "shipped": 10.0,
+  "sold": 1.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Dionysus X",
+  "size": "4 ml.",
+  "barcode": "8857128012088",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Dream Island",
+  "size": "50 ml.",
+  "barcode": "8857128011300",
+  "shipped": 54.0,
+  "sold": 36.0,
+  "remaining": 18.0
+ },
+ {
+  "scent": "Dream Island",
+  "size": "30 ml.",
+  "barcode": "8857128011874",
+  "shipped": 43.0,
+  "sold": 29.0,
+  "remaining": 14.0
+ },
+ {
+  "scent": "Dream Island",
+  "size": "10 ml.",
+  "barcode": "8857128012030",
+  "shipped": 145.0,
+  "sold": 123.0,
+  "remaining": 22.0
+ },
+ {
+  "scent": "Dream Island",
+  "size": "4 ml.",
+  "barcode": "8857128012015",
+  "shipped": 60.0,
+  "sold": 20.0,
+  "remaining": 40.0
+ },
+ {
+  "scent": "Dynasty",
+  "size": "50 ml.",
+  "barcode": "8857128011010",
+  "shipped": 5.0,
+  "sold": 3.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "Dynasty",
+  "size": "30 ml.",
+  "barcode": "8857128011812",
+  "shipped": 7.0,
+  "sold": 4.0,
+  "remaining": 3.0
+ },
+ {
+  "scent": "Dynasty",
+  "size": "10 ml.",
+  "barcode": "8857128012128",
+  "shipped": 13.0,
+  "sold": 9.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Dynasty",
+  "size": "4 ml.",
+  "barcode": "8857128012129",
+  "shipped": 10.0,
+  "sold": 9.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Eden",
+  "size": "50 ml.",
+  "barcode": "8857128011317",
+  "shipped": 21.0,
+  "sold": 17.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Eden",
+  "size": "30 ml.",
+  "barcode": "8857128012057",
+  "shipped": 8.0,
+  "sold": 3.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Eden",
+  "size": "10 ml.",
+  "barcode": "8857128012058",
+  "shipped": 39.0,
+  "sold": 27.0,
+  "remaining": 12.0
+ },
+ {
+  "scent": "Eden",
+  "size": "4 ml.",
+  "barcode": "8857128012059",
+  "shipped": 10.0,
+  "sold": 9.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Excalibur (EDP)",
+  "size": "50 ml.",
+  "barcode": "8857128011133",
+  "shipped": 19.0,
+  "sold": 13.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Excalibur (EDP)",
+  "size": "30 ml.",
+  "barcode": "8857128011935",
+  "shipped": 16.0,
+  "sold": 11.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Excalibur (EDP)",
+  "size": "10 ml.",
+  "barcode": "8857128012062",
+  "shipped": 48.0,
+  "sold": 39.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Excalibur (EDP)",
+  "size": "4 ml.",
+  "barcode": "8857128012063",
+  "shipped": 25.0,
+  "sold": 22.0,
+  "remaining": 3.0
+ },
+ {
+  "scent": "Gambling34+35",
+  "size": "50 ml.",
+  "barcode": "8857128011591",
+  "shipped": 11.0,
+  "sold": 8.0,
+  "remaining": 3.0
+ },
+ {
+  "scent": "Gambling34+35",
+  "size": "10 ml.",
+  "barcode": "8857128012103",
+  "shipped": 20.0,
+  "sold": 14.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Gambling34+35",
+  "size": "4 ml.",
+  "barcode": "8857128012104",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Gentle Elixir",
+  "size": "50 ml.",
+  "barcode": "8857128012140",
+  "shipped": 13.0,
+  "sold": 6.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Gentle Elixir",
+  "size": "30 ml.",
+  "barcode": "8857128012141",
+  "shipped": 13.0,
+  "sold": 6.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Gentle Elixir",
+  "size": "10 ml.",
+  "barcode": "8857128012142",
+  "shipped": 14.0,
+  "sold": 7.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Gentle Elixir",
+  "size": "4 ml.",
+  "barcode": "8857128012143",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Hercules",
+  "size": "50 ml.",
+  "barcode": "8857128011034",
+  "shipped": 9.0,
+  "sold": 4.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Hercules",
+  "size": "30 ml.",
+  "barcode": "8857128011737",
+  "shipped": 14.0,
+  "sold": 5.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Hercules",
+  "size": "10 ml.",
+  "barcode": "8857128011744",
+  "shipped": 25.0,
+  "sold": 14.0,
+  "remaining": 11.0
+ },
+ {
+  "scent": "Hercules",
+  "size": "4 ml.",
+  "barcode": "8857128011546",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "La Belle",
+  "size": "50 ml.",
+  "barcode": "8857128011058",
+  "shipped": 40.0,
+  "sold": 26.0,
+  "remaining": 14.0
+ },
+ {
+  "scent": "La Belle",
+  "size": "30 ml.",
+  "barcode": "8857128011904",
+  "shipped": 42.0,
+  "sold": 26.0,
+  "remaining": 16.0
+ },
+ {
+  "scent": "La Belle",
+  "size": "10 ml.",
+  "barcode": "8857128012034",
+  "shipped": 91.0,
+  "sold": 79.0,
+  "remaining": 12.0
+ },
+ {
+  "scent": "La Belle",
+  "size": "4 ml.",
+  "barcode": "8857128012016",
+  "shipped": 30.0,
+  "sold": 20.0,
+  "remaining": 10.0
+ },
+ {
+  "scent": "Legend of Oud",
+  "size": "50 ml.",
+  "barcode": "8857128011683",
+  "shipped": 9.0,
+  "sold": 5.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Legend of Oud",
+  "size": "30 ml.",
+  "barcode": "8857128012007",
+  "shipped": 18.0,
+  "sold": 13.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Legend of Oud",
+  "size": "10 ml.",
+  "barcode": "8857128012110",
+  "shipped": 34.0,
+  "sold": 22.0,
+  "remaining": 12.0
+ },
+ {
+  "scent": "Legend of Oud",
+  "size": "4 ml.",
+  "barcode": "8857128012111",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Luscious Santal",
+  "size": "50 ml.",
+  "barcode": "8857128011690",
+  "shipped": 4.0,
+  "sold": 2.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "Luscious Santal",
+  "size": "30 ml.",
+  "barcode": "8857128012008",
+  "shipped": 6.0,
+  "sold": 5.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Luscious Santal",
+  "size": "10 ml.",
+  "barcode": "8857128012122",
+  "shipped": 22.0,
+  "sold": 15.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Luscious Santal",
+  "size": "4 ml.",
+  "barcode": "8857128012123",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Make Way",
+  "size": "50 ml.",
+  "barcode": "8857128012020",
+  "shipped": 18.0,
+  "sold": 10.0,
+  "remaining": 8.0
+ },
+ {
+  "scent": "Make Way",
+  "size": "30 ml.",
+  "barcode": "8857128012024",
+  "shipped": 19.0,
+  "sold": 10.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Make Way",
+  "size": "10 ml.",
+  "barcode": "8857128012028",
+  "shipped": 42.0,
+  "sold": 34.0,
+  "remaining": 8.0
+ },
+ {
+  "scent": "Make Way",
+  "size": "4 ml.",
+  "barcode": "8857128012049",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Never Blue",
+  "size": "50 ml.",
+  "barcode": "8857128011287",
+  "shipped": 62.0,
+  "sold": 45.0,
+  "remaining": 17.0
+ },
+ {
+  "scent": "Never Blue",
+  "size": "30 ml.",
+  "barcode": "8857128011836",
+  "shipped": 38.0,
+  "sold": 26.0,
+  "remaining": 12.0
+ },
+ {
+  "scent": "Never Blue",
+  "size": "10 ml.",
+  "barcode": "8857128012035",
+  "shipped": 123.0,
+  "sold": 100.0,
+  "remaining": 23.0
+ },
+ {
+  "scent": "Never Blue",
+  "size": "4 ml.",
+  "barcode": "8857128012036",
+  "shipped": 55.0,
+  "sold": 11.0,
+  "remaining": 44.0
+ },
+ {
+  "scent": "Persist",
+  "size": "50 ml.",
+  "barcode": "8857128011041",
+  "shipped": 21.0,
+  "sold": 17.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Persist",
+  "size": "30 ml.",
+  "barcode": "8857128011881",
+  "shipped": 15.0,
+  "sold": 9.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Persist",
+  "size": "10 ml.",
+  "barcode": "8857128012042",
+  "shipped": 49.0,
+  "sold": 41.0,
+  "remaining": 8.0
+ },
+ {
+  "scent": "Persist",
+  "size": "4 ml.",
+  "barcode": "8857128012043",
+  "shipped": 10.0,
+  "sold": 10.0,
+  "remaining": 0
+ },
+ {
+  "scent": "Queen",
+  "size": "50 ml.",
+  "barcode": "8857128011607",
+  "shipped": 7.0,
+  "sold": 3.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Queen",
+  "size": "30 ml.",
+  "barcode": "8857128012001",
+  "shipped": 13.0,
+  "sold": 10.0,
+  "remaining": 3.0
+ },
+ {
+  "scent": "Queen",
+  "size": "10 ml.",
+  "barcode": "8857128012116",
+  "shipped": 22.0,
+  "sold": 16.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Queen",
+  "size": "4 ml.",
+  "barcode": "8857128012117",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Savoury",
+  "size": "50 ml.",
+  "barcode": "8857128011614",
+  "shipped": 7.0,
+  "sold": 3.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Savoury",
+  "size": "30 ml.",
+  "barcode": "8857128012002",
+  "shipped": 6.0,
+  "sold": 2.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Savoury",
+  "size": "10 ml.",
+  "barcode": "8857128012118",
+  "shipped": 15.0,
+  "sold": 6.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Savoury",
+  "size": "4 ml.",
+  "barcode": "8857128012119",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Secret of Peach",
+  "size": "50 ml.",
+  "barcode": "8857128011119",
+  "shipped": 89.0,
+  "sold": 66.0,
+  "remaining": 23.0
+ },
+ {
+  "scent": "Secret of Peach",
+  "size": "30 ml.",
+  "barcode": "8857128011850",
+  "shipped": 72.0,
+  "sold": 54.0,
+  "remaining": 18.0
+ },
+ {
+  "scent": "Secret of Peach",
+  "size": "10 ml.",
+  "barcode": "8857128012037",
+  "shipped": 269.0,
+  "sold": 246.0,
+  "remaining": 23.0
+ },
+ {
+  "scent": "Secret of Peach",
+  "size": "4 ml.",
+  "barcode": "8857128012038",
+  "shipped": 65.0,
+  "sold": 23.0,
+  "remaining": 42.0
+ },
+ {
+  "scent": "Senorita",
+  "size": "50 ml.",
+  "barcode": "8857128011171",
+  "shipped": 53.0,
+  "sold": 39.0,
+  "remaining": 14.0
+ },
+ {
+  "scent": "Senorita",
+  "size": "10 ml.",
+  "barcode": "8857128012039",
+  "shipped": 158.0,
+  "sold": 133.0,
+  "remaining": 25.0
+ },
+ {
+  "scent": "Senorita",
+  "size": "4 ml.",
+  "barcode": "8857128012040",
+  "shipped": 20.0,
+  "sold": 20.0,
+  "remaining": 0
+ },
+ {
+  "scent": "Shadow De Bacci Light",
+  "size": "50 ml.",
+  "barcode": "8857128011294",
+  "shipped": 8.0,
+  "sold": 6.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "Shadow De Bacci Light",
+  "size": "30 ml.",
+  "barcode": "8857128012092",
+  "shipped": 3.0,
+  "sold": 1.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "Shadow De Bacci Light",
+  "size": "10 ml.",
+  "barcode": "8857128012093",
+  "shipped": 16.0,
+  "sold": 11.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Shadow De Bacci Light",
+  "size": "4 ml.",
+  "barcode": "8857128012094",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Sicilia",
+  "size": "50 ml.",
+  "barcode": "8857128011140",
+  "shipped": 10.0,
+  "sold": 5.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Sicilia",
+  "size": "30 ml.",
+  "barcode": "8857128011911",
+  "shipped": 10.0,
+  "sold": 5.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Sicilia",
+  "size": "10 ml.",
+  "barcode": "8857128012055",
+  "shipped": 31.0,
+  "sold": 24.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Sicilia",
+  "size": "4 ml.",
+  "barcode": "8857128012056",
+  "shipped": 30.0,
+  "sold": 29.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Soir",
+  "size": "50 ml.",
+  "barcode": "8857128012144",
+  "shipped": 10.0,
+  "sold": 6.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Soir",
+  "size": "30 ml.",
+  "barcode": "8857128012145",
+  "shipped": 15.0,
+  "sold": 9.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Soir",
+  "size": "10 ml.",
+  "barcode": "8857128012146",
+  "shipped": 19.0,
+  "sold": 15.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Soir",
+  "size": "4 ml.",
+  "barcode": "8857128012147",
+  "shipped": 0,
+  "sold": 4.0,
+  "remaining": -4.0
+ },
+ {
+  "scent": "Sparkling Mandarin",
+  "size": "50 ml.",
+  "barcode": "8857128011713",
+  "shipped": 17.0,
+  "sold": 12.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Sparkling Mandarin",
+  "size": "30 ml.",
+  "barcode": "8857128012010",
+  "shipped": 13.0,
+  "sold": 8.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Sparkling Mandarin",
+  "size": "10 ml.",
+  "barcode": "8857128012108",
+  "shipped": 50.0,
+  "sold": 36.0,
+  "remaining": 14.0
+ },
+ {
+  "scent": "Sparkling Mandarin",
+  "size": "4 ml.",
+  "barcode": "8857128012109",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Teenage Dream",
+  "size": "50 ml.",
+  "barcode": "8857128011096",
+  "shipped": 10.0,
+  "sold": 5.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Teenage Dream",
+  "size": "30 ml.",
+  "barcode": "8857128012069",
+  "shipped": 9.0,
+  "sold": 5.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Teenage Dream",
+  "size": "10 ml.",
+  "barcode": "8857128012070",
+  "shipped": 29.0,
+  "sold": 22.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Teenage Dream",
+  "size": "4 ml.",
+  "barcode": "8857128012071",
+  "shipped": 20.0,
+  "sold": 21.0,
+  "remaining": -1.0
+ },
+ {
+  "scent": "Tropical Leather",
+  "size": "50 ml.",
+  "barcode": "8857128011720",
+  "shipped": 3.0,
+  "sold": 3.0,
+  "remaining": 0
+ },
+ {
+  "scent": "Tropical Leather",
+  "size": "30 ml.",
+  "barcode": "8857128012011",
+  "shipped": 5.0,
+  "sold": 3.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "Tropical Leather",
+  "size": "10 ml.",
+  "barcode": "8857128012112",
+  "shipped": 17.0,
+  "sold": 11.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Tropical Leather",
+  "size": "4 ml.",
+  "barcode": "8857128012113",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Velvet Oud",
+  "size": "50 ml.",
+  "barcode": "8857128011522",
+  "shipped": 26.0,
+  "sold": 15.0,
+  "remaining": 11.0
+ },
+ {
+  "scent": "Velvet Oud",
+  "size": "30 ml.",
+  "barcode": "8857128012048",
+  "shipped": 25.0,
+  "sold": 12.0,
+  "remaining": 13.0
+ },
+ {
+  "scent": "Velvet Oud",
+  "size": "10 ml.",
+  "barcode": "8857128012047",
+  "shipped": 66.0,
+  "sold": 50.0,
+  "remaining": 16.0
+ },
+ {
+  "scent": "Velvet Oud",
+  "size": "4 ml.",
+  "barcode": "8857128012046",
+  "shipped": 0,
+  "sold": 1.0,
+  "remaining": -1.0
+ },
+ {
+  "scent": "Victory",
+  "size": "50 ml.",
+  "barcode": "8857128011164",
+  "shipped": 15.0,
+  "sold": 9.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Victory",
+  "size": "30 ml.",
+  "barcode": "8857128011430",
+  "shipped": 12.0,
+  "sold": 7.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Victory",
+  "size": "10 ml.",
+  "barcode": "8857128011263",
+  "shipped": 43.0,
+  "sold": 37.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Victory",
+  "size": "4 ml.",
+  "barcode": "8857128011751",
+  "shipped": 0,
+  "sold": 0,
+  "remaining": 0
+ },
+ {
+  "scent": "Virgin X",
+  "size": "50 ml.",
+  "barcode": "8857128011256",
+  "shipped": 10.0,
+  "sold": 6.0,
+  "remaining": 4.0
+ },
+ {
+  "scent": "Virgin X",
+  "size": "30 ml.",
+  "barcode": "8857128011997",
+  "shipped": 13.0,
+  "sold": 8.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Virgin X",
+  "size": "10 ml.",
+  "barcode": "8857128012053",
+  "shipped": 68.0,
+  "sold": 62.0,
+  "remaining": 6.0
+ },
+ {
+  "scent": "Virgin X",
+  "size": "4 ml.",
+  "barcode": "8857128012054",
+  "shipped": 40.0,
+  "sold": 43.0,
+  "remaining": -3.0
+ },
+ {
+  "scent": "Vivid",
+  "size": "50 ml.",
+  "barcode": "8857128011065",
+  "shipped": 16.0,
+  "sold": 11.0,
+  "remaining": 5.0
+ },
+ {
+  "scent": "Vivid",
+  "size": "30 ml.",
+  "barcode": "8857128011898",
+  "shipped": 18.0,
+  "sold": 11.0,
+  "remaining": 7.0
+ },
+ {
+  "scent": "Vivid",
+  "size": "10 ml.",
+  "barcode": "8857128012060",
+  "shipped": 47.0,
+  "sold": 38.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Vivid",
+  "size": "4 ml.",
+  "barcode": "8857128012061",
+  "shipped": 20.0,
+  "sold": 19.0,
+  "remaining": 1.0
+ },
+ {
+  "scent": "Voyage",
+  "size": "50 ml.",
+  "barcode": "8857128012019",
+  "shipped": 39.0,
+  "sold": 26.0,
+  "remaining": 13.0
+ },
+ {
+  "scent": "Voyage",
+  "size": "30 ml.",
+  "barcode": "8857128012023",
+  "shipped": 30.0,
+  "sold": 16.0,
+  "remaining": 14.0
+ },
+ {
+  "scent": "Voyage",
+  "size": "10 ml.",
+  "barcode": "8857128012027",
+  "shipped": 87.0,
+  "sold": 67.0,
+  "remaining": 20.0
+ },
+ {
+  "scent": "Voyage",
+  "size": "4 ml.",
+  "barcode": "8857128012045",
+  "shipped": 5.0,
+  "sold": 5.0,
+  "remaining": 0
+ },
+ {
+  "scent": "Zeus",
+  "size": "50 ml.",
+  "barcode": "8857128011027",
+  "shipped": 35.0,
+  "sold": 20.0,
+  "remaining": 15.0
+ },
+ {
+  "scent": "Zeus",
+  "size": "30 ml.",
+  "barcode": "8857128011843",
+  "shipped": 22.0,
+  "sold": 12.0,
+  "remaining": 10.0
+ },
+ {
+  "scent": "Zeus",
+  "size": "10 ml.",
+  "barcode": "8857128012041",
+  "shipped": 44.0,
+  "sold": 28.0,
+  "remaining": 16.0
+ },
+ {
+  "scent": "Zeus",
+  "size": "4 ml.",
+  "barcode": "8857128012017",
+  "shipped": 20.0,
+  "sold": 18.0,
+  "remaining": 2.0
+ },
+ {
+  "scent": "ถุงกระดาษ Size M",
+  "size": "Size M",
+  "barcode": "8857128012134",
+  "shipped": 615.0,
+  "sold": 0,
+  "remaining": 615.0
+ },
+ {
+  "scent": "ถุงกระดาษ Size S",
+  "size": "Size S",
+  "barcode": "8857128012133",
+  "shipped": 500.0,
+  "sold": 0,
+  "remaining": 500.0
+ },
+ {
+  "scent": "Tumbler CYOC (White)",
+  "size": "White",
+  "barcode": "8857128012130",
+  "shipped": 44.0,
+  "sold": 35.0,
+  "remaining": 9.0
+ },
+ {
+  "scent": "Tumbler CYOC (Dark Blue)",
+  "size": "Dark Blue",
+  "barcode": "8857128012131",
+  "shipped": 9.0,
+  "sold": 9.0,
+  "remaining": 0
+ },
+ {
+  "scent": "Cloth BAG CYOC",
+  "size": "Size M",
+  "barcode": "8857128012132",
+  "shipped": 80.0,
+  "sold": 30.0,
+  "remaining": 50.0
+ }
+]

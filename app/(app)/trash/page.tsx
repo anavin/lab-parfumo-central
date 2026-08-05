@@ -1,0 +1,20 @@
+import { Trash2 } from "lucide-react";
+import { PageHeader, Card } from "@/components/ui";
+import { requireAdmin } from "@/lib/auth/require-user";
+import { trashedRequisitions } from "@/lib/queries";
+import { TrashManager } from "@/components/TrashManager";
+
+export const dynamic = "force-dynamic";
+
+export default async function TrashPage() {
+  await requireAdmin();
+  const rows = await trashedRequisitions();
+  return (
+    <div className="p-8 max-w-[900px] mx-auto">
+      <PageHeader icon={Trash2} title="ถังขยะ" subtitle={`ใบเบิกที่ถูกลบ ${rows.length} รายการ · กู้คืนหรือลบถาวรได้`} />
+      <Card bodyClass="p-0">
+        <TrashManager rows={rows} />
+      </Card>
+    </div>
+  );
+}

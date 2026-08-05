@@ -1,0 +1,22 @@
+[
+ {
+  "branch_code": "01_CTW - Central World",
+  "store_code": "01_CTW",
+  "store_no": "สาขาที่ 00001",
+  "tel": null,
+  "receiver": null,
+  "email_store": null,
+  "email_admin": null,
+  "address": null
+ },
+ {
+  "branch_code": "02_SCS-Seacon Squar Srinakarin",
+  "store_code": "02_SCS",
+  "store_no": "Event",
+  "tel": null,
+  "receiver": null,
+  "email_store": null,
+  "email_admin": null,
+  "address": null
+ }
+]
