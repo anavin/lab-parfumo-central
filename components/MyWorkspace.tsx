@@ -1,9 +1,10 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, Clock, XCircle, Users } from "lucide-react";
-import { searchProducts } from "@/lib/actions/lookups";
+import { Plus, Pencil, Trash2, Check, Clock, XCircle, Users, ScanLine } from "lucide-react";
+import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
 import { submitSale, submitCustomerDay, updateMySale, updateMyCustomerDay, deleteMySubmission } from "@/lib/actions/submissions";
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow } from "@/lib/queries";
 
@@ -133,9 +134,17 @@ function SubmissionItem({ r, onEdit, onDelete, pending }: { r: SubmissionRow; on
 function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleState; setState: (s: SaleState | null) => void; onSave: () => void; pending: boolean; fullName: string }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const s = (k: keyof SaleState, v: any) => setState({ ...state, [k]: v });
   const onItem = (v: string) => { s("item", v); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
   const total = (Number(state.qty) || 0) * (Number(state.unit_price) || 0) - (Number(state.discount) || 0);
+
+  const onScanned = async (code: string) => {
+    setScanning(false);
+    const p = await findProductByBarcode(code);
+    if (p) setState({ ...state, item: p.scent, barcode: p.barcode, size: p.size || state.size, unit_price: p.price ?? state.unit_price });
+    else { setState({ ...state, barcode: code }); alert(`ไม่พบสินค้าบาร์โค้ดนี้ในระบบ (${code}) — กรอกกลิ่นเองได้`); }
+  };
 
   return (
     <div className="card p-5 mb-4">
@@ -149,7 +158,13 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="ช่องทาง"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option>CTW</option><option>EVENT_SCS</option></select></Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
         <div className="md:col-span-2 relative"><Field label="สินค้า">
-          <input className={inp} value={state.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="ค้นหากลิ่น" /></Field>
+          <div className="flex gap-2">
+            <input className={inp} value={state.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="ค้นหากลิ่น หรือสแกนบาร์โค้ด" />
+            <button type="button" onClick={() => setScanning(true)} title="สแกนบาร์โค้ด"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 rounded-lg border border-line bg-white text-sm font-medium hover:bg-canvas">
+              <ScanLine className="w-4 h-4" /> สแกน
+            </button>
+          </div></Field>
           {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-white border border-line rounded-lg shadow-lg text-sm">
             {res.map((p) => <button key={p.id} onMouseDown={() => { setState({ ...state, item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
@@ -168,6 +183,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
           </div>
         </div>
       </div>
+      {scanning && <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
   );
 }

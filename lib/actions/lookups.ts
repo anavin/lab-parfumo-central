@@ -10,6 +10,16 @@ export async function searchProducts(term: string) {
     order by scent, size limit 25`, [t]);
 }
 
+/** Exact-match a product by scanned barcode (for the sale form scanner). */
+export async function findProductByBarcode(barcode: string) {
+  const code = (barcode ?? "").trim();
+  if (!code) return null;
+  const [p] = await q<{ id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number }>(`
+    select id, barcode, scent, grade, size, sku, price::float
+    from products where barcode = $1 limit 1`, [code]);
+  return p ?? null;
+}
+
 export async function listPOs() {
   return q<{ po_number: string; order_date: string; branch_label: string; lines: number; qty: number }>(`
     select po.po_number, po.order_date, po.branch_label,
