@@ -14,11 +14,20 @@ export async function createSession(userId: number): Promise<string> {
 
 export async function getUserFromToken(token: string | undefined): Promise<User | null> {
   if (!token) return null;
-  const rows = await q<User & { last_activity_at: string }>(`
-    select u.id, u.username, u.full_name, u.role, u.permissions, u.is_active, u.last_login_at, u.created_at,
+  const sql = (permCol: string) => `
+    select u.id, u.username, u.full_name, u.role, ${permCol} as permissions, u.is_active, u.last_login_at, u.created_at,
            s.last_activity_at
     from user_sessions s join users u on u.id = s.user_id
-    where s.token = $1 and u.is_active = true`, [token]);
+    where s.token = $1 and u.is_active = true`;
+  let rows: (User & { last_activity_at: string })[];
+  try {
+    rows = await q<User & { last_activity_at: string }>(sql("u.permissions"), [token]);
+  } catch (e: any) {
+    // Migration 0005 (users.permissions) not applied yet → fall back to role
+    // presets so the whole app doesn't hard-crash. (Postgres 42703 = undefined_column.)
+    if (e?.code !== "42703" && !/permissions.*does not exist/i.test(String(e?.message || ""))) throw e;
+    rows = await q<User & { last_activity_at: string }>(sql("null::text[]"), [token]);
+  }
   const row = rows[0];
   if (!row) return null;
 
