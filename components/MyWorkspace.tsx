@@ -224,29 +224,34 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       </div>
 
       {/* extra options */}
-      <details className="mb-3">
-        <summary className="text-xs text-brand-dark cursor-pointer select-none">ตัวเลือกเพิ่มเติม (เลขใบเสร็จ · เวลา · ช่องทางขาย)</summary>
-        <div className="grid grid-cols-2 gap-3 mt-2">
-          <div className="col-span-2"><Field label="เลขใบเสร็จ (ถ้ามี)"><input className={inp} value={state.receipt_no} onChange={(e) => set({ receipt_no: e.target.value })} placeholder="ไม่มีก็เว้นได้" /></Field></div>
-          <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => set({ sale_time: e.target.value })} /></Field>
-          <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => set({ source: e.target.value })}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
+      <details className="mb-4 border-t border-line/60 pt-3">
+        <summary className="text-sm text-brand-dark cursor-pointer select-none list-none">▾ ตัวเลือกเพิ่มเติม <span className="text-muted text-xs">(เลขใบเสร็จ · เวลา · ช่องทางขาย)</span></summary>
+        <div className="mt-3 space-y-3">
+          <Field label="เลขใบเสร็จ (ถ้ามี)"><input className={inp} value={state.receipt_no} onChange={(e) => set({ receipt_no: e.target.value })} placeholder="ไม่มีก็เว้นได้" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => set({ sale_time: e.target.value })} /></Field>
+            <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => set({ source: e.target.value })}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
+          </div>
         </div>
       </details>
 
       {/* bill-level extra discount (%) — default 5%, adjustable */}
-      <div className="mb-3">
-        <div className="text-xs text-muted mb-1">ส่วนลดเพิ่มท้ายบิล (%) <span className="text-muted/70">— ราคาต่อชิ้นลดมาแล้ว อันนี้ลดเพิ่มตอนต่อรอง</span></div>
+      <div className="mb-4 border-t border-line/60 pt-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-sm font-medium text-ink">ส่วนลดเพิ่มท้ายบิล</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[0, 5, 10].map((v) => <button key={v} onClick={() => set({ discount_pct: v })} className={"px-3 py-1.5 rounded-lg text-xs font-medium border " + (pct === v ? "bg-brand text-white border-brand" : "border-line hover:bg-canvas")}>{v}%</button>)}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-line overflow-hidden shrink-0">
+          <div className="flex items-center rounded-lg border border-line overflow-hidden">
             <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input inputMode="numeric" className="w-12 text-center py-2 text-sm outline-none" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value })} />
+            <input inputMode="numeric" className="w-12 text-center py-2 text-sm outline-none" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value.replace(/^0+(?=\d)/, "") })} onFocus={(e) => e.target.select()} />
             <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
           <span className="text-sm text-muted">%</span>
-          <div className="ml-auto flex gap-1.5">
-            {[0, 5, 10].map((v) => <button key={v} onClick={() => set({ discount_pct: v })} className={"px-2.5 py-1.5 rounded-lg text-xs border " + (pct === v ? "bg-brand text-white border-brand" : "border-line hover:bg-canvas")}>{v}%</button>)}
-          </div>
         </div>
+        <div className="text-[11px] text-muted mt-1.5">ราคาต่อชิ้นลดมาแล้ว — อันนี้ลดเพิ่มตอนต่อรอง</div>
       </div>
 
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}

@@ -230,17 +230,18 @@ function isTransientDbError(e: any): boolean {
 /** Convenience: run a query and return rows (with transient-error retry on pg). */
 export async function q<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   if (usePg()) {
+    const MAX = 4;
     let lastErr: any;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < MAX; attempt++) {
       try {
         const pool = await getPgPool();
         const r = await pool.query(sql, params);
         return r.rows as T[];
       } catch (e) {
         lastErr = e;
-        if (attempt === 2 || !isTransientDbError(e)) throw e;
-        console.warn(`[db] transient error, retrying (${attempt + 1}/2):`, (e as any)?.message);
-        await new Promise((res) => setTimeout(res, 150 * (attempt + 1)));
+        if (attempt === MAX - 1 || !isTransientDbError(e)) throw e;
+        console.warn(`[db] transient error, retrying (${attempt + 1}/${MAX - 1}):`, (e as any)?.message);
+        await new Promise((res) => setTimeout(res, 250 * (attempt + 1)));  // 250 / 500 / 750ms
       }
     }
     throw lastErr;
