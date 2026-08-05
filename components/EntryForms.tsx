@@ -55,9 +55,9 @@ export function AddSale() {
         </div>
         <Field label="ขนาด"><input className={inp} value={f.size} onChange={(e) => s("size", e.target.value)} /></Field>
         <Field label="สัญชาติ"><select className={inp} value={f.nation} onChange={(e) => s("nation", e.target.value)}><option value="">-</option><option>Thai</option><option>Foreign</option></select></Field>
-        <Field label="จำนวน"><input type="number" className={inp} value={f.qty} onChange={(e) => s("qty", e.target.value)} /></Field>
-        <Field label="ราคา/หน่วย"><input type="number" className={inp} value={f.unit_price} onChange={(e) => s("unit_price", e.target.value)} /></Field>
-        <Field label="ส่วนลด"><input type="number" className={inp} value={f.discount} onChange={(e) => s("discount", e.target.value)} /></Field>
+        <Field label="จำนวน"><input inputMode="numeric" className={inp} value={f.qty} onFocus={(e) => e.target.select()} onChange={(e) => s("qty", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
+        <Field label="ราคา/หน่วย"><input inputMode="numeric" className={inp} value={f.unit_price} onFocus={(e) => e.target.select()} onChange={(e) => s("unit_price", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
+        <Field label="ส่วนลด"><input inputMode="numeric" className={inp} value={f.discount} onFocus={(e) => e.target.select()} onChange={(e) => s("discount", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <Field label="ช่องทางชำระ"><input className={inp} value={f.payment_channel} onChange={(e) => s("payment_channel", e.target.value)} /></Field>
         <div className="md:col-span-4 flex items-center justify-between border-t border-black/5 pt-3">
           <span className="text-sm">รวม: <b>฿{total.toLocaleString()}</b></span>
@@ -85,7 +85,7 @@ export function AddCash() {
         <Field label="วันที่"><input type="date" className={inp} value={f.cash_date} onChange={(e) => s("cash_date", e.target.value)} /></Field>
         <Field label="รายละเอียด"><input className={inp} value={f.description} onChange={(e) => s("description", e.target.value)} /></Field>
         <Field label="ประเภท"><input className={inp} value={f.type} onChange={(e) => s("type", e.target.value)} /></Field>
-        <Field label="จำนวนเงิน"><input type="number" className={inp} value={f.amount} onChange={(e) => s("amount", e.target.value)} /></Field>
+        <Field label="จำนวนเงิน"><input inputMode="numeric" className={inp} value={f.amount} onFocus={(e) => e.target.select()} onChange={(e) => s("amount", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <div className="md:col-span-4 text-right"><button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-ink text-white text-sm font-medium hover:bg-black disabled:opacity-50">บันทึก</button></div>
       </div>
     </Panel>
@@ -108,10 +108,10 @@ export function AddCustomerDay() {
       <div className="grid md:grid-cols-6 gap-3">
         <Field label="วันที่"><input type="date" className={inp} value={f.cust_date} onChange={(e) => s("cust_date", e.target.value)} /></Field>
         <Field label="BA"><input className={inp} value={f.ba} onChange={(e) => s("ba", e.target.value)} /></Field>
-        <Field label="ลูกค้า"><input type="number" className={inp} value={f.customers} onChange={(e) => s("customers", e.target.value)} /></Field>
-        <Field label="ยอดขาย"><input type="number" className={inp} value={f.sell_amount} onChange={(e) => s("sell_amount", e.target.value)} /></Field>
-        <Field label="ไทย"><input type="number" className={inp} value={f.thai} onChange={(e) => s("thai", e.target.value)} /></Field>
-        <Field label="ต่างชาติ"><input type="number" className={inp} value={f.foreign} onChange={(e) => s("foreign", e.target.value)} /></Field>
+        <Field label="ลูกค้า"><input inputMode="numeric" className={inp} value={f.customers} onFocus={(e) => e.target.select()} onChange={(e) => s("customers", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
+        <Field label="ยอดขาย"><input inputMode="numeric" className={inp} value={f.sell_amount} onFocus={(e) => e.target.select()} onChange={(e) => s("sell_amount", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
+        <Field label="ไทย"><input inputMode="numeric" className={inp} value={f.thai} onFocus={(e) => e.target.select()} onChange={(e) => s("thai", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
+        <Field label="ต่างชาติ"><input inputMode="numeric" className={inp} value={f.foreign} onFocus={(e) => e.target.select()} onChange={(e) => s("foreign", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <div className="md:col-span-6 text-right"><button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-ink text-white text-sm font-medium hover:bg-black disabled:opacity-50">บันทึก</button></div>
       </div>
     </Panel>

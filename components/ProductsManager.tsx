@@ -110,7 +110,7 @@ function ProductForm({ state, setState, onSave, pending }: { state: FormState; s
         <Field label="Grade"><input className={inp} value={state.grade} onChange={(e) => s("grade", e.target.value)} placeholder="EDP / PARFUM ..." /></Field>
         <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} placeholder="50 ml." /></Field>
         <Field label="SKU"><input className={inp} value={state.sku} onChange={(e) => s("sku", e.target.value)} /></Field>
-        <Field label="ราคา"><input type="number" min="0" className={inp} value={state.price} onChange={(e) => s("price", e.target.value)} /></Field>
+        <Field label="ราคา"><input inputMode="numeric" className={inp} value={state.price} onFocus={(e) => e.target.select()} onChange={(e) => s("price", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <div className="md:col-span-3 flex justify-end gap-2 border-t border-line pt-3">
           <button onClick={() => setState(null)} className="px-4 py-2 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
           <button onClick={onSave} disabled={pending || !state.barcode || !state.scent} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "เพิ่มสินค้า"}</button>

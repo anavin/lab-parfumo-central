@@ -367,13 +367,18 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending }: { index: numb
         {rows.map((r) => (
           <li key={r.id} className="flex items-center gap-2 text-sm">
             <span className="text-muted text-xs w-7 shrink-0 text-right">{num(r.qty ?? 0)}×</span>
-            <span className="flex-1 min-w-0 truncate text-ink">{r.item} <span className="text-muted text-xs">{r.size}</span></span>
+            {r.status === "pending" ? (
+              <button onClick={() => onEdit(r)} disabled={pending}
+                className="group flex-1 min-w-0 flex items-center gap-1.5 text-left disabled:opacity-50" aria-label="แก้ไขรายการนี้">
+                <span className="truncate text-ink group-active:text-brand-dark">{r.item} <span className="text-muted text-xs">{r.size}</span></span>
+                <Pencil className="w-3 h-3 shrink-0 text-muted/60 group-hover:text-brand-dark" />
+              </button>
+            ) : (
+              <span className="flex-1 min-w-0 truncate text-ink">{r.item} <span className="text-muted text-xs">{r.size}</span></span>
+            )}
             <span className="text-ink whitespace-nowrap tabular-nums">{baht(r.total ?? 0)}</span>
             {r.status === "pending" && (
-              <span className="flex items-center shrink-0">
-                <button onClick={() => onEdit(r)} disabled={pending} className="p-1 rounded text-muted hover:text-ink disabled:opacity-50" aria-label="แก้ไข"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => onDelete(r)} disabled={pending} className="p-1 rounded text-muted hover:text-red-600 disabled:opacity-50" aria-label="ลบ"><Trash2 className="w-3.5 h-3.5" /></button>
-              </span>
+              <button onClick={() => onDelete(r)} disabled={pending} className="p-1 rounded text-muted hover:text-red-600 disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-3.5 h-3.5" /></button>
             )}
           </li>
         ))}
@@ -390,6 +395,13 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   const [scanning, setScanning] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
   const s = (k: keyof SaleState, v: any) => setState({ ...state, [k]: v });
+  // numeric field: select-all on focus + strip leading zeros so a default 0 disappears when typing
+  const numFld = (k: "qty" | "unit_price" | "discount") => ({
+    inputMode: "numeric" as const,
+    value: state[k] as any,
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => s(k, e.target.value.replace(/^0+(?=\d)/, "")),
+  });
   const onItem = (v: string) => { s("item", v); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
   const onScanned = async (code: string) => {
     setScanning(false);
@@ -423,9 +435,9 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         </div>}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-        <Field label="จำนวน"><input type="number" min="0" inputMode="numeric" className={inp} value={state.qty} onChange={(e) => s("qty", e.target.value)} /></Field>
-        <Field label="ราคา/หน่วย"><input type="number" min="0" inputMode="numeric" className={inp} value={state.unit_price} onChange={(e) => s("unit_price", e.target.value)} /></Field>
-        <Field label="ส่วนลด"><input type="number" min="0" inputMode="numeric" className={inp} value={state.discount} onChange={(e) => s("discount", e.target.value)} /></Field>
+        <Field label="จำนวน"><input {...numFld("qty")} className={inp} /></Field>
+        <Field label="ราคา/หน่วย"><input {...numFld("unit_price")} className={inp} /></Field>
+        <Field label="ส่วนลด"><input {...numFld("discount")} className={inp} /></Field>
         <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
