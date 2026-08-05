@@ -203,10 +203,13 @@ function usePg() {
 async function getPgPool() {
   if (!gp._pgPool) {
     const { Pool, types } = await import("pg");
-    // node-postgres returns bigint (int8) as a string by default, while PGlite
-    // returns a number — that mismatch broke id comparisons (e.g. ownPending's
-    // created_by check) on prod only. Parse int8 as a number so both match.
+    // Make node-postgres return the same JS types as PGlite (local dev) to avoid
+    // prod-only bugs:
+    //  - bigint/int8 (OID 20): string -> number (id comparisons, e.g. ownPending)
+    //  - date (OID 1082): Date -> "YYYY-MM-DD" string (so entry_date/sale_date
+    //    stay strings for zod string validation and equality)
     types.setTypeParser(20, (v: string | null) => (v == null ? null : parseInt(v, 10)));
+    types.setTypeParser(1082, (v: string | null) => v);
     // Serverless-friendly: keep few connections per instance (Supabase NANO has
     // a small direct-connection limit), release idle ones, and fail fast on a
     // stuck connect instead of hanging a Server Component render.
