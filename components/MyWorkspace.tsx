@@ -274,7 +274,7 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
   );
   return (
     <div className="rounded-xl border border-line bg-white p-3">
-      {/* name — prominent, own line */}
+      {/* name + size */}
       <div className="flex items-center gap-2 mb-2.5">
         <span className="w-5 text-center text-xs font-medium text-muted shrink-0">{index + 1}</span>
         <div className="flex-1 relative min-w-0">
@@ -283,16 +283,16 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
             {res.map((p) => <button key={p.id} onMouseDown={() => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
+        <input className="w-[70px] shrink-0 border border-line rounded-lg px-1.5 py-2 text-sm text-center text-muted focus:outline-none focus:border-brand" value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
         <button onClick={onRemove} className="p-1.5 rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
       </div>
-      {/* fields — labeled, equal width */}
-      <div className="grid grid-cols-4 gap-2 pl-7">
-        <Cell label="ขนาด"><input className={fld} value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="-" /></Cell>
+      {/* qty · price · discount — wider now that size moved up */}
+      <div className="grid grid-cols-3 gap-2.5 pl-7">
         <Cell label="จำนวน">
           <div className="flex items-stretch rounded-lg border border-line overflow-hidden">
-            <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-6 flex items-center justify-center text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-3.5 h-3.5" /></button>
+            <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-7 flex items-center justify-center text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
             <input inputMode="numeric" className="w-full min-w-0 text-center text-sm py-1.5 tabular-nums outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
-            <button onClick={() => onChange({ qty: q + 1 })} className="w-6 flex items-center justify-center text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-3.5 h-3.5" /></button>
+            <button onClick={() => onChange({ qty: q + 1 })} className="w-7 flex items-center justify-center text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
         </Cell>
         <Cell label="ราคา"><input inputMode="numeric" className={fld} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} /></Cell>
