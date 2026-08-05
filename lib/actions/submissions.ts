@@ -87,7 +87,8 @@ async function ownPending(id: number, userId: number) {
   const [row] = await q<{ id: number; kind: string; status: string; created_by: number }>(
     `select id, kind, status, created_by from submissions where id = $1`, [id]);
   if (!row) throw new Error("ไม่พบรายการ");
-  if (row.created_by !== userId) throw new Error("แก้ไขได้เฉพาะรายการของตัวเอง");
+  // node-postgres returns bigint columns as strings; compare numerically
+  if (Number(row.created_by) !== Number(userId)) throw new Error("แก้ไขได้เฉพาะรายการของตัวเอง");
   if (row.status !== "pending") throw new Error("รายการนี้ถูกตรวจแล้ว แก้ไขไม่ได้");
   return row;
 }
