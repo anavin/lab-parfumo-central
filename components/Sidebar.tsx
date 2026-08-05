@@ -76,7 +76,7 @@ export function Sidebar({ user, pending = 0 }: { user: User; pending?: number })
                 const on = active(n.href);
                 const Icon = n.icon;
                 return (
-                  <Link key={n.href} href={n.href}
+                  <Link key={n.href} href={n.href} prefetch={false}
                     className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] transition-colors ${
                       on ? "bg-white/[0.09] text-white font-medium" : "text-white/70 hover:bg-white/[0.05] hover:text-white"}`}>
                     <Icon className={`w-[18px] h-[18px] ${on ? "text-brand" : "text-white/45 group-hover:text-white/70"}`} strokeWidth={2} />
