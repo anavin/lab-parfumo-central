@@ -27,11 +27,15 @@ const PAYMENTS = [
 ];
 
 // ---- bill (multi-item) types ----
-type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any };
-type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; items: BillItem[] };
+// Per-item price is already discounted; discount_pct is an extra bill-level
+// discount (e.g. negotiated when buying several), distributed to each line.
+type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any };
+type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[] };
+type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number };
+const DEFAULT_DISCOUNT_PCT = 5;
 let itemKey = 0;
-const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", items: withItem ? [newItem()] : [] });
+const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, ...patch });
+const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
@@ -56,13 +60,13 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
     wasOpen.current = open;
   });
 
-  const submitTheBill = (items: BillItem[]) => start(async () => {
+  const submitTheBill = (items: BillItemPayload[]) => start(async () => {
     if (!bill) return;
     try {
       await submitBill({
         sale_date: bill.sale_date, sale_time: bill.sale_time, source: bill.source,
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
-        items: items.map((it) => ({ item: it.item, barcode: it.barcode, size: it.size, qty: Number(it.qty), unit_price: Number(it.unit_price), discount: Number(it.discount) })),
+        items,
       });
       setBill(null); refresh();
     } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
@@ -120,7 +124,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
 
 // ---------------------------------------------------------------- bill builder
 function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItem[]) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
+  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[]) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
 }) {
   const [scanning, setScanning] = useState(!!autoScan);
   const [missing, setMissing] = useState<string[]>([]);
@@ -136,7 +140,16 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     else addItem({ barcode: code });
   };
 
-  const total = state.items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.unit_price) || 0) - (Number(it.discount) || 0), 0);
+  // bill-level extra discount (%), distributed to each line
+  const pct = Math.min(100, Math.max(0, Number(state.discount_pct) || 0));
+  const lines = state.items.map((it) => {
+    const sub = (Number(it.qty) || 0) * (Number(it.unit_price) || 0);
+    const discount = Math.round((sub * pct) / 100);
+    return { it, sub, discount, total: sub - discount };
+  });
+  const subtotal = lines.reduce((s, l) => s + l.sub, 0);
+  const discountTotal = lines.reduce((s, l) => s + l.discount, 0);
+  const net = subtotal - discountTotal;
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
 
   const submit = () => {
@@ -146,7 +159,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     if (state.items.length === 0) m.push("สินค้า");
     else if (state.items.some((it) => !String(it.item || "").trim())) m.push("ชื่อสินค้าให้ครบ");
     setMissing(m);
-    if (m.length === 0) onSubmit(state.items);
+    if (m.length === 0) onSubmit(lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount })));
   };
   const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-red-400 border-red-400" : "");
 
@@ -199,11 +212,31 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         </div>
       </details>
 
+      {/* bill-level extra discount (%) — default 5%, adjustable */}
+      <div className="mb-3">
+        <div className="text-xs text-muted mb-1">ส่วนลดเพิ่มท้ายบิล (%) <span className="text-muted/70">— ราคาต่อชิ้นลดมาแล้ว อันนี้ลดเพิ่มตอนต่อรอง</span></div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-line overflow-hidden shrink-0">
+            <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
+            <input inputMode="numeric" className="w-12 text-center py-2 text-sm outline-none" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value })} />
+            <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+          </div>
+          <span className="text-sm text-muted">%</span>
+          <div className="ml-auto flex gap-1.5">
+            {[0, 5, 10].map((v) => <button key={v} onClick={() => set({ discount_pct: v })} className={"px-2.5 py-1.5 rounded-lg text-xs border " + (pct === v ? "bg-brand text-white border-brand" : "border-line hover:bg-canvas")}>{v}%</button>)}
+          </div>
+        </div>
+      </div>
+
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
 
-      <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
-        <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
-        <div className="flex gap-2 shrink-0">
+      <div className="border-t border-line pt-3">
+        <div className="space-y-0.5 text-sm mb-3">
+          <div className="flex justify-between text-muted"><span>ยอดรวม</span><span>{baht(subtotal)}</span></div>
+          {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด {pct}%</span><span>−{baht(discountTotal)}</span></div>}
+          <div className="flex justify-between items-baseline font-semibold text-ink pt-0.5"><span>รวมสุทธิ</span><span className="text-brand-dark text-2xl">{baht(net)}</span></div>
+        </div>
+        <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
           <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">ส่งให้ตรวจสอบ</button>
         </div>
@@ -219,8 +252,8 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
-  const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0, dc = Number(it.discount) || 0;
-  const line = q * up - dc;
+  const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
+  const line = q * up;
   return (
     <div className="rounded-xl border border-line bg-white p-3">
       <div className="flex items-start gap-2">
@@ -239,12 +272,10 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
           <input inputMode="numeric" className="w-9 text-center py-2 text-sm outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
           <button onClick={() => onChange({ qty: q + 1 })} className="px-3 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
         </div>
-        <div className="flex-1 grid grid-cols-2 gap-2 min-w-0">
-          <input inputMode="numeric" className={inp + " text-right"} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} placeholder="ราคา" />
-          <input inputMode="numeric" className={inp + " text-right"} value={it.discount} onChange={(e) => onChange({ discount: e.target.value })} placeholder="ส่วนลด" />
-        </div>
+        <input inputMode="numeric" className={inp + " text-right flex-1 min-w-0"} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} placeholder="ราคา/ชิ้น" />
+        <div className="text-sm font-semibold text-ink whitespace-nowrap shrink-0">{baht(line)}</div>
       </div>
-      <div className="text-right text-xs text-muted mt-1.5">{it.size ? `${it.size} · ` : ""}รวม <b className="text-ink">{baht(line)}</b></div>
+      {it.size && <div className="text-xs text-muted mt-1 pl-6">{it.size}</div>}
     </div>
   );
 }
