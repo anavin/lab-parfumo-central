@@ -268,31 +268,37 @@ function ItemCard({ it, index, onChange, onRemove }: { it: BillItem; index: numb
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0, dc = Number(it.discount) || 0;
   const line = q * up - dc;
+  const fld = "w-full border border-line rounded-lg px-1.5 py-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
+  const Cell = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div><span className="block text-[10px] text-muted text-center mb-0.5">{label}</span>{children}</div>
+  );
   return (
     <div className="rounded-xl border border-line bg-white p-3">
-      {/* name + size */}
-      <div className="flex items-start gap-2">
-        <span className="text-xs text-muted mt-2.5 w-4 shrink-0">{index + 1}</span>
+      {/* name — prominent, own line */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="w-5 text-center text-xs font-medium text-muted shrink-0">{index + 1}</span>
         <div className="flex-1 relative min-w-0">
-          <input className={inp} value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
+          <input className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
           {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-white border border-line rounded-lg shadow-lg text-sm">
             {res.map((p) => <button key={p.id} onMouseDown={() => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
-        <input className={inp + " w-[74px] shrink-0 text-center px-1"} value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
-        <button onClick={onRemove} className="p-2 -mr-1 text-muted hover:text-red-600 shrink-0 self-start" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
+        <button onClick={onRemove} className="p-1.5 rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
       </div>
-      {/* qty + price + discount */}
-      <div className="flex items-center gap-2 mt-2 pl-6">
-        <div className="flex items-center rounded-lg border border-line overflow-hidden shrink-0">
-          <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="px-2.5 py-2 hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-          <input inputMode="numeric" className="w-8 text-center py-2 text-sm outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
-          <button onClick={() => onChange({ qty: q + 1 })} className="px-2.5 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
-        </div>
-        <input inputMode="numeric" className={inp + " text-right flex-1 min-w-0 px-2"} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} placeholder="ราคา" />
-        <input inputMode="numeric" className={inp + " text-right flex-1 min-w-0 px-2"} value={it.discount} onChange={(e) => onChange({ discount: e.target.value })} placeholder="ส่วนลด" />
+      {/* fields — labeled, equal width */}
+      <div className="grid grid-cols-4 gap-2 pl-7">
+        <Cell label="ขนาด"><input className={fld} value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="-" /></Cell>
+        <Cell label="จำนวน">
+          <div className="flex items-stretch rounded-lg border border-line overflow-hidden">
+            <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-6 flex items-center justify-center text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-3.5 h-3.5" /></button>
+            <input inputMode="numeric" className="w-full min-w-0 text-center text-sm py-1.5 tabular-nums outline-none" value={it.qty} onChange={(e) => onChange({ qty: e.target.value })} />
+            <button onClick={() => onChange({ qty: q + 1 })} className="w-6 flex items-center justify-center text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-3.5 h-3.5" /></button>
+          </div>
+        </Cell>
+        <Cell label="ราคา"><input inputMode="numeric" className={fld} value={it.unit_price} onChange={(e) => onChange({ unit_price: e.target.value })} /></Cell>
+        <Cell label="ส่วนลด"><input inputMode="numeric" className={fld} value={it.discount} onChange={(e) => onChange({ discount: e.target.value })} /></Cell>
       </div>
-      <div className="text-right text-sm mt-1.5 pl-6">รวม <b className="text-ink">{baht(line)}</b></div>
+      <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">รวม <b className="text-ink text-base">{baht(line)}</b></div>
     </div>
   );
 }
