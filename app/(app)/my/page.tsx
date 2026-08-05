@@ -1,4 +1,4 @@
-import { Store } from "lucide-react";
+import { Store, Wallet, CreditCard } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { myDayKpis, mySubmissions, myTrend } from "@/lib/queries";
 import { PageHeader, Stat, Card } from "@/components/ui";
@@ -41,12 +41,32 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
         <Stat label="ยอดขายวันนี้" value={baht(kpi.revenue)} tone="brand" />
         <Stat label="บิล" value={num(kpi.bills)} sub="ใบเสร็จ" />
         <Stat label="จำนวน" value={num(kpi.qty)} sub="ชิ้น" />
         <Stat label="ลูกค้า" value={num(kpi.customers)} sub="ราย" />
         <Stat label="เฉลี่ย/บิล" value={baht(kpi.aov)} />
+      </div>
+
+      {/* payment breakdown — cash vs. everything else */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="rounded-xl border border-line bg-white p-4">
+          <div className="flex items-center gap-2 text-[13px] text-muted">
+            <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><Wallet className="w-4 h-4" /></span>
+            เงินสด
+          </div>
+          <div className="text-xl font-bold text-ink mt-2 tabular-nums">{baht(kpi.cashRevenue)}</div>
+          <div className="text-[11px] text-muted-soft">{num(kpi.cashBills)} บิล</div>
+        </div>
+        <div className="rounded-xl border border-line bg-white p-4">
+          <div className="flex items-center gap-2 text-[13px] text-muted">
+            <span className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center"><CreditCard className="w-4 h-4" /></span>
+            โอน / บัตร / อื่นๆ
+          </div>
+          <div className="text-xl font-bold text-ink mt-2 tabular-nums">{baht(kpi.otherRevenue)}</div>
+          <div className="text-[11px] text-muted-soft">{num(kpi.otherBills)} บิล</div>
+        </div>
       </div>
 
       <Card title="ยอดขายของฉัน 14 วันล่าสุด">

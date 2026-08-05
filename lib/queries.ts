@@ -286,17 +286,24 @@ export function mySubmissions(userId: number, date: string) {
  * everything they entered that has not been rejected), so their view reflects
  * their own work regardless of review state. */
 export async function myDayKpis(userId: number, date: string) {
-  const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number }>(`
+  const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number; cash_revenue: number; cash_bills: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float qty,
            -- one bill per shared receipt/bill-ref; legacy rows with none count individually
            count(distinct coalesce(nullif(receipt_no,''), 'i'||id))::int bills,
-           count(*) filter (where status='pending')::int pending
+           count(*) filter (where status='pending')::int pending,
+           -- cash-only split, for the daily payment breakdown
+           coalesce(sum(total) filter (where payment_channel='Cash'),0)::float cash_revenue,
+           count(distinct coalesce(nullif(receipt_no,''), 'i'||id)) filter (where payment_channel='Cash')::int cash_bills
     from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2`,
     [userId, date]);
   // customers is derived from bills (one bill ≈ one customer) — no separate entry
   const aov = sale.bills ? sale.revenue / sale.bills : 0;
-  return { revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: sale.bills, aov };
+  return {
+    revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: sale.bills, aov,
+    cashRevenue: sale.cash_revenue, cashBills: sale.cash_bills,
+    otherRevenue: sale.revenue - sale.cash_revenue, otherBills: sale.bills - sale.cash_bills,
+  };
 }
 
 /** Last `days` days of a staff member's own revenue (for the mini trend). */
