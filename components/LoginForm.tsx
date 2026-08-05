@@ -1,20 +1,28 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { signIn } from "@/lib/actions/auth";
 
-function Submit() {
+function Submit({ redirecting }: { redirecting: boolean }) {
   const { pending } = useFormStatus();
+  const busy = pending || redirecting;
   return (
-    <button disabled={pending}
+    <button disabled={busy}
       className="w-full bg-ink text-white rounded-lg py-2.5 text-sm font-medium hover:bg-black disabled:opacity-50 transition-colors">
-      {pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
+      {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
     </button>
   );
 }
 
 export function LoginForm({ next }: { next: string }) {
   const [state, action] = useActionState(signIn, null);
+  const ok = !!(state && (state as any).ok);
+
+  // full navigation on success so the page renders with the new session cookie
+  useEffect(() => {
+    if (ok) window.location.assign((state as any).next || "/");
+  }, [ok, state]);
+
   return (
     <form action={action} className="space-y-3.5">
       <input type="hidden" name="next" value={next} />
@@ -35,7 +43,7 @@ export function LoginForm({ next }: { next: string }) {
             <span className="text-muted"> · เหลือ {state.attemptsRemaining} ครั้ง</span>}
         </div>
       )}
-      <Submit />
+      <Submit redirecting={ok} />
     </form>
   );
 }

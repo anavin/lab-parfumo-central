@@ -25,7 +25,12 @@ export async function signIn(_prev: unknown, formData: FormData) {
   const token = await createSession(res.user.id);
   await setSessionCookie(token);
   await logAudit("login", "auth", res.user.username, "เข้าสู่ระบบ", res.user);
-  redirect(next.startsWith("/") ? next : "/");
+  // Return success and let the client do a full navigation (window.location).
+  // A server-action redirect() does a soft navigation that can render blank
+  // right after the session cookie is set (esp. with the staff -> /my layout
+  // redirect), forcing a manual refresh. A full load always renders with the
+  // new cookie.
+  return { ok: true as const, next: next.startsWith("/") ? next : "/" };
 }
 
 export async function signOut() {
