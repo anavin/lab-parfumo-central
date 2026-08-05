@@ -33,7 +33,7 @@ const PAYMENTS = [
 type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any };
 type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number };
-const DEFAULT_DISCOUNT_PCT = 5;
+const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
 const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [] });
@@ -184,6 +184,8 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   });
   const subtotal = lines.reduce((s, l) => s + l.sub, 0);
   const discountTotal = lines.reduce((s, l) => s + l.discount, 0);
+  const itemDiscTotal = lines.reduce((s, l) => s + Math.min(l.sub, Number(l.it.discount) || 0), 0);
+  const billDiscTotal = discountTotal - itemDiscTotal;   // baht from the bill-level %
   const net = subtotal - discountTotal;
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
 
@@ -249,23 +251,29 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         </div>
       </details>
 
-      {/* bill-level extra discount (%) — default 5%, adjustable */}
+      {/* bill-level extra discount (%) — default 0%, adjustable */}
       <div className="mb-4 border-t border-line/60 pt-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-baseline justify-between gap-2 mb-2">
           <span className="text-sm font-medium text-ink">ส่วนลดเพิ่มท้ายบิล</span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {[0, 5, 10].map((v) => <button key={v} onClick={() => set({ discount_pct: v })} className={"px-3 py-1.5 rounded-lg text-xs font-medium border " + (pct === v ? "bg-brand text-white border-brand" : "border-line hover:bg-canvas")}>{v}%</button>)}
+          {pct > 0
+            ? <span className="text-sm font-semibold text-brand-dark shrink-0">{pct}% · −{baht(billDiscTotal)}</span>
+            : <span className="text-xs text-muted shrink-0">ไม่มีส่วนลด</span>}
+        </div>
+        <div className="flex items-stretch gap-2">
+          {[0, 5, 10].map((v) => (
+            <button key={v} onClick={() => set({ discount_pct: v })}
+              className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors " +
+                (pct === v ? "bg-brand text-white border-brand" : "border-line text-muted hover:bg-canvas")}>
+              {v}%
+            </button>
+          ))}
+          <div className={"flex items-center rounded-lg border overflow-hidden shrink-0 " + (![0, 5, 10].includes(pct) ? "border-brand" : "border-line")}>
+            <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
+            <input inputMode="numeric" className="w-9 text-center py-2 text-sm outline-none tabular-nums" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value.replace(/^0+(?=\d)/, "") })} onFocus={(e) => e.target.select()} />
+            <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-line overflow-hidden">
-            <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input inputMode="numeric" className="w-12 text-center py-2 text-sm outline-none" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value.replace(/^0+(?=\d)/, "") })} onFocus={(e) => e.target.select()} />
-            <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-3 py-2 hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
-          </div>
-          <span className="text-sm text-muted">%</span>
-        </div>
-        <div className="text-[11px] text-muted mt-1.5">ราคาต่อชิ้นลดมาแล้ว — อันนี้ลดเพิ่มตอนต่อรอง</div>
+        <div className="text-[11px] text-muted mt-1.5">ราคาต่อชิ้นลดมาแล้ว — ช่องนี้ไว้ลดเพิ่มตอนต่อรอง (กรอกเองได้ในช่อง %)</div>
       </div>
 
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
