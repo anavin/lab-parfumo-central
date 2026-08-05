@@ -3,11 +3,11 @@ import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { saleSchema, customerDaySchema, cashSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
-import { requireUser } from "@/lib/auth/require-user";
+import { requirePermission } from "@/lib/auth/require-user";
 import { monthLabel } from "@/lib/month";
 
 export async function createSale(input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("sales");
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
@@ -24,7 +24,7 @@ export async function createSale(input: unknown) {
 }
 
 export async function createCustomerDay(input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("sales");
   const parsed = customerDaySchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
@@ -37,6 +37,7 @@ export async function createCustomerDay(input: unknown) {
 }
 
 export async function createCashEntry(input: unknown) {
+  await requirePermission("cash");
   const parsed = cashSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;

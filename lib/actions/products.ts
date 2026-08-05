@@ -3,7 +3,7 @@ import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { productSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
-import { requireAdmin } from "@/lib/auth/require-user";
+import { requirePermission } from "@/lib/auth/require-user";
 
 // Postgres unique_violation → friendly message (barcode is unique).
 function friendly(e: any): never {
@@ -12,7 +12,7 @@ function friendly(e: any): never {
 }
 
 export async function createProduct(input: unknown) {
-  await requireAdmin();
+  await requirePermission("products");
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
@@ -31,7 +31,7 @@ export async function createProduct(input: unknown) {
 }
 
 export async function updateProduct(id: number, input: unknown) {
-  await requireAdmin();
+  await requirePermission("products");
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;

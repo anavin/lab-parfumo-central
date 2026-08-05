@@ -1,5 +1,5 @@
 import { ClipboardCheck } from "lucide-react";
-import { requireAdmin } from "@/lib/auth/require-user";
+import { requirePermission } from "@/lib/auth/require-user";
 import { pendingSubmissions } from "@/lib/queries";
 import { PageHeader } from "@/components/ui";
 import { ReviewQueue } from "@/components/ReviewQueue";
@@ -7,7 +7,7 @@ import { ReviewQueue } from "@/components/ReviewQueue";
 export const dynamic = "force-dynamic";
 
 export default async function ReviewPage() {
-  await requireAdmin();
+  await requirePermission("review");
   const rows = await pendingSubmissions();
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1000px] mx-auto">

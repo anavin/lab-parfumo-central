@@ -15,7 +15,7 @@ export async function createSession(userId: number): Promise<string> {
 export async function getUserFromToken(token: string | undefined): Promise<User | null> {
   if (!token) return null;
   const rows = await q<User & { last_activity_at: string }>(`
-    select u.id, u.username, u.full_name, u.role, u.is_active, u.last_login_at, u.created_at,
+    select u.id, u.username, u.full_name, u.role, u.permissions, u.is_active, u.last_login_at, u.created_at,
            s.last_activity_at
     from user_sessions s join users u on u.id = s.user_id
     where s.token = $1 and u.is_active = true`, [token]);

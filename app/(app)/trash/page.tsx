@@ -1,13 +1,13 @@
 import { Trash2 } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth/require-user";
+import { requirePermission } from "@/lib/auth/require-user";
 import { trashedRequisitions } from "@/lib/queries";
 import { TrashManager } from "@/components/TrashManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrashPage() {
-  await requireAdmin();
+  await requirePermission("trash");
   const rows = await trashedRequisitions();
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">

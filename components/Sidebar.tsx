@@ -8,38 +8,53 @@ import {
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import type { User } from "@/lib/auth/constants";
+import { effectivePermissions, ROLE_LABEL, type PermKey } from "@/lib/auth/permissions";
 
 type Item = { href: string; label: string; icon: any; badge?: number };
 type Group = { title: string; items: Item[] };
 
-const ADMIN_GROUPS = (pending: number): Group[] => [
-  { title: "ภาพรวม", items: [{ href: "/", label: "แดชบอร์ด", icon: LayoutDashboard }] },
+// One icon per permission key; groups mirror PERMISSIONS[].group.
+const ICON: Record<PermKey, any> = {
+  dashboard: LayoutDashboard, requisitions: ClipboardList, shipments: Truck, sales: Receipt,
+  stock: Package, products: FlaskConical, cash: Wallet, review: ClipboardCheck,
+  users: Users, audit: ScrollText, trash: Trash2, my_sales: Store,
+};
+const MENU: { title: string; items: { key: PermKey; href: string; label: string }[] }[] = [
+  { title: "ภาพรวม", items: [{ key: "dashboard", href: "/", label: "แดชบอร์ด" }] },
   { title: "ปฏิบัติการ", items: [
-    { href: "/requisitions", label: "ใบเบิกสินค้า", icon: ClipboardList },
-    { href: "/shipments", label: "ส่ง / คืนสินค้า", icon: Truck },
-    { href: "/sales", label: "การขาย", icon: Receipt },
+    { key: "requisitions", href: "/requisitions", label: "ใบเบิกสินค้า" },
+    { key: "shipments", href: "/shipments", label: "ส่ง / คืนสินค้า" },
+    { key: "sales", href: "/sales", label: "การขาย" },
   ]},
   { title: "คลัง & การเงิน", items: [
-    { href: "/stock", label: "สต๊อกคงเหลือ", icon: Package },
-    { href: "/products", label: "สินค้า", icon: FlaskConical },
-    { href: "/cash", label: "เงินสด", icon: Wallet },
+    { key: "stock", href: "/stock", label: "สต๊อกคงเหลือ" },
+    { key: "products", href: "/products", label: "สินค้า" },
+    { key: "cash", href: "/cash", label: "เงินสด" },
   ]},
   { title: "ผู้ดูแล", items: [
-    { href: "/review", label: "ตรวจสอบยอดขาย", icon: ClipboardCheck, badge: pending },
-    { href: "/users", label: "จัดการผู้ใช้", icon: Users },
-    { href: "/audit", label: "บันทึกกิจกรรม", icon: ScrollText },
-    { href: "/trash", label: "ถังขยะ", icon: Trash2 },
+    { key: "review", href: "/review", label: "ตรวจสอบยอดขาย" },
+    { key: "users", href: "/users", label: "จัดการผู้ใช้" },
+    { key: "audit", href: "/audit", label: "บันทึกกิจกรรม" },
+    { key: "trash", href: "/trash", label: "ถังขยะ" },
   ]},
+  { title: "พนักงานขาย", items: [{ key: "my_sales", href: "/my", label: "ยอดขายของฉัน" }] },
 ];
 
-const STAFF_GROUPS: Group[] = [
-  { title: "พนักงานขาย", items: [{ href: "/my", label: "ยอดขายของฉัน", icon: Store }] },
-];
+function groupsFor(user: User, pending: number): Group[] {
+  const allowed = new Set(effectivePermissions(user));
+  return MENU.map((g) => ({
+    title: g.title,
+    items: g.items.filter((it) => allowed.has(it.key)).map((it) => ({
+      href: it.href, label: it.label, icon: ICON[it.key],
+      badge: it.key === "review" ? pending : undefined,
+    })),
+  })).filter((g) => g.items.length > 0);
+}
 
 export function Sidebar({ user, pending = 0 }: { user: User; pending?: number }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const groups = user.role === "admin" ? ADMIN_GROUPS(pending) : STAFF_GROUPS;
+  const groups = groupsFor(user, pending);
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
   // close the mobile drawer whenever the route changes
@@ -99,7 +114,7 @@ export function Sidebar({ user, pending = 0 }: { user: User; pending?: number })
           </div>
           <div className="min-w-0">
             <div className="text-[13px] text-white font-medium truncate">{user.full_name}</div>
-            <div className="text-[10.5px] text-white/40 truncate">{user.role === "admin" ? "ผู้ดูแลระบบ" : "พนักงาน"} · @{user.username}</div>
+            <div className="text-[10.5px] text-white/40 truncate">{ROLE_LABEL[user.role] ?? user.role} · @{user.username}</div>
           </div>
         </div>
         <form action={signOut}>

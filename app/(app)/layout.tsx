@@ -2,18 +2,17 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { requireUser } from "@/lib/auth/require-user";
+import { can, permissionForPath, landingFor } from "@/lib/auth/permissions";
 import { pendingCount } from "@/lib/queries";
-
-// Staff may only reach their own workspace; everything else is admin-only.
-const STAFF_ALLOWED = ["/my"];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const path = (await headers()).get("x-pathname") || "";
-  if (user.role !== "admin" && !STAFF_ALLOWED.some((p) => path === p || path.startsWith(p + "/"))) {
-    redirect("/my");
-  }
-  const pending = user.role === "admin" ? await pendingCount() : 0;
+  // Enforce menu-level access: if this path maps to a permission the user
+  // lacks, send them to the first page they can see.
+  const perm = permissionForPath(path);
+  if (perm && !can(user, perm)) redirect(landingFor(user));
+  const pending = can(user, "review") ? await pendingCount() : 0;
   return (
     <div className="flex min-h-screen bg-canvas">
       <Sidebar user={user} pending={pending} />

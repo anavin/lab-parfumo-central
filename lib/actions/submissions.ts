@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
-import { requireUser, requireAdmin } from "@/lib/auth/require-user";
+import { requirePermission } from "@/lib/auth/require-user";
 
 // ---------------------------------------------------------------- staff: submit
 // Staff entries land in `submissions` (status='pending'). Nothing touches the
@@ -17,7 +17,7 @@ function requireSaleFields(d: { payment_channel?: string; nation?: string }) {
 }
 
 export async function submitSale(input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("my_sales");
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
@@ -40,7 +40,7 @@ export async function submitSale(input: unknown) {
 // reference (the entered receipt no., or a generated one) so they count as a
 // single bill/customer, plus shared payment/nationality/time.
 export async function submitBill(input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("my_sales");
   const parsed = billSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
@@ -66,7 +66,7 @@ export async function submitBill(input: unknown) {
 }
 
 export async function submitCustomerDay(input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("my_sales");
   const parsed = customerDaySchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
@@ -94,7 +94,7 @@ async function ownPending(id: number, userId: number) {
 }
 
 export async function updateMySale(id: number, input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("my_sales");
   await ownPending(id, user.id);
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
@@ -115,7 +115,7 @@ export async function updateMySale(id: number, input: unknown) {
 }
 
 export async function updateMyCustomerDay(id: number, input: unknown) {
-  const user = await requireUser();
+  const user = await requirePermission("my_sales");
   await ownPending(id, user.id);
   const parsed = customerDaySchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
@@ -128,7 +128,7 @@ export async function updateMyCustomerDay(id: number, input: unknown) {
 }
 
 export async function deleteMySubmission(id: number) {
-  const user = await requireUser();
+  const user = await requirePermission("my_sales");
   await ownPending(id, user.id);
   await q(`delete from submissions where id = $1`, [id]);
   await logAudit("delete", "submission", id, "ลบรายการที่กรอก");
@@ -163,7 +163,7 @@ async function copyToLive(id: number) {
 }
 
 export async function approveSubmission(id: number) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("review");
   const { s, approvedId } = await copyToLive(id);
   await q(
     `update submissions set status='approved', reviewed_by=$2, reviewed_at=now(), approved_id=$3, updated_at=now() where id=$1`,
@@ -174,7 +174,7 @@ export async function approveSubmission(id: number) {
 }
 
 export async function rejectSubmission(id: number, note?: string) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("review");
   const [s] = await q<{ status: string; ba: string; kind: string }>(
     `select status, ba, kind from submissions where id = $1`, [id]);
   if (!s) throw new Error("ไม่พบรายการ");
@@ -187,7 +187,7 @@ export async function rejectSubmission(id: number, note?: string) {
 }
 
 export async function approveMany(ids: number[]) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("review");
   let ok = 0;
   for (const id of ids) {
     try {

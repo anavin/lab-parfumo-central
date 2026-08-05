@@ -1,6 +1,6 @@
 import { ScrollText } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth/require-user";
+import { requirePermission } from "@/lib/auth/require-user";
 import { auditLog } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ const ENTITY: Record<string, string> = {
 };
 
 export default async function AuditPage() {
-  await requireAdmin();
+  await requirePermission("audit");
   const rows = await auditLog({}, 300);
 
   return (
