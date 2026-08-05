@@ -6,6 +6,7 @@ import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PromptPayButton } from "@/components/PromptPayButton";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow } from "@/lib/queries";
 
@@ -27,6 +28,7 @@ const PAYMENTS = [
   { v: "EDC Alipay/WeChat", label: "Alipay / WeChat" },
   { v: "EDC Thai QR Payment", label: "Thai QR" },
   { v: "EDC PromptCard", label: "PromptCard" },
+  { v: "PromptPay", label: "พร้อมเพย์ (PromptPay)" },
 ];
 
 // ---- bill (multi-item) types ----
@@ -288,6 +290,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
           {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
           <div className="flex justify-between items-baseline font-semibold text-ink pt-0.5"><span>รวมสุทธิ</span><span className="text-brand-dark text-2xl">{baht(net)}</span></div>
         </div>
+        {net > 0 && <div className="mb-3"><PromptPayButton amount={net} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
           <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
@@ -471,6 +474,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
       </div>
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
+      {total > 0 && <div className="mb-3"><PromptPayButton amount={total} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
         <div className="flex gap-2 shrink-0">
