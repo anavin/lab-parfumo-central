@@ -21,7 +21,7 @@ function relaxUpcEanChecksum() {
   }
 }
 
-export type ScanResult = { ok: boolean; label: string };
+export type ScanResult = { ok: boolean; label: string; sub?: string };
 
 // Camera barcode scanner (iOS Safari + Android Chrome, rear camera).
 // - single mode: fires onDetected once, then closes.
@@ -98,48 +98,51 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
 
         <div className="relative bg-black aspect-[3/4]">
           <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-          {!error && (
+          {!error && !paused && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className={`w-[72%] h-[32%] border-2 rounded-xl transition-colors ${paused ? "border-white/30" : "border-white/85"}`} style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }} />
+              <div className="w-[72%] h-[32%] border-2 border-white/85 rounded-xl" style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }} />
             </div>
           )}
-          {paused && !error && <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-white/70 text-sm">หยุดชั่วคราว</div>}
           {error && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/90">{error}</div>}
+
+          {/* checking overlay */}
+          {checking && (
+            <div className="absolute inset-0 bg-ink/92 flex flex-col items-center justify-center text-white/80">
+              <ScanLine className="w-10 h-10 mb-3 animate-pulse" />
+              <div className="text-sm">กำลังตรวจสอบ…</div>
+            </div>
+          )}
+
+          {/* BIG result overlay — clear, full camera view */}
+          {result && (
+            <div className="absolute inset-0 bg-ink/95 flex flex-col items-center justify-center text-center px-6">
+              <div className={"w-20 h-20 rounded-full flex items-center justify-center mb-4 " + (result.ok ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400")}>
+                {result.ok ? <Check className="w-11 h-11" strokeWidth={2.5} /> : <AlertTriangle className="w-10 h-10" />}
+              </div>
+              <div className={"text-sm font-semibold mb-3 " + (result.ok ? "text-green-400" : "text-amber-400")}>
+                {result.ok ? "เพิ่มลงบิลแล้ว" : "ไม่พบในระบบ — เพิ่มไว้ให้กรอกชื่อเอง"}
+              </div>
+              <div className="text-white text-2xl font-bold leading-snug">{result.label}</div>
+              {result.sub && <div className="text-white/60 text-base mt-1">{result.sub}</div>}
+              <button onClick={scanNext} className="mt-8 w-full inline-flex items-center justify-center gap-2 px-4 py-4 rounded-xl bg-brand text-white text-base font-semibold hover:bg-brand-dark active:scale-[.99] transition">
+                <ScanLine className="w-5 h-5" /> ตกลง — สแกนต่อ
+              </button>
+              <button onClick={onClose} className="mt-2 text-white/60 text-sm py-2 hover:text-white">เสร็จสิ้น</button>
+            </div>
+          )}
         </div>
 
-        {/* footer */}
-        {continuous ? (
-          <div className="p-3">
-            {checking ? (
-              <div className="text-center text-white/80 text-sm py-3">กำลังตรวจสอบ…</div>
-            ) : result ? (
-              <div>
-                <div className={`rounded-xl px-4 py-3 mb-3 ${result.ok ? "bg-green-500/15 text-green-300" : "bg-amber-500/15 text-amber-300"}`}>
-                  <div className="flex items-center gap-2 font-semibold text-sm">
-                    {result.ok ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                    {result.ok ? "เพิ่มลงบิลแล้ว" : "ไม่พบในระบบ — เพิ่มไว้ให้กรอกชื่อเอง"}
-                  </div>
-                  <div className="text-white text-[15px] mt-1 leading-snug">{result.label}</div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={scanNext} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark">
-                    <ScanLine className="w-4 h-4" /> ตกลง — สแกนต่อ
-                  </button>
-                  <button onClick={onClose} className="px-4 py-3 rounded-xl border border-white/20 text-white/85 text-sm font-medium hover:bg-white/10">เสร็จสิ้น</button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-white/80">{count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b> รายการ · เล็งกล้องต่อ</> : "เล็งกล้องที่บาร์โค้ด"}</span>
-                <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">
-                  <Check className="w-4 h-4" /> เสร็จ
-                </button>
-              </div>
-            )}
+        {/* footer (only when not showing a result) */}
+        {!result && !checking && (continuous ? (
+          <div className="p-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-white/80">{count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b> รายการ · เล็งกล้องต่อ</> : "เล็งกล้องที่บาร์โค้ด"}</span>
+            <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">
+              <Check className="w-4 h-4" /> เสร็จ
+            </button>
           </div>
         ) : (
           <div className="px-4 py-3 text-center text-[12px] text-white/60">เล็งกล้องไปที่บาร์โค้ดสินค้า</div>
-        )}
+        ))}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, Check, Clock, XCircle, ScanLine, Minus } from "lu
 import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow } from "@/lib/queries";
 
@@ -46,6 +47,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
   const [bill, setBill] = useState<BillState | null>(null);
   const [autoScan, setAutoScan] = useState(false);
   const [edit, setEdit] = useState<SaleState | null>(null);
+  const [del, setDel] = useState<SubmissionRow | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
@@ -113,11 +115,16 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
             {rows.map((r) => (
               <SubmissionItem key={r.id} r={r} pending={pending}
                 onEdit={() => { setBill(null); setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" }); }}
-                onDelete={() => start(async () => { try { await deleteMySubmission(r.id); refresh(); } catch (e: any) { alert(e?.message ?? "ลบไม่สำเร็จ"); } })} />
+                onDelete={() => setDel(r)} />
             ))}
           </ul>
         )}
       </div>
+
+      <ConfirmDialog open={!!del} title="ลบรายการนี้?" danger confirmLabel="ลบ" pending={pending}
+        message={del ? `${del.item}${del.size ? ` ${del.size}` : ""}` : ""}
+        onCancel={() => setDel(null)}
+        onConfirm={() => { const id = del?.id; setDel(null); if (id != null) start(async () => { try { await deleteMySubmission(id); refresh(); } catch (e: any) { alert(e?.message ?? "ลบไม่สำเร็จ"); } }); }} />
     </div>
   );
 }
@@ -138,11 +145,11 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     const p = await findProductByBarcode(code);
     if (p) {
       addItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 });
-      const price = p.price ? ` · ฿${Number(p.price).toLocaleString()}` : "";
-      return { ok: true, label: `${p.scent}${p.size ? ` ${p.size}` : ""}${price}` };
+      const sub = [p.size, p.price ? `฿${Number(p.price).toLocaleString()}` : ""].filter(Boolean).join(" · ");
+      return { ok: true, label: p.scent, sub };
     }
     addItem({ barcode: code });
-    return { ok: false, label: `บาร์โค้ด ${code}` };
+    return { ok: false, label: `บาร์โค้ด ${code}`, sub: "" };
   };
 
   // bill-level extra discount (%), distributed to each line
@@ -313,7 +320,7 @@ function SubmissionItem({ r, onEdit, onDelete, pending }: { r: SubmissionRow; on
         {editable && (
           <>
             <button onClick={onEdit} disabled={pending} className="p-1.5 rounded-lg text-muted hover:bg-canvas hover:text-ink disabled:opacity-50" aria-label="แก้ไข"><Pencil className="w-4 h-4" /></button>
-            <button onClick={() => { if (confirm("ลบรายการนี้?")) onDelete(); }} disabled={pending} className="p-1.5 rounded-lg text-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-50" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
+            <button onClick={onDelete} disabled={pending} className="p-1.5 rounded-lg text-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-50" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
           </>
         )}
       </div>
