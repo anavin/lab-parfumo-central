@@ -2,10 +2,14 @@
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 
+// Do the arithmetic entirely in UTC so it never shifts across a timezone
+// boundary. (Building a local-time date and reading it back with toISOString()
+// subtracts the UTC+7 offset and lands a day early — 6th → 4th.)
 const shift = (date: string, days: number) => {
-  const d = new Date(date + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
 };
 
 // "พฤ. 6 ส.ค. 2569"
