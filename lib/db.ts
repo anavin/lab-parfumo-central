@@ -218,12 +218,32 @@ async function getPgPool() {
   return gp._pgPool;
 }
 
-/** Convenience: run a query and return rows. */
+// Transient connection errors are common on serverless + Supabase NANO (dropped
+// idle sockets, cold starts, brief connection-limit spikes). Retry these a few
+// times so a blip doesn't surface as a hard "Server Components render" error.
+function isTransientDbError(e: any): boolean {
+  const code = e?.code;
+  if (["57P01", "57P03", "53300", "08006", "08003", "08001", "ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "EPIPE"].includes(code)) return true;
+  return /terminat|connection|timeout|reset by peer|server closed|too many clients|ECONNRESET|socket hang up/i.test(String(e?.message || ""));
+}
+
+/** Convenience: run a query and return rows (with transient-error retry on pg). */
 export async function q<T = any>(sql: string, params: any[] = []): Promise<T[]> {
   if (usePg()) {
-    const pool = await getPgPool();
-    const r = await pool.query(sql, params);
-    return r.rows as T[];
+    let lastErr: any;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const pool = await getPgPool();
+        const r = await pool.query(sql, params);
+        return r.rows as T[];
+      } catch (e) {
+        lastErr = e;
+        if (attempt === 2 || !isTransientDbError(e)) throw e;
+        console.warn(`[db] transient error, retrying (${attempt + 1}/2):`, (e as any)?.message);
+        await new Promise((res) => setTimeout(res, 150 * (attempt + 1)));
+      }
+    }
+    throw lastErr;
   }
   const db = await getDb();
   const r = await db.query<T>(sql, params);
