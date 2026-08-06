@@ -46,43 +46,103 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
 
   useEffect(() => {
     relaxUpcEanChecksum();
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.CODE_128, BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-      BarcodeFormat.CODE_39, BarcodeFormat.QR_CODE, BarcodeFormat.ITF,
-    ]);
-    const reader = new BrowserMultiFormatReader(hints);
-    let controls: { stop: () => void } | null = null;
+    const video = videoRef.current!;
+    let stream: MediaStream | null = null;
+    let zxingControls: { stop: () => void } | null = null;
+    let raf = 0;
+    let stopped = false;
 
-    reader
-      .decodeFromConstraints({ video: { facingMode: { ideal: "environment" } } }, videoRef.current!, (res) => {
-        if (!res) return;
-        const code = res.getText();
-        if (continuous) {
-          if (pausedRef.current || Date.now() < cooldownRef.current) return; // ignore until confirmed / off cooldown
-          pausedRef.current = true;
-          setChecking(true);
-          Promise.resolve(cbRef.current(code)).then((r) => {
-            setChecking(false);
-            setResult(r && typeof r === "object" ? r : { ok: true, label: code });
-            setCount((c) => c + 1);
-          }).catch(() => { setChecking(false); setResult({ ok: false, label: code }); });
-        } else if (!doneRef.current) {
-          doneRef.current = true;
-          controls?.stop();
-          cbRef.current(code);
+    const stopAll = () => {
+      stopped = true;
+      if (raf) cancelAnimationFrame(raf);
+      try { zxingControls?.stop(); } catch {}
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+
+    // Shared handler for a decoded code (both native + ZXing paths funnel here).
+    const onCode = (code: string) => {
+      if (!code) return;
+      if (continuous) {
+        if (pausedRef.current || Date.now() < cooldownRef.current) return; // ignore until confirmed / off cooldown
+        pausedRef.current = true;
+        try { navigator.vibrate?.(45); } catch {}
+        setChecking(true);
+        Promise.resolve(cbRef.current(code)).then((r) => {
+          setChecking(false);
+          setResult(r && typeof r === "object" ? r : { ok: true, label: code });
+          setCount((c) => c + 1);
+        }).catch(() => { setChecking(false); setResult({ ok: false, label: code }); });
+      } else if (!doneRef.current) {
+        doneRef.current = true;
+        try { navigator.vibrate?.(45); } catch {}
+        stopAll();
+        cbRef.current(code);
+      }
+    };
+
+    // Grab the rear camera at the highest resolution the device will give — more
+    // pixels on the barcode = far fewer "won't scan" misses. Fall back gracefully.
+    const getStream = async () => {
+      const tries: MediaStreamConstraints[] = [
+        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { facingMode: { ideal: "environment" } }, audio: false },
+        { video: true, audio: false },
+      ];
+      let lastErr: any;
+      for (const c of tries) {
+        try { return await navigator.mediaDevices.getUserMedia(c); } catch (e) { lastErr = e; }
+      }
+      throw lastErr;
+    };
+
+    (async () => {
+      try {
+        stream = await getStream();
+        if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
+        video.srcObject = stream;
+        video.setAttribute("playsinline", "true");
+        await video.play().catch(() => {});
+
+        // Continuous autofocus — the single biggest fix for blurry, unreadable frames.
+        const track = stream.getVideoTracks()[0];
+        try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }); } catch {}
+
+        // Prefer the browser's native, hardware-accelerated detector (Android/Chrome):
+        // dramatically faster & more reliable than the JS decoder.
+        const NativeBD: any = (window as any).BarcodeDetector;
+        if (NativeBD) {
+          let detector: any;
+          try { detector = new NativeBD({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] }); }
+          catch { detector = new NativeBD(); }
+          const tick = async () => {
+            if (stopped) return;
+            try {
+              const codes = await detector.detect(video);
+              if (codes && codes.length && codes[0].rawValue) { onCode(codes[0].rawValue); }
+            } catch {}
+            if (!stopped) raf = requestAnimationFrame(tick);
+          };
+          raf = requestAnimationFrame(tick);
+        } else {
+          // iOS Safari & others: tuned ZXing on the same high-res, autofocused stream.
+          const hints = new Map();
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
+          ]);
+          hints.set(DecodeHintType.TRY_HARDER, true);   // work harder to lock onto a barcode
+          const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
+          zxingControls = await reader.decodeFromStream(stream, video, (res) => { if (res) onCode(res.getText()); });
         }
-      })
-      .then((c) => { controls = c; })
-      .catch((e) => {
+      } catch (e: any) {
         setError(
           e?.name === "NotAllowedError"
             ? "ไม่ได้รับอนุญาตให้ใช้กล้อง — เปิดสิทธิ์กล้องในเบราว์เซอร์แล้วลองใหม่"
             : "เปิดกล้องไม่ได้ — ต้องเปิดผ่าน https และเบราว์เซอร์รองรับกล้อง"
         );
-      });
+      }
+    })();
 
-    return () => { controls?.stop(); };
+    return () => { stopAll(); };
   }, [continuous]);
 
   const scanNext = () => { setResult(null); cooldownRef.current = Date.now() + 1000; pausedRef.current = false; };
