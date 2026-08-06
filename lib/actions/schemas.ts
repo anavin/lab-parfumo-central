@@ -87,6 +87,7 @@ export const billSchema = z.object({
     qty: z.coerce.number().min(1, "จำนวนต้องอย่างน้อย 1").max(999999),
     unit_price: z.coerce.number().min(0).max(99999999).optional(),
     discount: z.coerce.number().min(0).max(99999999).optional(),
+    payment_channel: z.string().trim().max(60).optional(),   // per-item override (else bill default)
   })).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(50),
   attachments: z.array(z.string().startsWith("data:image/", "ไฟล์แนบไม่ถูกต้อง").max(3_000_000)).max(6).optional(),
 });

@@ -41,16 +41,32 @@ export async function submitSale(input: unknown) {
 // One bill = one customer buying one or more items. All lines share a bill
 // reference (the entered receipt no., or a generated one) so they count as a
 // single bill/customer, plus shared payment/nationality/time.
+// Standard, human-readable bill ref when staff leaves เลขใบเสร็จ blank:
+//   {BRANCH}-{YYMMDD}-{running}  e.g. CTW-260806-001  (sortable, self-explanatory)
+async function genBillRef(saleDate: string, source: string): Promise<string> {
+  const [y, m, dd] = saleDate.split("-");
+  const src = source === "EVENT_SCS" ? "EVT" : (source || "CTW").slice(0, 3).toUpperCase();
+  const prefix = `${src}-${(y || "").slice(2)}${(m || "").padStart(2, "0")}${(dd || "").padStart(2, "0")}-`;
+  // max running number already used for this branch+day (only our generated refs)
+  const [mx] = await q<{ n: number }>(
+    `select coalesce(max(substring(receipt_no from '[0-9]+$')::int), 0) n
+     from submissions where receipt_no ~ $1`, [`^${prefix}[0-9]+$`]);
+  return prefix + String((mx?.n ?? 0) + 1).padStart(3, "0");
+}
+
 export async function submitBill(input: unknown) {
   const user = await requirePermission("my_sales");
   const parsed = billSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
-  if (!d.payment_channel?.trim()) throw new Error("กรุณาเลือกช่องทางชำระ");
   if (!d.nation?.trim()) throw new Error("กรุณาเลือกสัญชาติลูกค้า");
-  const ref = d.receipt_no?.trim() || ("B" + Date.now().toString(36).toUpperCase());
+  // each line's channel = its own override, else the bill default; all required
+  const billPc = d.payment_channel?.trim() || "";
+  if (d.items.some((it) => !((it.payment_channel?.trim() || billPc)))) throw new Error("กรุณาเลือกช่องทางชำระให้ครบทุกชิ้น");
+  const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, d.source || "CTW"));
   let count = 0, sum = 0;
   for (const it of d.items) {
+    const pc = it.payment_channel?.trim() || billPc;
     const total = it.qty * (it.unit_price ?? 0) - (it.discount ?? 0);
     const [row] = await q<{ id: number }>(
       `insert into submissions
@@ -59,7 +75,7 @@ export async function submitBill(input: unknown) {
        returning id`,
       [user.id, user.full_name, d.sale_date, d.source || "CTW", d.sale_time || null, ref,
        it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, it.discount ?? 0, total,
-       d.payment_channel, d.nation]);
+       pc, d.nation]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
     count++; sum += total;
   }
