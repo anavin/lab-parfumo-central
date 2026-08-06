@@ -212,7 +212,7 @@ export async function deleteMySubmission(id: number) {
     const [left] = await q<{ n: number }>(`select count(*)::int n from submissions where receipt_no = $1`, [ref.receipt_no]);
     if (!left?.n) {
       await q(`delete from bill_attachments where bill_ref = $1`, [ref.receipt_no]);
-      await q(`delete from bill_payments where bill_ref = $1`, [ref.receipt_no]);
+      try { await q(`delete from bill_payments where bill_ref = $1`, [ref.receipt_no]); } catch {}
     }
   }
   await logAudit("delete", "submission", id, "ลบรายการที่กรอก");
@@ -378,7 +378,7 @@ export async function rejectMany(ids: number[], note?: string) {
     } catch (e) { console.error("[rejectMany] failed", id, e); }
   }
   // a rejected split bill's per-channel amounts must stop counting toward cash
-  for (const ref of refs) await q(`delete from bill_payments where bill_ref = $1`, [ref]);
+  try { for (const ref of refs) await q(`delete from bill_payments where bill_ref = $1`, [ref]); } catch {}
   await logAudit("reject", "submission", null, `ตีกลับ ${ok} รายการ${note ? ` · ${note}` : ""}`);
   revalidatePath("/review"); revalidatePath("/my");
   return ok;

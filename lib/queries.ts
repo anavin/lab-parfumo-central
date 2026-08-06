@@ -298,15 +298,21 @@ export function mySubmissions(userId: number, date: string) {
 export type BillAttachment = { id: number; bill_ref: string; data: string; created_by: number };
 
 export type BillTender = { channel: string; amount: number };
+// bill_payments is added by a manual migration in prod; tolerate it being
+// absent (the page renders without split data instead of crashing).
+const missingTable = (e: any) => e?.code === "42P01" || /relation "?bill_payments"? does not exist/i.test(String(e?.message || ""));
+
 /** Split-tender breakdown for a set of bill refs → map ref -> [{channel, amount}]. */
 export async function paymentsForRefs(refs: string[]): Promise<Record<string, BillTender[]>> {
   const uniq = [...new Set((refs || []).filter(Boolean))];
   if (!uniq.length) return {};
-  const rows = await q<{ bill_ref: string; channel: string; amount: number }>(
-    `select bill_ref, channel, amount::float amount from bill_payments where bill_ref = any($1) order by id`, [uniq]);
-  const map: Record<string, BillTender[]> = {};
-  for (const r of rows) (map[r.bill_ref] ??= []).push({ channel: r.channel, amount: r.amount });
-  return map;
+  try {
+    const rows = await q<{ bill_ref: string; channel: string; amount: number }>(
+      `select bill_ref, channel, amount::float amount from bill_payments where bill_ref = any($1) order by id`, [uniq]);
+    const map: Record<string, BillTender[]> = {};
+    for (const r of rows) (map[r.bill_ref] ??= []).push({ channel: r.channel, amount: r.amount });
+    return map;
+  } catch (e) { if (missingTable(e)) return {}; throw e; }
 }
 
 /** Photo evidence for a set of bill refs → map ref -> attachments (in order). */
@@ -341,9 +347,12 @@ export async function myDayKpis(userId: number, date: string) {
     where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2
       and coalesce(payment_channel,'') <> $3
     group by 1`, [userId, date, SPLIT2]);
-  const tenderCh = await q<{ channel: string; revenue: number }>(`
-    select channel, sum(amount)::float revenue
-    from bill_payments where created_by=$1 and entry_date=$2 group by 1`, [userId, date]);
+  let tenderCh: { channel: string; revenue: number }[] = [];
+  try {
+    tenderCh = await q<{ channel: string; revenue: number }>(`
+      select channel, sum(amount)::float revenue
+      from bill_payments where created_by=$1 and entry_date=$2 group by 1`, [userId, date]);
+  } catch (e) { if (!missingTable(e)) throw e; }
 
   const map = new Map<string, number>();
   for (const r of [...lineCh, ...tenderCh]) map.set(r.channel, (map.get(r.channel) ?? 0) + (r.revenue ?? 0));
