@@ -59,11 +59,14 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         {trend.every((t) => t.revenue === 0) ? (
           <div className="py-6 text-center text-sm text-muted">ยังไม่มียอดขายในช่วง 14 วันนี้</div>
         ) : (
-          <div className="flex items-end gap-1.5 h-32 pt-2">
+          <div className="flex items-stretch gap-1.5 h-36 pt-2">
             {trend.map((t) => (
               <div key={t.d} className="flex-1 flex flex-col items-center gap-1 group" title={`${t.d}: ${baht(t.revenue)}`}>
-                <div className="w-full rounded-t bg-brand/80 group-hover:bg-brand transition-colors" style={{ height: `${Math.max(2, (t.revenue / maxRev) * 100)}%` }} />
-                <span className="text-[9px] text-muted">{t.d.slice(8)}</span>
+                {/* fixed-height bar track so the % bar height actually resolves */}
+                <div className="flex-1 w-full flex items-end">
+                  <div className="w-full rounded-t bg-brand/80 group-hover:bg-brand transition-colors" style={{ height: `${Math.max(2, (t.revenue / maxRev) * 100)}%` }} />
+                </div>
+                <span className="text-[9px] text-muted shrink-0">{t.d.slice(8)}</span>
               </div>
             ))}
           </div>
