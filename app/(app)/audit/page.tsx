@@ -2,6 +2,7 @@ import { ScrollText } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/require-user";
 import { auditLog } from "@/lib/queries";
+import { fmtDateTH, fmtTimeTH } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function AuditPage() {
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-canvas sticky top-0"><tr className="th border-b border-line-soft">
-              <th className="px-5 py-2.5">เวลา</th><th className="px-3 py-2.5">ผู้ใช้</th>
+              <th className="px-5 py-2.5">วันที่ · เวลา</th><th className="px-3 py-2.5">ผู้ใช้</th>
               <th className="px-3 py-2.5">การกระทำ</th><th className="px-3 py-2.5">ประเภท</th><th className="px-5 py-2.5">รายละเอียด</th>
             </tr></thead>
             <tbody>
@@ -40,7 +41,10 @@ export default async function AuditPage() {
                 const a = ACTION[r.action] ?? { label: r.action, tone: "gray" as const };
                 return (
                   <tr key={r.id} className="border-b border-line-soft last:border-0">
-                    <td className="px-5 py-2.5 text-muted text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString("th-TH", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+                    <td className="px-5 py-2.5 whitespace-nowrap">
+                      <div className="text-ink text-xs font-medium">{fmtDateTH(r.created_at)}</div>
+                      <div className="text-muted text-[11px] tabular-nums">{fmtTimeTH(r.created_at)} น.</div>
+                    </td>
                     <td className="px-3 py-2.5"><span className="font-medium text-ink">{r.user_name}</span>{r.user_role === "admin" && <span className="text-[10px] text-brand-dark ml-1">admin</span>}</td>
                     <td className="px-3 py-2.5"><Badge tone={a.tone}>{a.label}</Badge></td>
                     <td className="px-3 py-2.5 text-muted">{ENTITY[r.entity] ?? r.entity}</td>
