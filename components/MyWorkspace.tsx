@@ -347,6 +347,13 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 }
 
 // ---------------------------------------------------------------- one bill item
+// Module-level so it keeps a stable component identity — defining it inside
+// ItemCard made React remount the inputs on every keystroke (couldn't type
+// more than one digit at a time).
+const Cell = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div><span className="block text-[10px] text-muted text-center mb-0.5">{label}</span>{children}</div>
+);
+
 function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "" }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
@@ -364,9 +371,6 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange({ [k]: e.target.value.replace(/^0+(?=\d)/, "") }),
   });
-  const Cell = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div><span className="block text-[10px] text-muted text-center mb-0.5">{label}</span>{children}</div>
-  );
   return (
     <div className="rounded-xl border border-line bg-white p-3">
       {/* name + size */}
