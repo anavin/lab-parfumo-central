@@ -13,7 +13,7 @@ import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { SplitTenders } from "@/components/SplitTenders";
 import { baht, num } from "@/lib/format";
-import type { SubmissionRow, BillAttachment } from "@/lib/queries";
+import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 
 const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
 const nowHM = () => new Date().toTimeString().slice(0, 5);
@@ -48,8 +48,8 @@ const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
-export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
-  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {} }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]> }) {
   const router = useRouter();
   const viewingPast = date !== today;   // browsing an older day; new sales still go to today
   const [pending, start] = useTransition();
@@ -97,7 +97,11 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
 
   const editRow = (r: SubmissionRow) => {
     setBill(null);
-    setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "", tenders: isSplit(r.payment_channel) ? [{ channel: "", amount: "" }, { channel: "", amount: "" }] : [] });
+    // pre-fill the split rows from what was saved (bill_payments), so editing a
+    // 2-channel bill shows the original channels + amounts instead of blanks
+    const saved = (payments[r.receipt_no || ""] || []).map((t) => ({ channel: t.channel, amount: String(Math.round(t.amount)) }));
+    const tenders = isSplit(r.payment_channel) ? (saved.length >= 2 ? saved : [{ channel: "", amount: "" }, { channel: "", amount: "" }]) : [];
+    setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "", tenders });
     // jump up to the edit form once it has rendered (reliable on mobile)
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   };

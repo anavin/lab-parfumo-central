@@ -173,7 +173,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                               </button>
                             </div>
                             {editId === r.id && (
-                              <RowEditor row={r} pending={pending}
+                              <RowEditor row={r} pending={pending} savedTenders={payments[bill.ref]}
                                 onCancel={() => setEditId(null)}
                                 onSave={(payload) => start(async () => {
                                   try { await updateSubmissionByAdmin(r.id, payload); setEditId(null); refresh(); }
@@ -296,14 +296,16 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   );
 }
 
-function RowEditor({ row, onSave, onCancel, pending }: { row: SubmissionRow; onSave: (payload: any) => void; onCancel: () => void; pending: boolean }) {
+function RowEditor({ row, onSave, onCancel, pending, savedTenders }: { row: SubmissionRow; onSave: (payload: any) => void; onCancel: () => void; pending: boolean; savedTenders?: BillTender[] }) {
   const isSale = row.kind === "sale";
   const [f, setF] = useState<any>(isSale ? {
     sale_date: row.entry_date, sale_time: (row.sale_time || "").slice(0, 5), source: row.source || "CTW",
     receipt_no: row.receipt_no || "", item: row.item || "", barcode: row.barcode || "", size: row.size || "",
     qty: row.qty ?? 1, unit_price: row.unit_price ?? 0, discount: row.discount ?? 0,
     payment_channel: row.payment_channel || "", nation: row.nation || "",
-    tenders: isSplit(row.payment_channel) ? [{ channel: "", amount: "" }, { channel: "", amount: "" }] : [],
+    tenders: isSplit(row.payment_channel)
+      ? ((savedTenders || []).length >= 2 ? (savedTenders || []).map((t) => ({ channel: t.channel, amount: String(Math.round(t.amount)) })) : [{ channel: "", amount: "" }, { channel: "", amount: "" }])
+      : [],
   } : {
     cust_date: row.entry_date, customers: row.customers ?? 0, thai: row.thai ?? 0, foreign: row.foreign_cnt ?? 0, sell_amount: row.sell_amount ?? 0,
   });
