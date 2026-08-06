@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X, ClipboardCheck, Store,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import type { User } from "@/lib/auth/constants";
@@ -19,7 +19,7 @@ const ICON: Record<PermKey, any> = {
   stock: Package, products: FlaskConical, cash: Wallet, review: ClipboardCheck,
   users: Users, audit: ScrollText, trash: Trash2, my_sales: Store,
 };
-const MENU: { title: string; items: { key: PermKey; href: string; label: string }[] }[] = [
+const MENU: { title: string; items: { key: PermKey; href: string; label: string; icon?: any }[] }[] = [
   { title: "ภาพรวม", items: [{ key: "dashboard", href: "/", label: "แดชบอร์ด" }] },
   { title: "ปฏิบัติการ", items: [
     { key: "requisitions", href: "/requisitions", label: "ใบเบิกสินค้า" },
@@ -29,6 +29,7 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string 
   { title: "คลัง & การเงิน", items: [
     { key: "stock", href: "/stock", label: "สต๊อกคงเหลือ" },
     { key: "products", href: "/products", label: "สินค้า" },
+    { key: "products", href: "/products/barcodes", label: "พิมพ์บาร์โค้ด", icon: Barcode },
     { key: "cash", href: "/cash", label: "เงินสด" },
   ]},
   { title: "ผู้ดูแล", items: [
@@ -45,7 +46,7 @@ function groupsFor(user: User, pending: number): Group[] {
   return MENU.map((g) => ({
     title: g.title,
     items: g.items.filter((it) => allowed.has(it.key)).map((it) => ({
-      href: it.href, label: it.label, icon: ICON[it.key],
+      href: it.href, label: it.label, icon: it.icon ?? ICON[it.key],
       badge: it.key === "review" ? pending : undefined,
     })),
   })).filter((g) => g.items.length > 0);
@@ -55,7 +56,7 @@ export function Sidebar({ user, pending = 0 }: { user: User; pending?: number })
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const groups = groupsFor(user, pending);
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const active = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
   // close the mobile drawer whenever the route changes
   useEffect(() => { setOpen(false); }, [path]);
