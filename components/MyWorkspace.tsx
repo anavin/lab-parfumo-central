@@ -269,7 +269,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     const outTenders = split ? tenders.map((t, i) => ({ channel: t.channel, amount: tenderAmount(i) })) : undefined;
     onSubmit(items, outTenders);
   };
-  const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-red-400 border-red-400" : "");
+  const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-danger border-danger" : "");
 
   return (
     <div className="card p-4 sm:p-5 mb-4">
@@ -293,7 +293,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* nationality — big toggle */}
       <div className="mb-3">
         <div className="text-xs text-muted mb-1">สัญชาติลูกค้า *</div>
-        <div className={"grid grid-cols-2 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-red-400 rounded-lg p-0.5" : "")}>
+        <div className={"grid grid-cols-2 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-danger rounded-lg p-0.5" : "")}>
           {([["Thai", "🇹🇭 ไทย"], ["Foreign", "🌏 ต่างชาติ"]] as const).map(([v, l]) => (
             <button key={v} onClick={() => { set({ nation: v }); clearMiss("สัญชาติ"); }} className={"py-3 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
           ))}
@@ -327,7 +327,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
                   <div className="flex-1 min-w-0">
                     <Select value={t.channel} onValueChange={(v) => { setTender(i, { channel: v }); clearMiss("ช่องทางชำระ"); }} onPick={bumpQr}
                       options={payOptions(t.channel)} placeholder="- เลือกช่องทาง -"
-                      className={"py-2" + (missing.includes("ช่องทางชำระ") && !t.channel ? " ring-1 ring-red-400 border-red-400" : "")} />
+                      className={"py-2" + (missing.includes("ช่องทางชำระ") && !t.channel ? " ring-1 ring-danger border-danger" : "")} />
                   </div>
                   <div className="relative w-28 shrink-0">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
@@ -584,7 +584,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
           {canEditPhotos && onAddPhotos && <AddPhotoInline refId={ref} count={photos.length} pending={pending} onAdd={onAddPhotos} />}
         </div>
       )}
-      {note && <div className="text-xs text-red-600 mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
+      {note && <div className="text-xs text-danger mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
       </div>
     </div>
   );
@@ -658,7 +658,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
     setMissing(m);
     if (m.length === 0) onSave();
   };
-  const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-red-400 border-red-400" : "");
+  const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-danger border-danger" : "");
 
   return (
     <div className="card p-4 sm:p-5 mb-4">
@@ -701,11 +701,17 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       </div>
       {missing.length > 0 && <div className="mb-3 text-sm bg-danger-soft border border-danger/30 text-danger rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
       {(split ? (state.tenders ?? []).some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr key={qrKey} />}
-      <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
-        <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
+      {/* sticky action bar — matches the new-bill form so saving an edit is always
+          one tap away on mobile */}
+      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-5 mt-3 px-4 sm:px-5 pt-3 bg-surface/95 backdrop-blur border-t border-line flex items-center justify-between gap-3 shadow-[0_-4px_14px_rgba(0,0,0,0.05)]"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <div className="min-w-0 leading-tight">
+          <div className="text-[11px] text-muted">รวม</div>
+          <div className="text-brand-dark text-xl font-bold tabular-nums truncate">{baht(total)}</div>
+        </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => setState(null)} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={handleSave} disabled={pending || !state.item || (split && !tendersOk)} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
+          <button onClick={() => setState(null)} className="px-4 min-h-[48px] rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
+          <button onClick={handleSave} disabled={pending || !state.item || (split && !tendersOk)} className="px-6 min-h-[48px] rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
         </div>
       </div>
       {scanning && <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />}
