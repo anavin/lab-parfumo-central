@@ -323,11 +323,15 @@ export async function unapproveMany(ids: number[]) {
   const failed: number[] = [];
   for (const id of ids) {
     try {
-      const [s] = await q<{ kind: string; status: string }>(`select kind, status from submissions where id = $1`, [id]);
+      const [s] = await q<{ kind: string; status: string; approved_id: number | null }>(
+        `select kind, status, approved_id from submissions where id = $1`, [id]);
       if (!s || s.status !== "approved") continue;   // only approved rows can be undone
-      // remove the live sale/customer row this approval created (restores stock & dashboard)
-      if (s.kind === "sale") await q(`delete from sales where submission_id = $1`, [id]);
-      else await q(`delete from daily_customers where submission_id = $1`, [id]);
+      // remove the live sale/customer row this approval created (restores stock & dashboard).
+      // approved_id points at the exact inserted row (most precise); submission_id is a
+      // belt-and-suspenders fallback. `tbl` is a fixed literal chosen by kind — not user input.
+      const tbl = s.kind === "sale" ? "sales" : "daily_customers";
+      if (s.approved_id != null) await q(`delete from ${tbl} where id = $1`, [s.approved_id]);
+      await q(`delete from ${tbl} where submission_id = $1`, [id]);
       const res = await q<{ id: number }>(
         `update submissions set status='pending', reviewed_by=null, reviewed_at=null, approved_id=null, review_note=null, updated_at=now()
          where id=$1 and status='approved' returning id`, [id]);
