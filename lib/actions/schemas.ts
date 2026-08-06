@@ -88,6 +88,7 @@ export const billSchema = z.object({
     unit_price: z.coerce.number().min(0).max(99999999).optional(),
     discount: z.coerce.number().min(0).max(99999999).optional(),
   })).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(50),
+  attachments: z.array(z.string().startsWith("data:image/", "ไฟล์แนบไม่ถูกต้อง").max(3_000_000)).max(6).optional(),
 });
 
 export const productSchema = z.object({

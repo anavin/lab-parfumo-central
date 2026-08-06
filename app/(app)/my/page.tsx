@@ -1,6 +1,6 @@
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
-import { myDayKpis, mySubmissions, myTrend } from "@/lib/queries";
+import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs } from "@/lib/queries";
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
 import { DateNav } from "@/components/DateNav";
@@ -33,6 +33,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     return { d, revenue: revByDay.get(d) ?? 0 };
   });
   const maxRev = Math.max(1, ...trend.map((t) => t.revenue));
+  const attachments = await attachmentsForRefs(rows.map((r) => r.receipt_no).filter(Boolean) as string[]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
@@ -40,7 +41,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         action={<DateNav date={date} today={today} />} />
 
       {/* data entry first */}
-      <MyWorkspace date={date} fullName={user.full_name} rows={rows} />
+      <MyWorkspace date={date} fullName={user.full_name} rows={rows} attachments={attachments} />
 
       {/* daily summary — below the entry */}
       <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>

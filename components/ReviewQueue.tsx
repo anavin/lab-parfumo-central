@@ -4,9 +4,11 @@ import { useRouter } from "next/navigation";
 import { Check, X, CheckCheck, Clock, ShoppingBag, Users } from "lucide-react";
 import { approveSubmission, rejectSubmission, approveMany } from "@/lib/actions/submissions";
 import { baht, num, fmtDate } from "@/lib/format";
-import type { SubmissionRow } from "@/lib/queries";
+import { PhotoStrip } from "@/components/BillPhotos";
+import type { SubmissionRow, BillAttachment } from "@/lib/queries";
 
-export function ReviewQueue({ rows }: { rows: SubmissionRow[] }) {
+export function ReviewQueue({ rows, attachments = {} }: { rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
+  const shownRefs = new Set<string>();   // show each bill's photos once (on its first row)
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<number | null>(null);
@@ -75,6 +77,13 @@ export function ReviewQueue({ rows }: { rows: SubmissionRow[] }) {
                       </div>
                     </>
                   )}
+                  {(() => {
+                    const ref = r.receipt_no || "";
+                    const ph = attachments[ref];
+                    if (!ph?.length || shownRefs.has(ref)) return null;
+                    shownRefs.add(ref);
+                    return <PhotoStrip photos={ph} size={52} />;
+                  })()}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => approve(r.id)} disabled={pending}

@@ -8,5 +8,7 @@ const nextConfig = {
   serverExternalPackages: ["@electric-sql/pglite"],
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  // bill photo evidence is sent inline with the submit action (compressed)
+  experimental: { serverActions: { bodySizeLimit: "12mb" } },
 };
 export default nextConfig;

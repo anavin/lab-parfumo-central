@@ -3,12 +3,14 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus } from "lucide-react";
 import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
-import { submitBill, updateMySale, deleteMySubmission } from "@/lib/actions/submissions";
+import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PromptPayButton } from "@/components/PromptPayButton";
+import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
+import { compressImage } from "@/lib/img";
 import { baht, num } from "@/lib/format";
-import type { SubmissionRow } from "@/lib/queries";
+import type { SubmissionRow, BillAttachment } from "@/lib/queries";
 
 const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
 const nowHM = () => new Date().toTimeString().slice(0, 5);
@@ -35,17 +37,18 @@ const PAYMENTS = [
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
 type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any };
-type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[] };
+type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[]; attachments: string[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number };
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [] });
+const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
 
-export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: string; rows: SubmissionRow[] }) {
+export function MyWorkspace({ date, fullName, rows, attachments = {} }:
+  { date: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [bill, setBill] = useState<BillState | null>(null);
@@ -81,7 +84,7 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
       await submitBill({
         sale_date: bill.sale_date, sale_time: bill.sale_time, source: bill.source,
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
-        items,
+        items, attachments: bill.attachments,
       });
       setBill(null); refresh();
     } catch (e: any) { onActionError(e, () => setBill(null)); }
@@ -104,6 +107,13 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
   }
   // count only bills that aren't fully rejected, to match the daily-summary KPI
   const activeBillCount = bills.filter((b) => b.rows.some((r) => r.status !== "rejected")).length;
+
+  const addPhotos = (ref: string, imgs: string[]) => start(async () => {
+    try { await addBillAttachments(ref, imgs); refresh(); } catch (e: any) { onActionError(e); }
+  });
+  const delPhoto = (id: number) => start(async () => {
+    try { await deleteBillAttachment(id); refresh(); } catch (e: any) { onActionError(e); }
+  });
 
   const busy = bill !== null || edit !== null;
 
@@ -143,7 +153,9 @@ export function MyWorkspace({ date, fullName, rows }: { date: string; fullName: 
           <div className="px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
         ) : (
           <div className="divide-y divide-line">
-            {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending} onEdit={editRow} onDelete={setDel} />)}
+            {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending}
+              onEdit={editRow} onDelete={setDel} photos={attachments[b.rows[0].receipt_no || ""] || []}
+              onAddPhotos={addPhotos} onDeletePhoto={delPhoto} />)}
           </div>
         )}
       </div>
@@ -282,6 +294,11 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         <div className="text-[11px] text-muted mt-1.5">ราคาต่อชิ้นลดมาแล้ว — ช่องนี้ไว้ลดเพิ่มตอนต่อรอง (กรอกเองได้ในช่อง %)</div>
       </div>
 
+      {/* photo evidence for this bill */}
+      <div className="mb-4 border-t border-line/60 pt-3">
+        <PhotoPicker value={state.attachments} onChange={(a) => set({ attachments: a })} />
+      </div>
+
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
 
       <div className="border-t border-line pt-3">
@@ -362,11 +379,16 @@ function StatusPill({ status }: { status: string }) {
 }
 
 // one bill = the item lines a customer bought together
-function BillGroupCard({ index, rows, onEdit, onDelete, pending }: { index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; pending: boolean }) {
+function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], onAddPhotos, onDeletePhoto }: {
+  index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; pending: boolean;
+  photos?: BillAttachment[]; onAddPhotos?: (ref: string, imgs: string[]) => void; onDeletePhoto?: (id: number) => void;
+}) {
   const first = rows[0];
   const total = rows.reduce((s, r) => s + (r.total ?? 0), 0);
   const status = rows.every((r) => r.status === "approved") ? "approved" : rows.some((r) => r.status === "rejected") ? "rejected" : "pending";
   const note = rows.find((r) => r.status === "rejected" && r.review_note)?.review_note;
+  const ref = first.receipt_no || "";
+  const canEditPhotos = status === "pending" && !!ref;
   return (
     <div className="px-4 py-3">
       <div className="flex items-center justify-between mb-1.5">
@@ -401,8 +423,40 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending }: { index: numb
           </li>
         ))}
       </ul>
+      {(photos.length > 0 || canEditPhotos) && (
+        <div className="mt-2 pt-2 border-t border-line/60">
+          <PhotoStrip photos={photos} onDelete={canEditPhotos ? onDeletePhoto : undefined} size={52} />
+          {canEditPhotos && onAddPhotos && <AddPhotoInline refId={ref} count={photos.length} pending={pending} onAdd={onAddPhotos} />}
+        </div>
+      )}
       {note && <div className="text-xs text-red-600 mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
     </div>
+  );
+}
+
+// small "add photo" control for a pending bill in the list
+function AddPhotoInline({ refId, count, pending, onAdd }: { refId: string; count: number; pending: boolean; onAdd: (ref: string, imgs: string[]) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const max = 6 - count;
+  if (max <= 0) return null;
+  const pick = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    try {
+      const out: string[] = [];
+      for (const f of Array.from(files).slice(0, max)) { try { out.push(await compressImage(f)); } catch {} }
+      if (out.length) onAdd(refId, out);
+    } finally { setBusy(false); if (ref.current) ref.current.value = ""; }
+  };
+  return (
+    <>
+      <button type="button" onClick={() => ref.current?.click()} disabled={pending || busy}
+        className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-brand-dark hover:underline disabled:opacity-50">
+        <Plus className="w-3 h-3" /> {busy ? "กำลังแนบ…" : "แนบรูป"}
+      </button>
+      <input ref={ref} type="file" accept="image/*" multiple className="hidden" onChange={(e) => pick(e.target.files)} />
+    </>
   );
 }
 

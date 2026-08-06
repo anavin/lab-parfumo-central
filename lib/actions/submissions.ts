@@ -63,7 +63,40 @@ export async function submitBill(input: unknown) {
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
     count++; sum += total;
   }
-  await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}`);
+  for (const a of d.attachments ?? []) {
+    await q(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3)`, [ref, user.id, a]);
+  }
+  await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}${d.attachments?.length ? ` · แนบ ${d.attachments.length} รูป` : ""}`);
+  revalidatePath("/my"); revalidatePath("/review");
+}
+
+// Add / remove photo evidence on a bill you own that is still pending.
+export async function addBillAttachments(billRef: string, images: string[]) {
+  const user = await requirePermission("my_sales");
+  const ref = String(billRef || "").trim();
+  if (!ref) throw new Error("ไม่พบบิล");
+  // must own at least one still-pending row of this bill
+  const [own] = await q<{ n: number }>(
+    `select count(*)::int n from submissions where receipt_no = $1 and created_by = $2 and status = 'pending'`, [ref, user.id]);
+  if (!own?.n) throw new Error("แนบรูปได้เฉพาะบิลของตัวเองที่ยังรอตรวจ");
+  const imgs = (images || []).filter((s) => typeof s === "string" && s.startsWith("data:image/") && s.length <= 3_000_000).slice(0, 6);
+  if (!imgs.length) throw new Error("ไม่มีรูปที่ถูกต้อง");
+  for (const a of imgs) {
+    await q(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3)`, [ref, user.id, a]);
+  }
+  await logAudit("update", "submission", null, `แนบรูปบิล ${ref} · ${imgs.length} รูป`);
+  revalidatePath("/my"); revalidatePath("/review");
+}
+
+export async function deleteBillAttachment(id: number) {
+  const user = await requirePermission("my_sales");
+  const [a] = await q<{ bill_ref: string; created_by: number }>(`select bill_ref, created_by from bill_attachments where id = $1`, [id]);
+  if (!a) throw new Error("ไม่พบรูป");
+  if (Number(a.created_by) !== Number(user.id)) throw new Error("ลบได้เฉพาะรูปของตัวเอง");
+  const [locked] = await q<{ n: number }>(
+    `select count(*)::int n from submissions where receipt_no = $1 and status <> 'pending'`, [a.bill_ref]);
+  if (locked?.n) throw new Error("บิลนี้ถูกตรวจแล้ว ลบรูปไม่ได้");
+  await q(`delete from bill_attachments where id = $1`, [id]);
   revalidatePath("/my"); revalidatePath("/review");
 }
 
@@ -140,7 +173,13 @@ export async function updateMyCustomerDay(id: number, input: unknown) {
 export async function deleteMySubmission(id: number) {
   const user = await requirePermission("my_sales");
   await ownRow(id, user.id, ["pending", "rejected"]);   // allow removing a bounced entry
+  const [ref] = await q<{ receipt_no: string | null }>(`select receipt_no from submissions where id = $1`, [id]);
   await q(`delete from submissions where id = $1`, [id]);
+  // if that was the bill's last line, remove its now-orphaned photo evidence
+  if (ref?.receipt_no) {
+    const [left] = await q<{ n: number }>(`select count(*)::int n from submissions where receipt_no = $1`, [ref.receipt_no]);
+    if (!left?.n) await q(`delete from bill_attachments where bill_ref = $1`, [ref.receipt_no]);
+  }
   await logAudit("delete", "submission", id, "ลบรายการที่กรอก");
   revalidatePath("/my"); revalidatePath("/review");
 }

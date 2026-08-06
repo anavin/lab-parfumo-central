@@ -283,6 +283,19 @@ export function mySubmissions(userId: number, date: string) {
     order by s.created_at desc`, [userId, date]);
 }
 
+export type BillAttachment = { id: number; bill_ref: string; data: string; created_by: number };
+
+/** Photo evidence for a set of bill refs → map ref -> attachments (in order). */
+export async function attachmentsForRefs(refs: string[]): Promise<Record<string, BillAttachment[]>> {
+  const uniq = [...new Set((refs || []).filter(Boolean))];
+  if (!uniq.length) return {};
+  const rows = await q<BillAttachment>(
+    `select id, bill_ref, data, created_by from bill_attachments where bill_ref = any($1) order by id`, [uniq]);
+  const map: Record<string, BillAttachment[]> = {};
+  for (const r of rows) (map[r.bill_ref] ??= []).push(r);
+  return map;
+}
+
 /** Personal daily KPIs for a staff member — counts pending + approved (i.e.
  * everything they entered that has not been rejected), so their view reflects
  * their own work regardless of review state. */
