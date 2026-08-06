@@ -61,6 +61,11 @@ export const saleSchema = z.object({
   discount: z.coerce.number().min(0).max(99999999).optional(),
   payment_channel: z.string().trim().max(60).optional(),
   nation: z.string().trim().max(20).optional(),
+  // when payment_channel = the split marker: per-channel amounts for this bill
+  tenders: z.array(z.object({
+    channel: z.string().trim().min(1).max(60),
+    amount: z.coerce.number().min(0).max(99999999),
+  })).max(4).optional(),
 });
 
 export const customerDaySchema = z.object({

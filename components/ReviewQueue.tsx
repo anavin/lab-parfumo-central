@@ -5,7 +5,8 @@ import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDo
 import { approveMany, rejectMany, unapproveMany, updateSubmissionByAdmin } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
-import { PAYMENTS } from "@/lib/payments";
+import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
+import { SplitTenders } from "@/components/SplitTenders";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 
 const chLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v;
@@ -40,7 +41,7 @@ function groupDays(rows: SubmissionRow[]): Day[] {
   return days;
 }
 
-function SplitTenders({ tenders }: { tenders?: BillTender[] }) {
+function SplitBreakdown({ tenders }: { tenders?: BillTender[] }) {
   if (!tenders?.length) return null;
   return (
     <div className="mt-2 pt-2 border-t border-line/60 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
@@ -173,7 +174,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                         ))}
                       </ul>
 
-                      <SplitTenders tenders={payments[bill.ref]} />
+                      <SplitBreakdown tenders={payments[bill.ref]} />
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
 
                       {/* per-bill actions */}
@@ -261,7 +262,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                   </li>
                                 ))}
                               </ul>
-                              <SplitTenders tenders={payments[bill.ref]} />
+                              <SplitBreakdown tenders={payments[bill.ref]} />
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
                               <div className="flex justify-end mt-3 pt-2.5 border-t border-line">
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
@@ -292,12 +293,16 @@ function RowEditor({ row, onSave, onCancel, pending }: { row: SubmissionRow; onS
     receipt_no: row.receipt_no || "", item: row.item || "", barcode: row.barcode || "", size: row.size || "",
     qty: row.qty ?? 1, unit_price: row.unit_price ?? 0, discount: row.discount ?? 0,
     payment_channel: row.payment_channel || "", nation: row.nation || "",
+    tenders: isSplit(row.payment_channel) ? [{ channel: "", amount: "" }, { channel: "", amount: "" }] : [],
   } : {
     cust_date: row.entry_date, customers: row.customers ?? 0, thai: row.thai ?? 0, foreign: row.foreign_cnt ?? 0, sell_amount: row.sell_amount ?? 0,
   });
   const s = (k: string, v: any) => setF((o: any) => ({ ...o, [k]: v }));
   const payKnown = PAYMENTS.some((p) => p.v === f.payment_channel);
   const total = isSale ? Math.max(0, (Number(f.qty) || 0) * (Number(f.unit_price) || 0) - (Number(f.discount) || 0)) : 0;
+  const split = isSale && isSplit(f.payment_channel);
+  const tendersOk = splitOk(f.tenders ?? [], total);
+  const pickPay = (v: string) => setF((o: any) => ({ ...o, payment_channel: v, tenders: isSplit(v) && (o.tenders?.length ?? 0) < 2 ? [{ channel: "", amount: "" }, { channel: "", amount: "" }] : (o.tenders ?? []) }));
 
   return (
     <div className="mt-2 rounded-xl border border-line bg-canvas/50 p-3">
@@ -311,10 +316,11 @@ function RowEditor({ row, onSave, onCancel, pending }: { row: SubmissionRow; onS
           <Fld label="ส่วนลด"><input className={inp} {...numAttrs(f.discount, (v) => s("discount", v))} /></Fld>
           <Fld label="รวม"><input className={inp + " bg-canvas text-muted"} value={baht(total)} readOnly /></Fld>
           <Fld label="ช่องทางชำระ">
-            <select className={inp} value={f.payment_channel} onChange={(e) => s("payment_channel", e.target.value)}>
+            <select className={inp} value={f.payment_channel} onChange={(e) => pickPay(e.target.value)}>
               <option value="">- เลือก -</option>
-              {!payKnown && f.payment_channel && <option value={f.payment_channel}>{f.payment_channel}</option>}
+              {!payKnown && f.payment_channel && !isSplit(f.payment_channel) && <option value={f.payment_channel}>{f.payment_channel}</option>}
               {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
+              <option value={SPLIT2}>จ่าย 2 ช่องทาง (แยกยอด)</option>
             </select>
           </Fld>
           <Fld label="สัญชาติ"><select className={inp} value={f.nation} onChange={(e) => s("nation", e.target.value)}><option value="">- เลือก -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Fld>
@@ -332,12 +338,18 @@ function RowEditor({ row, onSave, onCancel, pending }: { row: SubmissionRow; onS
           <Fld label="ยอดขาย"><input className={inp} {...numAttrs(f.sell_amount, (v) => s("sell_amount", v))} /></Fld>
         </div>
       )}
+      {split && (
+        <div className="mt-3">
+          <div className="text-xs text-muted mb-1">แยกยอดแต่ละช่องทาง (รวมต้องเท่ากับ {baht(total)})</div>
+          <SplitTenders value={f.tenders ?? []} onChange={(t) => s("tenders", t)} net={total} />
+        </div>
+      )}
       <div className="flex justify-end gap-2 mt-3">
         <button onClick={onCancel} className="px-3 py-1.5 rounded-lg border border-line text-sm text-muted hover:bg-canvas">ยกเลิก</button>
         <button onClick={() => onSave(isSale
-          ? { ...f, qty: Number(f.qty) || 0, unit_price: Number(f.unit_price) || 0, discount: Number(f.discount) || 0 }
+          ? { ...f, qty: Number(f.qty) || 0, unit_price: Number(f.unit_price) || 0, discount: Number(f.discount) || 0, tenders: split ? resolveTenders(f.tenders ?? [], total) : undefined }
           : { ...f, customers: Number(f.customers) || 0, thai: Number(f.thai) || 0, foreign: Number(f.foreign) || 0, sell_amount: Number(f.sell_amount) || 0 })}
-          disabled={pending} className="px-4 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
+          disabled={pending || (split && !tendersOk)} className="px-4 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
       </div>
     </div>
   );

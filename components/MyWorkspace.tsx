@@ -10,7 +10,8 @@ import { PromptPayButton } from "@/components/PromptPayButton";
 import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
 import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
-import { PAYMENTS, SPLIT2, isSplit } from "@/lib/payments";
+import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
+import { SplitTenders } from "@/components/SplitTenders";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow, BillAttachment } from "@/lib/queries";
 
@@ -43,7 +44,7 @@ const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, 
 const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
-type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
+type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
 export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
   { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
@@ -94,7 +95,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
 
   const editRow = (r: SubmissionRow) => {
     setBill(null);
-    setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "" });
+    setEdit({ id: r.id, sale_date: r.entry_date, sale_time: (r.sale_time || "").slice(0, 5) || nowHM(), source: r.source || "CTW", receipt_no: r.receipt_no || "", item: r.item || "", barcode: r.barcode || "", size: r.size || "", qty: r.qty ?? 1, unit_price: r.unit_price ?? 0, discount: r.discount ?? 0, payment_channel: r.payment_channel || "", nation: r.nation || "", tenders: isSplit(r.payment_channel) ? [{ channel: "", amount: "" }, { channel: "", amount: "" }] : [] });
     // jump up to the edit form once it has rendered (reliable on mobile)
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   };
@@ -145,7 +146,9 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
       {edit && <SaleForm state={edit} setState={setEdit} pending={pending} fullName={fullName}
         onSave={() => start(async () => {
           try {
-            await updateMySale(edit.id, { ...edit, qty: Number(edit.qty), unit_price: Number(edit.unit_price), discount: Number(edit.discount) });
+            const lineTotal = (Number(edit.qty) || 0) * (Number(edit.unit_price) || 0) - (Number(edit.discount) || 0);
+            const tenders = isSplit(edit.payment_channel) ? resolveTenders(edit.tenders, lineTotal) : undefined;
+            await updateMySale(edit.id, { ...edit, qty: Number(edit.qty), unit_price: Number(edit.unit_price), discount: Number(edit.discount), tenders });
             setEdit(null); refresh();
           } catch (e: any) { onActionError(e, () => setEdit(null)); }
         })} />}
@@ -615,10 +618,20 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   };
   const total = (Number(state.qty) || 0) * (Number(state.unit_price) || 0) - (Number(state.discount) || 0);
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
+  const split = isSplit(state.payment_channel);
+  const tendersOk = splitOk(state.tenders ?? [], total);
+  const promptpayAmount = split
+    ? resolveTenders(state.tenders ?? [], total).reduce((s, t) => s + (t.channel === "PromptPay" ? t.amount : 0), 0)
+    : (state.payment_channel === "PromptPay" ? total : 0);
+  const paymentPick = (v: string) => {
+    s("payment_channel", v); clearMiss("ช่องทางชำระ");
+    if (isSplit(v) && (state.tenders?.length ?? 0) < 2) setState({ ...state, payment_channel: v, tenders: [{ channel: "", amount: "" }, { channel: "", amount: "" }] });
+  };
   const clearMiss = (f: string) => setMissing((m) => m.filter((x) => x !== f));
   const handleSave = () => {
     const m: string[] = [];
-    if (!String(state.payment_channel || "").trim()) m.push("ช่องทางชำระ");
+    if (split) { if (!tendersOk) m.push("ยอดชำระ 2 ช่องทางให้ครบและตรงกับยอดบิล"); }
+    else if (!String(state.payment_channel || "").trim()) m.push("ช่องทางชำระ");
     if (!String(state.nation || "").trim()) m.push("สัญชาติลูกค้า");
     setMissing(m);
     if (m.length === 0) onSave();
@@ -646,24 +659,31 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <Field label="ช่องทางชำระ *">
-          <Select value={state.payment_channel} onValueChange={(v) => { s("payment_channel", v); clearMiss("ช่องทางชำระ"); }}
-            options={payOptions(state.payment_channel)} placeholder="- เลือกช่องทางชำระ -"
-            className={"py-2.5" + errRing("ช่องทางชำระ")} />
+          <Select value={state.payment_channel} onValueChange={paymentPick}
+            options={[...payOptions(split ? "" : state.payment_channel), { value: SPLIT2, label: "จ่าย 2 ช่องทาง (แยกยอด)" }]}
+            placeholder="- เลือกช่องทางชำระ -"
+            className={"py-2.5" + (split ? "" : errRing("ช่องทางชำระ"))} />
         </Field>
         <Field label="สัญชาติลูกค้า *"><select className={inp + errRing("สัญชาติลูกค้า")} value={state.nation} onChange={(e) => { s("nation", e.target.value); clearMiss("สัญชาติลูกค้า"); }}><option value="">- เลือกสัญชาติ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
       </div>
+      {split && (
+        <div className="mb-3">
+          <div className="text-xs text-muted mb-1">แยกยอดแต่ละช่องทาง (รวมต้องเท่ากับ {baht(total)})</div>
+          <SplitTenders value={state.tenders ?? []} onChange={(t) => { s("tenders", t); clearMiss("ยอดชำระ 2 ช่องทางให้ครบและตรงกับยอดบิล"); }} net={total} />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Field>
         <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
       </div>
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
-      {total > 0 && state.payment_channel === "PromptPay" && <div className="mb-3"><PromptPayButton amount={total} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
+      {promptpayAmount > 0 && <div className="mb-3"><PromptPayButton amount={promptpayAmount} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => setState(null)} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={handleSave} disabled={pending || !state.item} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
+          <button onClick={handleSave} disabled={pending || !state.item || (split && !tendersOk)} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
         </div>
       </div>
       {scanning && <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />}

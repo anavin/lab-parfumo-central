@@ -166,6 +166,28 @@ async function ownRow(id: number, userId: number, allow: string[]) {
 }
 const ownPending = (id: number, userId: number) => ownRow(id, userId, ["pending"]);
 
+// When an existing bill is edited to (or away from) split payment, sync its
+// per-channel amounts. Supports single-line bills only — a multi-item bill's
+// split can't be expressed by editing one line, so it's rejected clearly.
+async function applyEditTenders(id: number, d: any, total: number) {
+  const split = isSplit((d.payment_channel || "").trim());
+  const [row] = await q<{ receipt_no: string | null; created_by: number }>(`select receipt_no, created_by from submissions where id = $1`, [id]);
+  const ref = row?.receipt_no?.trim() || null;
+  if (!split) { if (ref) { try { await q(`delete from bill_payments where bill_ref = $1`, [ref]); } catch {} } return; }
+  if (!ref) throw new Error("บิลนี้ไม่มีเลขที่บิล — ใช้จ่าย 2 ช่องทางไม่ได้ (ให้ลบแล้วกรอกใหม่)");
+  const [cnt] = await q<{ n: number }>(`select count(*)::int n from submissions where receipt_no = $1 and status <> 'rejected'`, [ref]);
+  if ((cnt?.n ?? 0) > 1) throw new Error("แก้เป็นจ่าย 2 ช่องทางได้เฉพาะบิลรายการเดียว — บิลหลายรายการให้ลบแล้วกรอกใหม่");
+  const tenders = ((d.tenders ?? []) as { channel: string; amount: number }[]).filter((t) => t.channel?.trim() && t.amount > 0);
+  if (tenders.length < 2) throw new Error("จ่าย 2 ทาง: เลือกช่องทางและใส่ยอดให้ครบอย่างน้อย 2 ช่องทาง");
+  const tsum = Math.round(tenders.reduce((s, t) => s + t.amount, 0));
+  if (tsum !== Math.round(total)) throw new Error(`ยอดชำระรวม ฿${tsum.toLocaleString()} ไม่เท่ากับยอดบิล ฿${Math.round(total).toLocaleString()}`);
+  await q(`delete from bill_payments where bill_ref = $1`, [ref]);
+  for (const t of tenders) {
+    await q(`insert into bill_payments (bill_ref, created_by, entry_date, channel, amount) values ($1,$2,$3,$4,$5)`,
+      [ref, row.created_by, d.sale_date, t.channel.trim(), t.amount]);
+  }
+}
+
 export async function updateMySale(id: number, input: unknown) {
   const user = await requirePermission("my_sales");
   await ownPending(id, user.id);
@@ -185,6 +207,7 @@ export async function updateMySale(id: number, input: unknown) {
      d.barcode || null, d.size || null, d.qty, d.unit_price ?? 0, discount, total,
      d.payment_channel || null, d.nation || null]);
   await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
+  await applyEditTenders(id, d, total);
   await logAudit("update", "submission", id, `แก้ไข: ${d.item}`);
   revalidatePath("/my"); revalidatePath("/review");
 }
@@ -242,6 +265,7 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
        d.barcode || null, d.size || null, d.qty, d.unit_price ?? 0, discount, total,
        d.payment_channel || null, d.nation || null]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
+    await applyEditTenders(id, d, total);
     await logAudit("update", "submission", id, `แอดมินแก้ไข: ${d.item}`);
   } else {
     const parsed = customerDaySchema.safeParse(input);
