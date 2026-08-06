@@ -6,9 +6,17 @@ import { SESSION_COOKIE, SESSION_IDLE_MIN, SESSION_COOKIE_MAX_AGE_DAYS, type Use
 
 export { SESSION_COOKIE, type User };
 
-export async function createSession(userId: number): Promise<string> {
+const missingCol = (e: any) => e?.code === "42703" || /column .*remember.* does not exist/i.test(String(e?.message || ""));
+
+export async function createSession(userId: number, remember = false): Promise<string> {
   const token = randomBytes(32).toString("base64url");
-  await q(`insert into user_sessions (token, user_id) values ($1, $2)`, [token, userId]);
+  try {
+    await q(`insert into user_sessions (token, user_id, remember) values ($1, $2, $3)`, [token, userId, remember]);
+  } catch (e) {
+    // migration 0009 (remember column) not applied yet → insert without it
+    if (!missingCol(e)) throw e;
+    await q(`insert into user_sessions (token, user_id) values ($1, $2)`, [token, userId]);
+  }
   return token;
 }
 
@@ -31,8 +39,15 @@ export async function getUserFromToken(token: string | undefined): Promise<User 
   const row = rows[0];
   if (!row) return null;
 
+  // "remember me" sessions skip the idle auto-logout (resilient if column absent)
+  let remember = false;
+  try {
+    const r = await q<{ remember: boolean }>(`select coalesce(remember,false) remember from user_sessions where token = $1`, [token]);
+    remember = !!r[0]?.remember;
+  } catch (e) { if (!missingCol(e)) throw e; }
+
   const idleMin = (Date.now() - new Date(row.last_activity_at).getTime()) / 60_000;
-  if (idleMin > SESSION_IDLE_MIN) {
+  if (!remember && idleMin > SESSION_IDLE_MIN) {
     await q(`delete from user_sessions where token = $1`, [token]).catch(() => {});
     return null;
   }
@@ -53,13 +68,14 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   return getUserFromToken(token);
 });
 
-export async function setSessionCookie(token: string): Promise<void> {
+export async function setSessionCookie(token: string, remember = false): Promise<void> {
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * SESSION_COOKIE_MAX_AGE_DAYS,
+    // remember → persistent (survives browser restart); otherwise a session cookie
+    ...(remember ? { maxAge: 60 * 60 * 24 * SESSION_COOKIE_MAX_AGE_DAYS } : {}),
   });
 }
 

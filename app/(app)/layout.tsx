@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import { IdleLogout } from "@/components/IdleLogout";
 import { requireUser } from "@/lib/auth/require-user";
 import { can, permissionForPath, landingFor } from "@/lib/auth/permissions";
 import { pendingCount } from "@/lib/queries";
@@ -15,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const pending = can(user, "review") ? await pendingCount() : 0;
   return (
     <div className="flex min-h-screen bg-canvas">
+      <IdleLogout />
       <Sidebar user={user} pending={pending} />
       <main className="flex-1 min-w-0 pt-14 lg:pt-0">{children}</main>
     </div>

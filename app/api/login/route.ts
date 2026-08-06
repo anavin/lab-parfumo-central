@@ -17,6 +17,7 @@ export async function POST(req: Request) {
   const username = String(body.username ?? "");
   const password = String(body.password ?? "");
   const next = typeof body.next === "string" ? body.next : "/";
+  const remember = body.remember === true || body.remember === "1";
 
   const res = await loginWithPassword(username, password);
   if (!res.ok || !res.user) {
@@ -25,8 +26,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: res.error ?? "เข้าสู่ระบบไม่สำเร็จ", attemptsRemaining: res.attemptsRemaining });
   }
 
-  const token = await createSession(res.user.id);
-  await setSessionCookie(token);
+  const token = await createSession(res.user.id, remember);
+  await setSessionCookie(token, remember);
   await logAudit("login", "auth", res.user.username, "เข้าสู่ระบบ", res.user);
 
   // Resolve the final destination by the user's permissions so they land on a
@@ -34,5 +35,8 @@ export async function POST(req: Request) {
   const wanted = isSafeNext(next) ? next : "/";
   const wantedPerm = permissionForPath(wanted);
   const dest = wantedPerm == null || can(res.user, wantedPerm) ? wanted : landingFor(res.user);
-  return NextResponse.json({ ok: true, next: dest });
+  const resp = NextResponse.json({ ok: true, next: dest });
+  // readable flag (not httpOnly) so the client idle-logout knows to skip when remembered
+  resp.cookies.set("lp_remember", remember ? "1" : "0", { path: "/", sameSite: "lax", ...(remember ? { maxAge: 60 * 60 * 24 * 7 } : {}) });
+  return resp;
 }

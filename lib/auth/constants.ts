@@ -1,6 +1,6 @@
 // Pure constants (no Node APIs) so the Edge middleware can import them.
 export const SESSION_COOKIE = "lp_session";
-export const SESSION_IDLE_MIN = 60;
+export const SESSION_IDLE_MIN = 5;   // auto-logout after 5 min idle (unless "remember me")
 export const SESSION_COOKIE_MAX_AGE_DAYS = 7;
 
 // Kept broad on purpose: role is free text in the DB and the set of presets can
