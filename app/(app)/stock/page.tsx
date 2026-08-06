@@ -2,13 +2,17 @@ import { PageHeader, Stat, Card, Badge } from "@/components/ui";
 import { num } from "@/lib/format";
 import { stockLive, stockSummary } from "@/lib/queries";
 import { ExportButton } from "@/components/ExportButton";
-import { Package } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
+import { Package, AlertTriangle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function StockPage() {
-  const [rows, s] = await Promise.all([stockLive(), stockSummary()]);
+  const [rows, s, user] = await Promise.all([stockLive(), stockSummary(), getCurrentUser()]);
   const tone = (r: number): "danger" | "warn" | "success" => (r <= 0 ? "danger" : r <= 3 ? "warn" : "success");
+  const lowCount = (s.low ?? 0) + (s.out ?? 0);
+  const canRequisition = !!user && can(user, "requisitions");
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
@@ -20,6 +24,21 @@ export default async function StockPage() {
         <Stat label="ใกล้หมด (≤3)" value={String(s.low)} tone="brand" />
         <Stat label="หมดสต๊อก" value={String(s.out)} tone="danger" />
       </div>
+
+      {lowCount > 0 && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-900">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            มีสินค้าใกล้หมด/หมด <b>{lowCount}</b> รายการ — ควรเบิกเพิ่ม
+          </div>
+          {canRequisition && (
+            <a href="/requisitions/new?prefill=lowstock"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark shrink-0">
+              สร้างใบเบิกของที่ใกล้หมด
+            </a>
+          )}
+        </div>
+      )}
       <Card title={`รายการสินค้า (${rows.length} SKU) · เรียงตามคงเหลือน้อยสุด`}>
         <div className="max-h-[600px] overflow-auto">
           <table className="w-full text-sm">
