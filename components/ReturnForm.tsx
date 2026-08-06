@@ -39,10 +39,9 @@ export function ReturnForm({ pos }: { pos: { po_number: string; branch_label: st
       </div>
       {msg && <div className="text-sm text-gold-dark bg-gold/10 border border-gold/20 rounded-lg px-4 py-2">{msg}</div>}
       <div className="flex gap-2">
-        <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-ink text-white font-medium hover:bg-black disabled:opacity-50">{pending ? "กำลังบันทึก…" : "บันทึกการคืน"}</button>
-        <a href="/shipments" className="px-5 py-2.5 rounded-lg border border-black/10 font-medium hover:bg-black/5">ยกเลิก</a>
+        <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-ink text-surface font-medium hover:opacity-90 disabled:opacity-50">{pending ? "กำลังบันทึก…" : "บันทึกการคืน"}</button>
+        <a href="/shipments" className="px-5 py-2.5 rounded-lg border border-line font-medium hover:bg-canvas">ยกเลิก</a>
       </div>
-      <style>{`.inp{width:100%;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:8px 10px;font-size:14px;background:#fff}.inp:focus{outline:none;border-color:#b08d57}`}</style>
     </div>
   );
 }

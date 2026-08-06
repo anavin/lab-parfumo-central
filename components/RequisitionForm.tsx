@@ -111,14 +111,11 @@ export function RequisitionForm({
 
       {err && <div className="text-sm text-danger bg-danger-soft border border-danger/30 rounded-lg px-4 py-2">{err}</div>}
       <div className="flex gap-2">
-        <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-ink text-white font-medium hover:bg-black disabled:opacity-50">
+        <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-ink text-surface font-medium hover:opacity-90 disabled:opacity-50">
           {pending ? "กำลังบันทึก…" : mode === "new" ? "สร้างใบเบิก" : "บันทึกการแก้ไข"}
         </button>
-        <a href={mode === "edit" ? `/requisitions/${id}` : "/requisitions"} className="px-5 py-2.5 rounded-lg border border-black/10 font-medium hover:bg-black/5">ยกเลิก</a>
+        <a href={mode === "edit" ? `/requisitions/${id}` : "/requisitions"} className="px-5 py-2.5 rounded-lg border border-line font-medium hover:bg-canvas">ยกเลิก</a>
       </div>
-
-      <style>{`.inp{width:100%;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:8px 10px;font-size:14px;background:#fff}
-      .inp:focus{outline:none;border-color:#b08d57}`}</style>
     </div>
   );
 }
@@ -143,7 +140,7 @@ function ItemRow({ index, item, onChange, onRemove }: { index: number; item: Ite
         <input value={item.scent} onChange={(e) => onSearch(e.target.value)} onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder="ค้นหากลิ่น / บาร์โค้ด" className="inp" />
         {open && results.length > 0 && (
-          <div className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-surface border border-black/10 rounded-lg shadow-lg text-sm">
+          <div className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
             {results.map((p) => (
               <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-gold/10">
                 <span className="font-medium">{p.scent}</span> <span className="text-ink/40">{p.size} · {p.grade} · {p.barcode}</span>

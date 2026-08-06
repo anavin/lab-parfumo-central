@@ -11,7 +11,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
       <select
         defaultValue={status}
         onChange={(e) => start(async () => { await setRequisitionStatus(id, e.target.value); router.refresh(); })}
-        className="border border-black/10 rounded-lg px-2.5 py-2 text-sm bg-surface"
+        className="border border-line rounded-lg px-2.5 py-2 text-sm bg-surface"
         disabled={pending}
       >
         <option value="draft">draft</option>
@@ -19,7 +19,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
         <option value="delivered">delivered</option>
         <option value="closed">closed</option>
       </select>
-      <a href={`/requisitions/${id}/edit`} className="px-3.5 py-2 rounded-lg border border-black/10 text-sm font-medium hover:bg-black/5">✎ แก้ไข</a>
+      <a href={`/requisitions/${id}/edit`} className="px-3.5 py-2 rounded-lg border border-line text-sm font-medium hover:bg-canvas">✎ แก้ไข</a>
       <button
         onClick={() => { if (confirm("ลบใบเบิกนี้?")) start(() => deleteRequisition(id)); }}
         className="px-3.5 py-2 rounded-lg border border-danger/30 text-danger text-sm font-medium hover:bg-danger-soft"

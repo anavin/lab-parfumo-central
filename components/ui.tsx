@@ -7,7 +7,7 @@ export function Hint({ text }: { text: string }) {
   return (
     <span className="group/hint relative inline-flex items-center align-middle">
       <Info className="w-3.5 h-3.5 text-muted-soft" strokeWidth={2} />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-30 w-max max-w-[220px] rounded-lg bg-ink text-white text-[11px] font-normal leading-snug px-2.5 py-1.5 opacity-0 group-hover/hint:opacity-100 transition-opacity shadow-pop">
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-30 w-max max-w-[220px] rounded-lg bg-ink text-surface text-[11px] font-normal leading-snug px-2.5 py-1.5 opacity-0 group-hover/hint:opacity-100 transition-opacity shadow-pop">
         {text}
       </span>
     </span>

@@ -49,7 +49,7 @@ export function DateNav({ date, today }: { date: string; today: string }) {
 
       {!isToday && (
         <button onClick={() => go(today)}
-          className="px-3.5 py-2 rounded-xl text-sm font-medium bg-ink text-white hover:bg-black shrink-0 transition-colors">
+          className="px-3.5 py-2 rounded-xl text-sm font-medium bg-ink text-surface hover:opacity-90 shrink-0 transition-colors">
           วันนี้
         </button>
       )}

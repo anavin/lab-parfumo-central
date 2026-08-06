@@ -170,7 +170,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
 
           {/* checking overlay */}
           {checking && (
-            <div className="absolute inset-0 bg-ink/92 flex flex-col items-center justify-center text-white/80">
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center text-white/80">
               <ScanLine className="w-10 h-10 mb-3 animate-pulse" />
               <div className="text-sm">กำลังตรวจสอบ…</div>
             </div>
@@ -178,7 +178,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
 
           {/* BIG result overlay — clear, full camera view */}
           {result && (
-            <div className="absolute inset-0 bg-ink/95 flex flex-col items-center justify-center text-center px-6">
+            <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center text-center px-6">
               <div className={"w-20 h-20 rounded-full flex items-center justify-center mb-4 " + (result.ok ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400")}>
                 {result.ok ? <Check className="w-11 h-11" strokeWidth={2.5} /> : <AlertTriangle className="w-10 h-10" />}
               </div>

@@ -31,7 +31,7 @@ export function KShopQr() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src="/kshop-qr.png" alt="K Shop QR" className="w-full rounded-lg" onError={() => setBroken(true)} />
             )}
-            <button onClick={() => setOpen(false)} className="mt-2 w-full py-2.5 rounded-lg bg-ink text-white text-sm font-medium hover:bg-black">ปิด</button>
+            <button onClick={() => setOpen(false)} className="mt-2 w-full py-2.5 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark">ปิด</button>
           </div>
         </div>
       )}
