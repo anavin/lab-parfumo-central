@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area, ComposedChart,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList,
@@ -33,6 +33,25 @@ function TT({ active, payload, label, fmt }: any) {
 }
 
 const box = (c: React.ReactNode) => <ResponsiveContainer width="100%" height="100%">{c as any}</ResponsiveContainer>;
+
+// Resolve a CSS custom property (RGB channels, e.g. "26 29 35") to an rgb() string,
+// re-reading whenever the theme flips so SVG fills stay in sync with light/dark.
+function useThemeColor(varName: string, fallback: string) {
+  const [color, setColor] = useState(fallback);
+  useEffect(() => {
+    const read = () => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+      setColor(v ? `rgb(${v})` : fallback);
+    };
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", read);
+    return () => { obs.disconnect(); mq.removeEventListener("change", read); };
+  }, [varName, fallback]);
+  return color;
+}
 
 export function RevenueTrend({ data, xKey = "month" }: { data: any[]; xKey?: string }) {
   return box(
@@ -187,6 +206,7 @@ export function Donut({
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const fmt = money ? baht : numAbbr;
   const [hovering, setHovering] = useState(false);
+  const divider = useThemeColor("--surface", "#fff");   // gap between slices = card background
   return (
     <div className="flex flex-col items-center">
       <div className="relative w-full" style={{ height: 176 }}>
@@ -194,7 +214,7 @@ export function Donut({
           <PieChart>
             <Pie
               data={data} dataKey="value" nameKey="name" innerRadius="66%" outerRadius="90%"
-              paddingAngle={2} stroke="#fff" strokeWidth={2.5} startAngle={90} endAngle={-270}
+              paddingAngle={2} stroke={divider} strokeWidth={2.5} startAngle={90} endAngle={-270}
               onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}
             >
               {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
