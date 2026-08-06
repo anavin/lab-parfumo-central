@@ -482,8 +482,10 @@ function AddPhotoInline({ refId, count, pending, onAdd }: { refId: string; count
     setBusy(true);
     try {
       const out: string[] = [];
-      for (const f of Array.from(files).slice(0, max)) { try { out.push(await compressImage(f)); } catch {} }
+      let failed = 0;
+      for (const f of Array.from(files).slice(0, max)) { try { out.push(await compressImage(f)); } catch { failed++; } }
       if (out.length) onAdd(refId, out);
+      if (failed) alert(`แนบไม่สำเร็จ ${failed} รูป — รองรับ JPG/PNG (รูป HEIC จาก iPhone บางเครื่องแปลงไม่ได้ ลอง “ถ่ายรูป” แทน)`);
     } finally { setBusy(false); if (ref.current) ref.current.value = ""; }
   };
   return (

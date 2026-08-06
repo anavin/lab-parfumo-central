@@ -10,16 +10,22 @@ export function PhotoPicker({ value, onChange, max = 6 }:
   const libRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   const add = async (files: FileList | null) => {
     if (!files?.length) return;
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
       const room = Math.max(0, max - value.length);
       const picked = Array.from(files).slice(0, room);
       const out: string[] = [];
-      for (const f of picked) { try { out.push(await compressImage(f)); } catch { /* skip bad file */ } }
+      let failed = 0;
+      for (const f of picked) { try { out.push(await compressImage(f)); } catch { failed++; } }
       if (out.length) onChange([...value, ...out]);
+      const notes: string[] = [];
+      if (failed) notes.push(`แนบไม่สำเร็จ ${failed} รูป — รองรับ JPG/PNG (รูป HEIC จาก iPhone บางเครื่องแปลงไม่ได้ ลองกด “ถ่ายรูป” ในแอปแทน)`);
+      if (files.length > room) notes.push(`แนบได้สูงสุด ${max} รูป`);
+      setErr(notes.join(" · ") || null);
     } finally { setBusy(false); if (camRef.current) camRef.current.value = ""; if (libRef.current) libRef.current.value = ""; }
   };
   const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
@@ -59,6 +65,7 @@ export function PhotoPicker({ value, onChange, max = 6 }:
       </div>
       <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => add(e.target.files)} />
       <input ref={libRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => add(e.target.files)} />
+      {err && <div className="mt-2 text-[11px] text-danger leading-snug">{err}</div>}
       {view && <Lightbox src={view} onClose={() => setView(null)} />}
     </div>
   );
