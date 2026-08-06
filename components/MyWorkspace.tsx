@@ -8,6 +8,7 @@ import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PromptPayButton } from "@/components/PromptPayButton";
 import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
+import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS } from "@/lib/payments";
 import { baht, num } from "@/lib/format";
@@ -15,6 +16,13 @@ import type { SubmissionRow, BillAttachment } from "@/lib/queries";
 
 const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
 const nowHM = () => new Date().toTimeString().slice(0, 5);
+// payment options for the app's own dropdown (tap = apply, no OS "Done" button);
+// includes the current value if it isn't a known channel (e.g. legacy data)
+const payOptions = (cur?: string) => {
+  const base = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
+  if (cur && !PAYMENTS.some((p) => p.v === cur)) base.unshift({ value: cur, label: cur });
+  return base;
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   // min-w-0 lets the field shrink inside a grid/flex cell — without it iOS native
@@ -258,11 +266,9 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
             แยกจ่ายรายชิ้น
           </label>
         </div>
-        <select className={inp + (state.splitPay ? "" : errRing("ช่องทางชำระ"))} value={state.payment_channel} onChange={(e) => { set({ payment_channel: e.target.value }); clearMiss("ช่องทางชำระ"); }}>
-          <option value="">- เลือกช่องทางชำระ -</option>
-          {!payKnown && state.payment_channel && <option value={state.payment_channel}>{state.payment_channel}</option>}
-          {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
-        </select>
+        <Select value={state.payment_channel} onValueChange={(v) => { set({ payment_channel: v }); clearMiss("ช่องทางชำระ"); }}
+          options={payOptions(state.payment_channel)} placeholder="- เลือกช่องทางชำระ -"
+          className={"py-2.5" + (state.splitPay ? "" : errRing("ช่องทางชำระ"))} />
         {state.splitPay && <div className="mt-1.5 text-[11px] text-muted">เลือกช่องทางของแต่ละชิ้นที่การ์ดสินค้าด้านบน (ไม่เลือก = ใช้ค่าเริ่มต้นนี้)</div>}
         {payBreakdown.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
@@ -383,12 +389,9 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       {showPayment && (
         <div className="mt-2.5 pl-7">
           <span className="block text-[10px] text-muted mb-0.5">ช่องทางชำระชิ้นนี้</span>
-          <select value={it.payment_channel || paymentDefault}
-            onChange={(e) => onChange({ payment_channel: e.target.value })}
-            className="w-full border border-line rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:border-brand">
-            <option value="">- เลือกช่องทาง -</option>
-            {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
-          </select>
+          <Select value={it.payment_channel || paymentDefault}
+            onValueChange={(v) => onChange({ payment_channel: v })}
+            options={payOptions(it.payment_channel || paymentDefault)} placeholder="- เลือกช่องทาง -" />
         </div>
       )}
       <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">รวม <b className="text-ink text-base">{baht(line)}</b></div>
@@ -539,11 +542,9 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <Field label="ช่องทางชำระ *">
-          <select className={inp + errRing("ช่องทางชำระ")} value={state.payment_channel} onChange={(e) => { s("payment_channel", e.target.value); clearMiss("ช่องทางชำระ"); }}>
-            <option value="">- เลือกช่องทางชำระ -</option>
-            {!payKnown && state.payment_channel && <option value={state.payment_channel}>{state.payment_channel}</option>}
-            {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
-          </select>
+          <Select value={state.payment_channel} onValueChange={(v) => { s("payment_channel", v); clearMiss("ช่องทางชำระ"); }}
+            options={payOptions(state.payment_channel)} placeholder="- เลือกช่องทางชำระ -"
+            className={"py-2.5" + errRing("ช่องทางชำระ")} />
         </Field>
         <Field label="สัญชาติลูกค้า *"><select className={inp + errRing("สัญชาติลูกค้า")} value={state.nation} onChange={(e) => { s("nation", e.target.value); clearMiss("สัญชาติลูกค้า"); }}><option value="">- เลือกสัญชาติ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
