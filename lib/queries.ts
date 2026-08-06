@@ -203,6 +203,15 @@ export async function stockSummary() {
 }
 
 // ---- audit + trash --------------------------------------------------------
+/** Recent successful logins (last `days` days) for the user-management page. */
+export function loginHistory(days = 5) {
+  return q<{ user_name: string; user_role: string | null; created_at: string }>(`
+    select user_name, user_role, created_at
+    from audit_log
+    where action = 'login' and created_at >= now() - ($1 * interval '1 day')
+    order by created_at desc limit 500`, [days]);
+}
+
 export function auditLog(filters: { action?: string; entity?: string; user?: string } = {}, limit = 200) {
   return q<{ id: number; user_name: string; user_role: string; action: string; entity: string; entity_id: string; detail: string; created_at: string }>(`
     select id, user_name, user_role, action, entity, entity_id, detail, created_at
