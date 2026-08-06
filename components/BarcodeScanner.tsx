@@ -107,8 +107,20 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
         const track = stream.getVideoTracks()[0];
         try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }); } catch {}
 
-        // Prefer the browser's native, hardware-accelerated detector (Android/Chrome):
-        // dramatically faster & more reliable than the JS decoder.
+        // BASE decoder on EVERY device: ZXing, patched to accept the shop's
+        // non-standard EAN-13 check digits. Native/standard scanners REJECT those
+        // labels, so this must always run — it's the only thing that reads them.
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
+        ]);
+        hints.set(DecodeHintType.TRY_HARDER, true);   // work harder to lock onto a barcode
+        const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
+        zxingControls = await reader.decodeFromStream(stream, video, (res) => { if (res) onCode(res.getText()); });
+
+        // BONUS parallel fast-path: the OS detector (Android/Chrome) locks onto
+        // VALID codes (e.g. the CODE-128 labels we print) almost instantly. Runs
+        // alongside ZXing on the same video; onCode() de-dupes whichever fires first.
         const NativeBD: any = (window as any).BarcodeDetector;
         if (NativeBD) {
           let detector: any;
@@ -123,15 +135,6 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
             if (!stopped) raf = requestAnimationFrame(tick);
           };
           raf = requestAnimationFrame(tick);
-        } else {
-          // iOS Safari & others: tuned ZXing on the same high-res, autofocused stream.
-          const hints = new Map();
-          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-            BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
-          ]);
-          hints.set(DecodeHintType.TRY_HARDER, true);   // work harder to lock onto a barcode
-          const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
-          zxingControls = await reader.decodeFromStream(stream, video, (res) => { if (res) onCode(res.getText()); });
         }
       } catch (e: any) {
         setError(
