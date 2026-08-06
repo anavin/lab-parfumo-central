@@ -1,14 +1,15 @@
 // Payment channels — values match the existing sales data so the dashboard
 // groups correctly. Shared by the staff entry form and the admin review editor.
+// Values (v) are stored in sales.payment_channel and drive the reports, so the
+// existing ones are kept — only the shown labels + which appear in the dropdown
+// changed. Legacy values on old bills (Thai QR, PromptCard, PromptPay) still
+// display via the payOptions legacy fallback.
 export const PAYMENTS = [
   { v: "Cash", label: "เงินสด" },
+  { v: "K Shop", label: "K Shop QR" },
+  { v: "K Shop Credit Card", label: "K Shop QR Credit Card" },
   { v: "EDC Credit Card", label: "บัตรเครดิต (EDC)" },
-  { v: "K Shop", label: "K SHOP" },
-  { v: "K Shop Credit Card", label: "K SHOP บัตรเครดิต" },
-  { v: "EDC Alipay/WeChat", label: "Alipay / WeChat" },
-  { v: "EDC Thai QR Payment", label: "Thai QR" },
-  { v: "EDC PromptCard", label: "PromptCard" },
-  { v: "PromptPay", label: "พร้อมเพย์ (PromptPay)" },
+  { v: "EDC Alipay/WeChat", label: "Alipay / WeChat (EDC)" },
 ];
 
 // Marker value used when a bill is paid across two channels; the per-channel
