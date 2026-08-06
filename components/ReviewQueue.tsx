@@ -7,7 +7,17 @@ import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { SplitTenders } from "@/components/SplitTenders";
+import { Select } from "@/components/ui/Select";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
+
+const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
+const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
+const payEditOptions = (cur?: string) => {
+  const base = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
+  if (cur && cur !== SPLIT2 && !PAYMENTS.some((p) => p.v === cur)) base.unshift({ value: cur, label: cur });
+  base.push({ value: SPLIT2, label: "จ่าย 2 ช่องทาง (แยกยอด)" });
+  return base;
+};
 
 const chLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v;
 
@@ -298,7 +308,6 @@ function RowEditor({ row, onSave, onCancel, pending }: { row: SubmissionRow; onS
     cust_date: row.entry_date, customers: row.customers ?? 0, thai: row.thai ?? 0, foreign: row.foreign_cnt ?? 0, sell_amount: row.sell_amount ?? 0,
   });
   const s = (k: string, v: any) => setF((o: any) => ({ ...o, [k]: v }));
-  const payKnown = PAYMENTS.some((p) => p.v === f.payment_channel);
   const total = isSale ? Math.max(0, (Number(f.qty) || 0) * (Number(f.unit_price) || 0) - (Number(f.discount) || 0)) : 0;
   const split = isSale && isSplit(f.payment_channel);
   const tendersOk = splitOk(f.tenders ?? [], total);
@@ -316,18 +325,13 @@ function RowEditor({ row, onSave, onCancel, pending }: { row: SubmissionRow; onS
           <Fld label="ส่วนลด"><input className={inp} {...numAttrs(f.discount, (v) => s("discount", v))} /></Fld>
           <Fld label="รวม"><input className={inp + " bg-canvas text-muted"} value={baht(total)} readOnly /></Fld>
           <Fld label="ช่องทางชำระ">
-            <select className={inp} value={f.payment_channel} onChange={(e) => pickPay(e.target.value)}>
-              <option value="">- เลือก -</option>
-              {!payKnown && f.payment_channel && !isSplit(f.payment_channel) && <option value={f.payment_channel}>{f.payment_channel}</option>}
-              {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
-              <option value={SPLIT2}>จ่าย 2 ช่องทาง (แยกยอด)</option>
-            </select>
+            <Select value={f.payment_channel} onValueChange={pickPay} options={payEditOptions(f.payment_channel)} placeholder="- เลือก -" />
           </Fld>
-          <Fld label="สัญชาติ"><select className={inp} value={f.nation} onChange={(e) => s("nation", e.target.value)}><option value="">- เลือก -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Fld>
+          <Fld label="สัญชาติ"><Select value={f.nation} onValueChange={(v) => s("nation", v)} options={NATION_OPTIONS} placeholder="- เลือก -" /></Fld>
           <Fld label="เลขใบเสร็จ"><input className={inp} value={f.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} /></Fld>
           <Fld label="วันที่"><input type="date" className={inp} value={f.sale_date} onChange={(e) => s("sale_date", e.target.value)} /></Fld>
           <Fld label="เวลา"><input type="time" className={inp} value={f.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Fld>
-          <Fld label="ช่องทางขาย"><select className={inp} value={f.source} onChange={(e) => s("source", e.target.value)}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Fld>
+          <Fld label="ช่องทางขาย"><Select value={f.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTIONS} /></Fld>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">

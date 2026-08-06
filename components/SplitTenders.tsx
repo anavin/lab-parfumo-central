@@ -1,7 +1,10 @@
 "use client";
 import { Plus, Trash2 } from "lucide-react";
 import { PAYMENTS, type Tender, splitAmounts, splitSum } from "@/lib/payments";
+import { Select } from "@/components/ui/Select";
 import { baht } from "@/lib/format";
+
+const PAY_OPTIONS = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
 
 // Presentational split-tender editor: pick each channel + amount; the last row
 // auto-fills the remainder. Used by the new-bill edit forms (staff + admin).
@@ -10,17 +13,15 @@ export function SplitTenders({ value, onChange, net }: { value: Tender[]; onChan
   const sum = splitSum(value, net);
   const matches = net > 0 && Math.round(sum) === Math.round(net);
   const setT = (i: number, patch: Partial<Tender>) => onChange(value.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
-  const inp = "border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
   return (
     <div className="mt-2 space-y-2">
       {value.map((t, i) => {
         const last = i === value.length - 1;
         return (
           <div key={i} className="flex gap-2 items-center">
-            <select className={inp + " flex-1 min-w-0"} value={t.channel} onChange={(e) => setT(i, { channel: e.target.value })}>
-              <option value="">- เลือกช่องทาง -</option>
-              {PAYMENTS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
-            </select>
+            <div className="flex-1 min-w-0">
+              <Select value={t.channel} onValueChange={(v) => setT(i, { channel: v })} options={PAY_OPTIONS} placeholder="- เลือกช่องทาง -" className="py-2" />
+            </div>
             <div className="relative w-28 shrink-0">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
               <input inputMode="numeric" value={last ? String(Math.round(amounts[i])) : (t.amount ?? "")} readOnly={last}

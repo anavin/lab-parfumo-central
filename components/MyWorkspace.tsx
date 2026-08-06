@@ -24,6 +24,8 @@ const payOptions = (cur?: string) => {
   if (cur && !PAYMENTS.some((p) => p.v === cur)) base.unshift({ value: cur, label: cur });
   return base;
 };
+const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
+const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   // min-w-0 lets the field shrink inside a grid/flex cell — without it iOS native
@@ -359,7 +361,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
           <Field label="เลขใบเสร็จ (ถ้ามี)"><input className={inp} value={state.receipt_no} onChange={(e) => set({ receipt_no: e.target.value })} placeholder="เว้นว่างได้ · ระบบตั้งให้ เช่น CTW-260806-001" /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => set({ sale_time: e.target.value })} /></Field>
-            <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => set({ source: e.target.value })}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
+            <Field label="ช่องทางขาย"><Select value={state.source} onValueChange={(v) => set({ source: v })} options={SOURCE_OPTIONS} className="py-2.5" /></Field>
           </div>
         </div>
       </details>
@@ -664,7 +666,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
             placeholder="- เลือกช่องทางชำระ -"
             className={"py-2.5" + (split ? "" : errRing("ช่องทางชำระ"))} />
         </Field>
-        <Field label="สัญชาติลูกค้า *"><select className={inp + errRing("สัญชาติลูกค้า")} value={state.nation} onChange={(e) => { s("nation", e.target.value); clearMiss("สัญชาติลูกค้า"); }}><option value="">- เลือกสัญชาติ -</option><option value="Thai">ไทย</option><option value="Foreign">ต่างชาติ</option></select></Field>
+        <Field label="สัญชาติลูกค้า *"><Select value={state.nation} onValueChange={(v) => { s("nation", v); clearMiss("สัญชาติลูกค้า"); }} options={NATION_OPTIONS} placeholder="- เลือกสัญชาติ -" className={"py-2.5" + errRing("สัญชาติลูกค้า")} /></Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
       </div>
       {split && (
@@ -675,7 +677,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       )}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Field>
-        <Field label="ช่องทางขาย"><select className={inp} value={state.source} onChange={(e) => s("source", e.target.value)}><option value="CTW">Central World</option><option value="EVENT_SCS">Event</option></select></Field>
+        <Field label="ช่องทางขาย"><Select value={state.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTIONS} className="py-2.5" /></Field>
       </div>
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
       {promptpayAmount > 0 && <div className="mb-3"><PromptPayButton amount={promptpayAmount} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
