@@ -46,12 +46,6 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       {/* daily summary — below the entry */}
       <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>
 
-      {kpi.pending > 0 && (
-        <div className="mb-4 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2.5">
-          มี <b>{kpi.pending}</b> รายการรอผู้ดูแลตรวจสอบ — จะขึ้นแดชบอร์ดรวมหลังได้รับอนุมัติ
-        </div>
-      )}
-
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-5">
         <Stat label="ยอดขายวันนี้" value={baht(kpi.revenue)} tone="brand" />
         <Stat label="เงินสด" value={baht(kpi.cashRevenue)} sub={`${num(kpi.cashBills)} บิล`} />
