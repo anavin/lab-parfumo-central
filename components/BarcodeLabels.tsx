@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Printer, Minus, Plus, CheckSquare, Square, ArrowLeft, Tag } from "lucide-react";
+import { Search, Printer, Minus, Plus, CheckSquare, Square, SquareMinus, ArrowLeft, Tag } from "lucide-react";
 import { Barcode } from "@/components/Barcode";
 import { baht } from "@/lib/format";
 
@@ -24,8 +24,18 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
 
   const setQ = (id: number, n: number) => setQty((o) => ({ ...o, [id]: Math.max(0, Math.min(MAX_QTY, n)) }));
   const toggle = (id: number) => setQty((o) => ({ ...o, [id]: o[id] ? 0 : 1 }));
-  const selectAllShown = () => setQty((o) => { const n = { ...o }; filtered.forEach((r) => { if (!n[r.id]) n[r.id] = 1; }); return n; });
   const clearAll = () => setQty({});
+
+  // select-all over the currently shown (filtered) rows — toggles them on/off
+  const shownIds = filtered.map((r) => r.id);
+  const allShownSelected = shownIds.length > 0 && shownIds.every((id) => (qty[id] ?? 0) > 0);
+  const someShownSelected = shownIds.some((id) => (qty[id] ?? 0) > 0);
+  const toggleAllShown = () => setQty((o) => {
+    const n = { ...o };
+    if (allShownSelected) shownIds.forEach((id) => { n[id] = 0; });
+    else shownIds.forEach((id) => { if (!n[id]) n[id] = 1; });
+    return n;
+  });
 
   const selected = rows.filter((r) => (qty[r.id] ?? 0) > 0);
   const totalLabels = selected.reduce((s, r) => s + (qty[r.id] ?? 0), 0);
@@ -48,7 +58,10 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด / SKU"
               className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:border-brand" />
           </div>
-          <button onClick={selectAllShown} className="px-3 py-2 rounded-lg border border-line text-sm text-ink hover:bg-canvas shrink-0">เลือกที่แสดง</button>
+          <button onClick={toggleAllShown} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm text-ink hover:bg-canvas shrink-0">
+            {allShownSelected ? <CheckSquare className="w-4 h-4 text-brand-dark" /> : <Square className="w-4 h-4 text-muted" />}
+            {allShownSelected ? "ยกเลิกทั้งหมด" : "เลือกทั้งหมด"}
+          </button>
           <button onClick={clearAll} className="px-3 py-2 rounded-lg border border-line text-sm text-muted hover:bg-canvas shrink-0">ล้าง</button>
         </div>
 
@@ -71,7 +84,11 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
             <table className="w-full text-sm min-w-[720px]">
               <thead className="bg-canvas sticky top-0 z-10">
                 <tr className="th border-b border-line-soft text-left">
-                  <th className="px-3 py-2.5 w-10"></th>
+                  <th className="px-3 py-2.5 w-10">
+                    <button onClick={toggleAllShown} aria-label={allShownSelected ? "ยกเลิกทั้งหมด" : "เลือกทั้งหมด"} className="align-middle">
+                      {allShownSelected ? <CheckSquare className="w-5 h-5 text-brand-dark" /> : someShownSelected ? <SquareMinus className="w-5 h-5 text-brand-dark" /> : <Square className="w-5 h-5 text-muted" />}
+                    </button>
+                  </th>
                   <th className="px-3 py-2.5">สินค้า</th>
                   <th className="px-3 py-2.5">บาร์โค้ด</th>
                   <th className="px-3 py-2.5 text-right">ราคา</th>
@@ -143,10 +160,16 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
       <style>{`
         @media print {
           @page { margin: 8mm; }
-          .print-sheet { display: flex; flex-wrap: wrap; gap: 3mm; }
+          /* inline-block flow (not flex): browsers honor break-inside far more
+             reliably here, so a label that would hit the page edge is pushed
+             whole onto the next sheet instead of being sliced. font-size:0 kills
+             the whitespace gaps between inline-block items. */
+          .print-sheet { display: block; font-size: 0; }
           .label {
-            width: 48mm; box-sizing: border-box; padding: 2mm 1.5mm; text-align: center;
-            border: 0.2mm dashed #bbb; border-radius: 1mm; break-inside: avoid; page-break-inside: avoid;
+            display: inline-block; vertical-align: top;
+            width: 48mm; box-sizing: border-box; margin: 0 1.5mm 3mm 0; padding: 2mm 1.5mm; text-align: center;
+            border: 0.2mm dashed #bbb; border-radius: 1mm;
+            break-inside: avoid; page-break-inside: avoid; -webkit-column-break-inside: avoid;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
           .label-name { font-size: 9pt; font-weight: 600; margin-bottom: 1mm; line-height: 1.1;
