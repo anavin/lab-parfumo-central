@@ -44,9 +44,10 @@ const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
 
-export function MyWorkspace({ date, fullName, rows, attachments = {} }:
-  { date: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
   const router = useRouter();
+  const viewingPast = date !== today;   // browsing an older day; new sales still go to today
   const [pending, start] = useTransition();
   const [bill, setBill] = useState<BillState | null>(null);
   const [autoScan, setAutoScan] = useState(false);
@@ -65,8 +66,9 @@ export function MyWorkspace({ date, fullName, rows, attachments = {} }:
     else alert(e?.message ?? "ทำรายการไม่สำเร็จ");
   };
 
-  const startScan = () => { setEdit(null); setAutoScan(true); setBill(blankBill(date, false)); };
-  const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(date, true)); };
+  // new sales are always recorded for TODAY (not the day being reviewed)
+  const startScan = () => { setEdit(null); setAutoScan(true); setBill(blankBill(today, false)); };
+  const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(today, true)); };
 
   // scroll to the form whenever it opens (new bill or edit)
   useEffect(() => {
@@ -83,7 +85,9 @@ export function MyWorkspace({ date, fullName, rows, attachments = {} }:
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
         items, attachments: bill.attachments,
       });
-      setBill(null); refresh();
+      setBill(null);
+      // the sale is recorded for today — jump to today's view so it's visible
+      if (viewingPast) router.push("/my"); else refresh();
     } catch (e: any) { onActionError(e, () => setBill(null)); }
   });
 
@@ -129,6 +133,11 @@ export function MyWorkspace({ date, fullName, rows, attachments = {} }:
         </div>
       )}
 
+      {bill && viewingPast && (
+        <div className="mb-3 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2.5">
+          คุณกำลังดูวันย้อนหลัง — บิลนี้จะบันทึกลง <b>วันนี้</b> ตามปกติ
+        </div>
+      )}
       {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan}
         onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
 

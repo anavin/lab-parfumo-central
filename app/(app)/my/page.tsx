@@ -41,7 +41,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         action={<DateNav date={date} today={today} />} />
 
       {/* data entry first */}
-      <MyWorkspace date={date} fullName={user.full_name} rows={rows} attachments={attachments} />
+      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} />
 
       {/* daily summary — below the entry */}
       <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>
