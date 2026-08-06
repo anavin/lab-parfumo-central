@@ -336,7 +336,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
                       className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-white")} />
                   </div>
                   {tenders.length > 2 && !last && (
-                    <button type="button" onClick={() => removeTender(i)} className="p-1 rounded text-muted hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => removeTender(i)} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
                   )}
                 </div>
               );
@@ -457,15 +457,15 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
           </div>}
         </div>
         <input className="w-[70px] shrink-0 border border-line rounded-lg px-1.5 py-2 text-sm text-center text-muted focus:outline-none focus:border-brand" value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
-        <button onClick={onRemove} className="p-1.5 rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
+        <button onClick={onRemove} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
       </div>
       {/* qty · price · discount — wider now that size moved up */}
       <div className="grid grid-cols-3 gap-2.5 pl-7">
         <Cell label="จำนวน">
-          <div className="flex items-stretch rounded-lg border border-line overflow-hidden">
-            <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-7 flex items-center justify-center text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input {...numAttrs("qty")} className="w-full min-w-0 text-center text-sm py-1.5 tabular-nums outline-none" />
-            <button onClick={() => onChange({ qty: q + 1 })} className="w-7 flex items-center justify-center text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+          <div className="flex items-stretch rounded-lg border border-line overflow-hidden min-h-[44px]">
+            <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-10 flex items-center justify-center text-muted hover:bg-canvas active:bg-line" aria-label="ลด"><Minus className="w-4 h-4" /></button>
+            <input {...numAttrs("qty")} className="w-full min-w-0 text-center text-sm tabular-nums outline-none" />
+            <button onClick={() => onChange({ qty: q + 1 })} className="w-10 flex items-center justify-center text-muted hover:bg-canvas active:bg-line" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
         </Cell>
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
@@ -556,7 +556,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
             )}
             <span className="text-ink whitespace-nowrap tabular-nums">{baht(r.total ?? 0)}</span>
             {r.status !== "approved" && (
-              <button onClick={() => onDelete(r)} disabled={pending} className="p-1 rounded text-muted hover:text-red-600 disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-3.5 h-3.5" /></button>
+              <button onClick={() => onDelete(r)} disabled={pending} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
             )}
           </li>
         ))}

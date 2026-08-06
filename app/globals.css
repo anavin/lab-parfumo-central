@@ -21,6 +21,24 @@ body {
 h1, h2, h3 { letter-spacing: -0.01em; }
 ::selection { background: rgba(161, 124, 72, 0.18); }
 
+/* Accessibility (UI/UX rules): a visible keyboard-focus ring on every control,
+   no grey tap-flash on mobile, and full respect for reduced-motion. */
+a, button, [role="button"], summary { -webkit-tap-highlight-color: transparent; }
+a:focus-visible, button:focus-visible, [role="button"]:focus-visible,
+summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* component tokens as plain CSS (no @apply → resolves regardless of config order) */
 .card {
   background: var(--surface);
