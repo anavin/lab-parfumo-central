@@ -57,9 +57,9 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         {kpi.channels.map((c) => (
           <Stat key={c.channel} label={chLabel(c.channel)} value={baht(c.revenue)} />
         ))}
-        <Stat label="บิล" value={num(kpi.bills)} sub="ใบเสร็จ" />
+        {/* 1 บิล ≈ 1 ลูกค้า — รวมเป็นตัวเดียว */}
+        <Stat label="จำนวนลูกค้า/จำนวนบิล" value={num(kpi.bills)} sub="ราย · ใบเสร็จ" />
         <Stat label="จำนวน" value={num(kpi.qty)} sub="ชิ้น" />
-        <Stat label="ลูกค้า" value={num(kpi.customers)} sub="ราย" />
         <Stat label="เฉลี่ย/บิล" value={baht(kpi.aov)} />
       </div>
 
