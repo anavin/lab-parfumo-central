@@ -456,7 +456,11 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
             {res.map((p) => <button key={p.id} onMouseDown={() => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
-        <input className="w-[70px] shrink-0 border border-line rounded-lg px-1.5 py-2 text-sm text-center text-muted focus:outline-none focus:border-brand" value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
+        {/* size stays hidden until there's a name — keeps the search field big &
+            easy to tap; it appears (auto-filled from the pick, or editable) after. */}
+        {it.item.trim() !== "" && (
+          <input className="w-[76px] shrink-0 border border-line rounded-lg px-1.5 py-2 text-sm text-center text-ink focus:outline-none focus:border-brand" value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
+        )}
         <button onClick={onRemove} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
       </div>
       {/* qty · price · discount — wider now that size moved up */}
