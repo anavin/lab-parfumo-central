@@ -135,13 +135,13 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
         {/* footer (only when not showing a result) */}
         {!result && !checking && (continuous ? (
           <div className="p-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-white/80">{count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b> รายการ · สแกนต่อ</> : "เล็งกล้องที่บาร์โค้ด"}</span>
+            <span className="text-sm text-white/80">{count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b> รายการ · สแกนต่อ</> : "สแกนที่บาร์โค้ด"}</span>
             <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">
               <Check className="w-4 h-4" /> เสร็จ
             </button>
           </div>
         ) : (
-          <div className="px-4 py-3 text-center text-[12px] text-white/60">เล็งกล้องไปที่บาร์โค้ดสินค้า</div>
+          <div className="px-4 py-3 text-center text-[12px] text-white/60">สแกนไปที่บาร์โค้ดสินค้า</div>
         ))}
       </div>
     </div>
