@@ -114,9 +114,10 @@ export function ReviewQueue({ rows, attachments = {} }: { rows: SubmissionRow[];
                     {/* items */}
                     <div className="px-3.5 py-2.5">
                       <ul className="space-y-1.5">
-                        {bill.rows.map((r) => (
+                        {bill.rows.map((r, i) => (
                           <li key={r.id}>
                             <div className="flex items-center gap-2 text-sm">
+                              <span className="w-4 h-4 shrink-0 rounded-full bg-canvas text-muted text-[10px] font-semibold tabular-nums flex items-center justify-center">{i + 1}</span>
                               {isSale ? (
                                 <>
                                   <span className="text-muted text-xs w-8 shrink-0 text-right">{num(r.qty ?? 0)}×</span>

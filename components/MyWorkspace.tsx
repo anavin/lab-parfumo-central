@@ -444,8 +444,9 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       </div>
       <div className="px-3.5 py-2.5">
       <ul className="space-y-1">
-        {rows.map((r) => (
+        {rows.map((r, i) => (
           <li key={r.id} className="flex items-center gap-2 text-sm">
+            <span className="w-4 h-4 shrink-0 rounded-full bg-canvas text-muted text-[10px] font-semibold tabular-nums flex items-center justify-center">{i + 1}</span>
             <span className="text-muted text-xs w-7 shrink-0 text-right">{num(r.qty ?? 0)}×</span>
             {r.status === "pending" ? (
               <button onClick={() => onEdit(r)} disabled={pending}

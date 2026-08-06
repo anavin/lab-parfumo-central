@@ -62,6 +62,9 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
           <div className="flex items-stretch gap-1.5 h-36 pt-2">
             {trend.map((t) => (
               <div key={t.d} className="flex-1 flex flex-col items-center gap-1 group" title={`${t.d}: ${baht(t.revenue)}`}>
+                <span className="text-[8px] font-semibold text-ink tabular-nums leading-none shrink-0 h-2.5">
+                  {t.revenue > 0 ? (t.revenue >= 1000 ? `${(t.revenue / 1000).toFixed(t.revenue >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : Math.round(t.revenue)) : ""}
+                </span>
                 {/* fixed-height bar track so the % bar height actually resolves */}
                 <div className="flex-1 w-full flex items-end">
                   <div className="w-full rounded-t bg-brand/80 group-hover:bg-brand transition-colors" style={{ height: `${Math.max(2, (t.revenue / maxRev) * 100)}%` }} />
