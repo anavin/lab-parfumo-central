@@ -11,7 +11,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
       <select
         defaultValue={status}
         onChange={(e) => start(async () => { await setRequisitionStatus(id, e.target.value); router.refresh(); })}
-        className="border border-black/10 rounded-lg px-2.5 py-2 text-sm bg-white"
+        className="border border-black/10 rounded-lg px-2.5 py-2 text-sm bg-surface"
         disabled={pending}
       >
         <option value="draft">draft</option>

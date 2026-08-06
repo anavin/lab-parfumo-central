@@ -20,15 +20,15 @@ export function Select({
   return (
     <RS.Root value={value} onValueChange={onValueChange}>
       <RS.Trigger
-        className={`flex items-center justify-between gap-2 w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm bg-white data-[state=open]:border-gold focus:outline-none focus:border-gold ${className}`}
+        className={`flex items-center justify-between gap-2 w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-surface data-[state=open]:border-gold focus:outline-none focus:border-gold ${className}`}
       >
         <RS.Value placeholder={placeholder} />
-        <RS.Icon><ChevronDown className="w-4 h-4 text-black/40" /></RS.Icon>
+        <RS.Icon><ChevronDown className="w-4 h-4 text-muted" /></RS.Icon>
       </RS.Trigger>
       <RS.Portal>
         <RS.Content
           position="popper" sideOffset={4}
-          className="z-50 min-w-[var(--radix-select-trigger-width)] max-h-72 overflow-auto bg-white border border-black/10 rounded-lg shadow-lg"
+          className="z-50 min-w-[var(--radix-select-trigger-width)] max-h-72 overflow-auto bg-surface border border-line rounded-lg shadow-lg"
         >
           <RS.Viewport className="p-1">
             {options.map((o) => (

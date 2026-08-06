@@ -26,7 +26,7 @@ export function SplitTenders({ value, onChange, net, onPick }: { value: Tender[]
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
               <input inputMode="numeric" value={last ? String(Math.round(amounts[i])) : (t.amount ?? "")} readOnly={last}
                 onChange={(e) => setT(i, { amount: e.target.value.replace(/[^\d]/g, "") })} onFocus={(e) => e.target.select()}
-                className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-white")} />
+                className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-surface")} />
             </div>
             {value.length > 2 && !last && (
               <button type="button" onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="p-1 rounded text-muted hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>

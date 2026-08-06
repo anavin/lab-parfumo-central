@@ -19,7 +19,7 @@ const numAbbr = (v: number) => (Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + "K" 
 function TT({ active, payload, label, fmt }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-line bg-white shadow-pop px-3 py-2 text-xs">
+    <div className="rounded-lg border border-line bg-surface shadow-pop px-3 py-2 text-xs">
       {label != null && <div className="font-semibold text-ink mb-1">{label}</div>}
       {payload.map((p: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
@@ -56,7 +56,7 @@ export function RevenueTrend({ data, xKey = "month" }: { data: any[]; xKey?: str
 function ComboTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-line bg-white shadow-pop px-3 py-2 text-xs">
+    <div className="rounded-lg border border-line bg-surface shadow-pop px-3 py-2 text-xs">
       <div className="font-semibold text-ink mb-1">{label}</div>
       {payload.map((p: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
@@ -147,7 +147,7 @@ function GradeTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-lg border border-line bg-white shadow-pop px-3 py-2 text-xs">
+    <div className="rounded-lg border border-line bg-surface shadow-pop px-3 py-2 text-xs">
       <div className="font-semibold text-ink mb-1">{label}</div>
       <div className="flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_DARK }} />

@@ -27,14 +27,14 @@ export function ReturnForm({ pos }: { pos: { po_number: string; branch_label: st
   return (
     <div className="space-y-5">
       <div className="card p-5 grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-black/50 mb-1 block">PO / ใบเบิก *</span>
+        <label className="block"><span className="text-xs text-ink/50 mb-1 block">PO / ใบเบิก *</span>
           <select className="inp" value={po} onChange={(e) => setPo(e.target.value)}>
             <option value="" disabled>— เลือก —</option>
             {pos.map((p) => <option key={p.po_number} value={p.po_number}>{p.po_number} · {p.branch_label}</option>)}
           </select></label>
-        <label className="block"><span className="text-xs text-black/50 mb-1 block">วันที่คืน</span>
+        <label className="block"><span className="text-xs text-ink/50 mb-1 block">วันที่คืน</span>
           <input type="date" className="inp" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-        <label className="block md:col-span-2"><span className="text-xs text-black/50 mb-1 block">รหัสหน่วยที่คืน (SKU) — 1 รหัส/บรรทัด</span>
+        <label className="block md:col-span-2"><span className="text-xs text-ink/50 mb-1 block">รหัสหน่วยที่คืน (SKU) — 1 รหัส/บรรทัด</span>
           <textarea rows={5} className="inp font-mono text-xs" value={skus} onChange={(e) => setSkus(e.target.value)} placeholder="Lab50 TA6688&#10;Lab50 TA6774" /></label>
       </div>
       {msg && <div className="text-sm text-gold-dark bg-gold/10 border border-gold/20 rounded-lg px-4 py-2">{msg}</div>}

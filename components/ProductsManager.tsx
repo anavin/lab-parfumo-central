@@ -6,7 +6,7 @@ import { createProduct, updateProduct } from "@/lib/actions/products";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { baht, num } from "@/lib/format";
 
-const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
+const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-brand";
 
 export type ProductRow = { id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number; sold: number };
 type FormState = { id?: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: any };
@@ -44,7 +44,7 @@ export function ProductsManager({ rows }: { rows: ProductRow[] }) {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด / SKU"
-            className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:border-brand" />
+            className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-surface focus:outline-none focus:border-brand" />
         </div>
         {!form && (
           <button onClick={() => setForm(blank())} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark shrink-0">
@@ -58,7 +58,7 @@ export function ProductsManager({ rows }: { rows: ProductRow[] }) {
       <div className="card overflow-hidden">
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-sm min-w-[720px]">
-            <thead className="text-muted text-xs text-left sticky top-0 bg-white z-10">
+            <thead className="text-muted text-xs text-left sticky top-0 bg-surface z-10">
               <tr className="border-b border-line">
                 <th className="px-3 py-2.5">Barcode</th><th className="px-3 py-2.5">กลิ่น</th>
                 <th className="px-3 py-2.5">Grade</th><th className="px-3 py-2.5">ขนาด</th>
@@ -101,7 +101,7 @@ function ProductForm({ state, setState, onSave, pending }: { state: FormState; s
           <div className="flex gap-2">
             <input className={inp} value={state.barcode} onChange={(e) => s("barcode", e.target.value)} placeholder="เลขบาร์โค้ด" />
             <button type="button" onClick={() => setScanning(true)} title="สแกนบาร์โค้ด"
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 rounded-lg border border-line bg-white text-sm font-medium hover:bg-canvas">
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 rounded-lg border border-line bg-surface text-sm font-medium hover:bg-canvas">
               <ScanLine className="w-4 h-4" /> สแกน
             </button>
           </div></Field>

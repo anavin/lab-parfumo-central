@@ -2,26 +2,28 @@ import type { Config } from "tailwindcss";
 
 export default {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  darkMode: ["selector", '[data-theme="dark"]'],
   theme: {
     extend: {
       fontFamily: { sans: ["var(--font-sans)", "system-ui", "sans-serif"] },
       colors: {
-        // neutrals
-        canvas: "#f5f6f8",
-        surface: "#ffffff",
-        ink: { DEFAULT: "#181b21", soft: "#3d434e" },
-        muted: { DEFAULT: "#697586", soft: "#98a1b0" },
-        line: { DEFAULT: "#e7e9ee", soft: "#f0f2f5" },
-        // sidebar (elegant near-black)
+        // theme-aware tokens — values live in globals.css as RGB channels so they
+        // flip between light/dark and still support Tailwind opacity modifiers.
+        canvas: "rgb(var(--canvas) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        ink: { DEFAULT: "rgb(var(--ink) / <alpha-value>)", soft: "rgb(var(--ink-soft) / <alpha-value>)" },
+        muted: { DEFAULT: "rgb(var(--muted) / <alpha-value>)", soft: "rgb(var(--muted-soft) / <alpha-value>)" },
+        line: { DEFAULT: "rgb(var(--line) / <alpha-value>)", soft: "rgb(var(--line-soft) / <alpha-value>)" },
+        // sidebar (elegant near-black — stays dark in both themes)
         nav: { DEFAULT: "#15161a", hover: "#212328", muted: "#8a8f9a" },
         // brand — refined gold
-        brand: { DEFAULT: "#a17c48", dark: "#836234", soft: "#f4eee2" },
-        gold: { DEFAULT: "#a17c48", dark: "#836234", soft: "#f4eee2" },
+        brand: { DEFAULT: "rgb(var(--brand) / <alpha-value>)", dark: "rgb(var(--brand-dark) / <alpha-value>)", soft: "rgb(var(--brand-soft) / <alpha-value>)" },
+        gold: { DEFAULT: "rgb(var(--brand) / <alpha-value>)", dark: "rgb(var(--brand-dark) / <alpha-value>)", soft: "rgb(var(--brand-soft) / <alpha-value>)" },
         // semantic
-        success: { DEFAULT: "#15803d", soft: "#e8f4ec" },
-        warn: { DEFAULT: "#b45309", soft: "#fbf1e3" },
-        danger: { DEFAULT: "#dc2626", soft: "#fcecec" },
-        info: { DEFAULT: "#2a78d6", soft: "#e9f1fc" },
+        success: { DEFAULT: "rgb(var(--success) / <alpha-value>)", soft: "rgb(var(--success-soft) / <alpha-value>)" },
+        warn: { DEFAULT: "rgb(var(--warn) / <alpha-value>)", soft: "rgb(var(--warn-soft) / <alpha-value>)" },
+        danger: { DEFAULT: "rgb(var(--danger) / <alpha-value>)", soft: "rgb(var(--danger-soft) / <alpha-value>)" },
+        info: { DEFAULT: "rgb(var(--info) / <alpha-value>)", soft: "rgb(var(--info-soft) / <alpha-value>)" },
         // chart series (validated, colorblind-safe)
         c1: "#2a78d6", c2: "#eb6834", c3: "#1baf7a", c4: "#eda100",
         c5: "#e87ba4", c6: "#008300", c7: "#4a3aa7", c8: "#e34948",

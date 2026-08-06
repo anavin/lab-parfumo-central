@@ -8,7 +8,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = "ยืน�
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-xs p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold text-ink mb-1">{title}</h3>
         {message && <p className="text-sm text-muted mb-4">{message}</p>}
         <div className={"flex gap-2 justify-end" + (message ? "" : " mt-4")}>

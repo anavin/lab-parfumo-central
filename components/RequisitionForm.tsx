@@ -99,7 +99,7 @@ export function RequisitionForm({
       <div className="card p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold">รายการสินค้า</h3>
-          <span className="text-xs text-black/40">รวม {totalQty} ขวด · {items.filter(i=>i.scent||i.barcode).length} รายการ</span>
+          <span className="text-xs text-ink/40">รวม {totalQty} ขวด · {items.filter(i=>i.scent||i.barcode).length} รายการ</span>
         </div>
         <div className="space-y-2">
           {items.map((it, idx) => (
@@ -124,7 +124,7 @@ export function RequisitionForm({
 }
 
 function L({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
-  return <label className={`block ${full ? "md:col-span-2" : ""}`}><span className="text-xs text-black/50 mb-1 block">{label}</span>{children}</label>;
+  return <label className={`block ${full ? "md:col-span-2" : ""}`}><span className="text-xs text-ink/50 mb-1 block">{label}</span>{children}</label>;
 }
 
 function ItemRow({ index, item, onChange, onRemove }: { index: number; item: Item; onChange: (p: Partial<Item>) => void; onRemove: () => void }) {
@@ -138,15 +138,15 @@ function ItemRow({ index, item, onChange, onRemove }: { index: number; item: Ite
   const pick = (p: Prod) => { onChange({ scent: p.scent, barcode: p.barcode, size: p.size, product_id: p.id }); setOpen(false); };
   return (
     <div className="flex gap-2 items-start">
-      <span className="w-6 pt-2 text-xs text-black/30 text-right">{index + 1}</span>
+      <span className="w-6 pt-2 text-xs text-ink/30 text-right">{index + 1}</span>
       <div className="relative flex-1">
         <input value={item.scent} onChange={(e) => onSearch(e.target.value)} onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder="ค้นหากลิ่น / บาร์โค้ด" className="inp" />
         {open && results.length > 0 && (
-          <div className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-black/10 rounded-lg shadow-lg text-sm">
+          <div className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-surface border border-black/10 rounded-lg shadow-lg text-sm">
             {results.map((p) => (
               <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-gold/10">
-                <span className="font-medium">{p.scent}</span> <span className="text-black/40">{p.size} · {p.grade} · {p.barcode}</span>
+                <span className="font-medium">{p.scent}</span> <span className="text-ink/40">{p.size} · {p.grade} · {p.barcode}</span>
               </button>
             ))}
           </div>
@@ -155,7 +155,7 @@ function ItemRow({ index, item, onChange, onRemove }: { index: number; item: Ite
       <input value={item.barcode} onChange={(e) => onChange({ barcode: e.target.value })} placeholder="Barcode" className="inp !w-40 font-mono text-xs" />
       <input value={item.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" className="inp !w-24" />
       <input type="number" min={0} value={item.qty} onChange={(e) => onChange({ qty: Number(e.target.value) })} className="inp !w-20 text-right" />
-      <button onClick={onRemove} className="pt-2 text-black/30 hover:text-red-500" title="ลบ">✕</button>
+      <button onClick={onRemove} className="pt-2 text-ink/30 hover:text-red-500" title="ลบ">✕</button>
     </div>
   );
 }

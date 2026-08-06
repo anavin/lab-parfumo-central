@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { searchProducts } from "@/lib/actions/lookups";
 import { createSale, createCashEntry, createCustomerDay } from "@/lib/actions/entries";
 
-const inp = "w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-gold";
+const inp = "w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-gold";
 const today = () => new Date().toISOString().slice(0, 10);
 
 // Presentational panel — no hooks. `open`/`onToggle` are owned by the parent so
@@ -21,7 +21,7 @@ function Panel({ open, onToggle, title, children }: { open: boolean; onToggle: (
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="text-xs text-black/50 mb-1 block">{label}</span>{children}</label>;
+  return <label className="block"><span className="text-xs text-ink/50 mb-1 block">{label}</span>{children}</label>;
 }
 
 // ---------------------------------------------------------------- sale
@@ -49,8 +49,8 @@ export function AddSale() {
         <Field label="เลขใบเสร็จ"><input className={inp} value={f.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} /></Field>
         <div className="md:col-span-2 relative"><Field label="สินค้า">
           <input className={inp} value={f.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="ค้นหากลิ่น" /></Field>
-          {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-white border border-black/10 rounded-lg shadow-lg text-sm">
-            {res.map((p) => <button key={p.id} onMouseDown={() => { s("item", p.scent); s("barcode", p.barcode); s("size", p.size); s("unit_price", p.price); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-gold/10"><b>{p.scent}</b> <span className="text-black/40">{p.size} · {p.barcode}</span></button>)}
+          {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-surface border border-black/10 rounded-lg shadow-lg text-sm">
+            {res.map((p) => <button key={p.id} onMouseDown={() => { s("item", p.scent); s("barcode", p.barcode); s("size", p.size); s("unit_price", p.price); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-gold/10"><b>{p.scent}</b> <span className="text-ink/40">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
         <Field label="ขนาด"><input className={inp} value={f.size} onChange={(e) => s("size", e.target.value)} /></Field>

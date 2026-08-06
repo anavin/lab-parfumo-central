@@ -25,7 +25,7 @@ export function DateNav({ date, today }: { date: string; today: string }) {
 
   return (
     <div className="w-full sm:w-auto flex items-center justify-center gap-2">
-      <div className="flex items-stretch rounded-xl border border-line bg-white shadow-sm overflow-hidden">
+      <div className="flex items-stretch rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
         <button onClick={() => go(shift(date, -1))}
           className="px-2.5 flex items-center text-muted hover:bg-canvas hover:text-ink transition-colors"
           aria-label="วันก่อนหน้า">

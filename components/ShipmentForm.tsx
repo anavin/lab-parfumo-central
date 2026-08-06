@@ -45,26 +45,26 @@ export function ShipmentForm({ pos }: { pos: PO[] }) {
   return (
     <div className="space-y-5">
       <div className="card p-5 grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-black/50 mb-1 block">เลือก PO / ใบเบิก *</span>
+        <label className="block"><span className="text-xs text-ink/50 mb-1 block">เลือก PO / ใบเบิก *</span>
           <select className="inp" defaultValue="" onChange={(e) => onSelect(e.target.value)}>
             <option value="" disabled>— เลือก —</option>
             {pos.map((p) => <option key={p.po_number} value={p.po_number}>{p.po_number} · {p.branch_label} · {p.qty} ขวด</option>)}
           </select>
         </label>
-        <label className="block"><span className="text-xs text-black/50 mb-1 block">วันที่ส่ง</span>
+        <label className="block"><span className="text-xs text-ink/50 mb-1 block">วันที่ส่ง</span>
           <input type="date" className="inp" value={date} onChange={(e) => setDate(e.target.value)} /></label>
       </div>
 
       {lines.length > 0 && (
         <div className="card p-5">
           <div className="flex justify-between mb-3"><h3 className="text-sm font-semibold">ใส่รหัสหน่วยสินค้า (SKU) — 1 รหัส/บรรทัด หรือคั่นด้วยจุลภาค</h3>
-            <span className="text-xs text-black/40">รวม {totalUnits} หน่วย</span></div>
+            <span className="text-xs text-ink/40">รวม {totalUnits} หน่วย</span></div>
           <div className="space-y-3">
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-[1fr_2fr] gap-3 items-start border-b border-black/5 pb-3">
                 <div className="text-sm pt-1">
                   <div className="font-medium">{l.scent}</div>
-                  <div className="text-black/40 text-xs">{l.size} · {l.grade} · เบิก {l.qty} ขวด</div>
+                  <div className="text-ink/40 text-xs">{l.size} · {l.grade} · เบิก {l.qty} ขวด</div>
                 </div>
                 <textarea rows={2} value={l.skus} onChange={(e) => setSkus(i, e.target.value)}
                   placeholder="เช่น Lab50 TA6688, Lab50 TA6774 …" className="inp font-mono text-xs" />

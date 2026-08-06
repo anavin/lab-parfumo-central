@@ -21,7 +21,7 @@ const payEditOptions = (cur?: string) => {
 
 const chLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v;
 
-const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
+const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-brand";
 const numAttrs = (v: any, on: (s: string) => void) => ({
   value: v ?? "", inputMode: "numeric" as const,
   onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
@@ -133,7 +133,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                 const photos = attachments[bill.ref] || [];
                 const isSale = first.kind === "sale";
                 return (
-                  <div key={bill.key} className="rounded-xl border border-line bg-white shadow-sm overflow-hidden">
+                  <div key={bill.key} className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
                     {/* bill header */}
                     <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -238,7 +238,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                         const photos = attachments[bill.ref] || [];
                         const isSale = first.kind === "sale";
                         return (
-                          <div key={bill.key} className="rounded-xl border border-green-200 bg-white shadow-sm overflow-hidden">
+                          <div key={bill.key} className="rounded-xl border border-green-200 bg-surface shadow-sm overflow-hidden">
                             <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-green-50/70 border-b border-green-100">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0">#{day.bills.length - i}</span>

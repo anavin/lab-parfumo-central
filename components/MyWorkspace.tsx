@@ -15,7 +15,7 @@ import { SplitTenders } from "@/components/SplitTenders";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 
-const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
+const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-brand";
 const nowHM = () => new Date().toTimeString().slice(0, 5);
 // payment options for the app's own dropdown (tap = apply, no OS "Done" button);
 // includes the current value if it isn't a known channel (e.g. legacy data)
@@ -137,7 +137,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
           <button onClick={startScan} className="flex-[2] inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-brand text-white text-base font-semibold shadow-sm hover:bg-brand-dark active:scale-[.99] transition">
             <ScanLine className="w-5 h-5" /> สแกนบาร์โค้ด
           </button>
-          <button onClick={startManual} className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl border border-line bg-white text-sm font-medium hover:bg-canvas active:scale-[.99] transition">
+          <button onClick={startManual} className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas active:scale-[.99] transition">
             <Plus className="w-4 h-4" /> เพิ่มเอง
           </button>
         </div>
@@ -287,7 +287,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* add item */}
       <div className="flex gap-2 mb-4">
         <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
-        <button onClick={() => addItem()} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-white text-sm font-medium hover:bg-canvas"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
+        <button onClick={() => addItem()} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
       </div>
 
       {/* nationality — big toggle */}
@@ -295,7 +295,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         <div className="text-xs text-muted mb-1">สัญชาติลูกค้า *</div>
         <div className={"grid grid-cols-2 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-red-400 rounded-lg p-0.5" : "")}>
           {([["Thai", "🇹🇭 ไทย"], ["Foreign", "🌏 ต่างชาติ"]] as const).map(([v, l]) => (
-            <button key={v} onClick={() => { set({ nation: v }); clearMiss("สัญชาติ"); }} className={"py-3 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-white border-line hover:bg-canvas")}>{l}</button>
+            <button key={v} onClick={() => { set({ nation: v }); clearMiss("สัญชาติ"); }} className={"py-3 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
           ))}
         </div>
       </div>
@@ -333,7 +333,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
                     <input inputMode="numeric" value={last ? String(Math.round(tenderAmount(i))) : (t.amount ?? "")} readOnly={last}
                       onChange={(e) => setTender(i, { amount: e.target.value.replace(/[^\d]/g, "") })} onFocus={(e) => e.target.select()}
-                      className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-white")} />
+                      className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-surface")} />
                   </div>
                   {tenders.length > 2 && !last && (
                     <button type="button" onClick={() => removeTender(i)} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
@@ -446,13 +446,13 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange({ [k]: e.target.value.replace(/^0+(?=\d)/, "") }),
   });
   return (
-    <div className="rounded-xl border border-line bg-white p-3">
+    <div className="rounded-xl border border-line bg-surface p-3">
       {/* name + size */}
       <div className="flex items-center gap-2 mb-2.5">
         <span className="w-5 text-center text-xs font-medium text-muted shrink-0">{index + 1}</span>
         <div className="flex-1 relative min-w-0">
           <input className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
-          {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-white border border-line rounded-lg shadow-lg text-sm">
+          {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
             {res.map((p) => <button key={p.id} onMouseDown={() => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
@@ -522,7 +522,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
   const ref = first.receipt_no || "";
   const canEditPhotos = status === "pending" && !!ref;
   return (
-    <div className="rounded-xl border border-line bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
       {/* header bar — makes each bill clearly its own card */}
       <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
         <div className="flex items-center gap-2 min-w-0">
@@ -652,7 +652,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       <button type="button" onClick={() => setScanning(true)} className="w-full mb-4 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-base font-semibold hover:bg-brand-dark"><ScanLine className="w-5 h-5" /> สแกนบาร์โค้ดสินค้า</button>
       <div className="relative mb-3">
         <Field label="สินค้า"><input className={inp} value={state.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" /></Field>
-        {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-white border border-line rounded-lg shadow-lg text-sm">
+        {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
           {res.map((p) => <button key={p.id} onMouseDown={() => { setState({ ...state, item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
         </div>}
       </div>

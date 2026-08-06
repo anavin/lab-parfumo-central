@@ -29,13 +29,13 @@ export default async function CashPage() {
       <Card title={`รายการเงินสด (${rows.length})`}>
         <div className="max-h-[560px] overflow-auto">
           <table className="w-full text-sm">
-            <thead className="text-black/40 text-xs text-left sticky top-0 bg-white"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายละเอียด</th><th className="pb-2">ประเภท</th><th className="pb-2 text-right">จำนวนเงิน</th></tr></thead>
+            <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายละเอียด</th><th className="pb-2">ประเภท</th><th className="pb-2 text-right">จำนวนเงิน</th></tr></thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} className="border-b last:border-0">
-                  <td className="py-1.5 text-black/50 whitespace-nowrap">{fmtDate(r.cash_date)}</td>
+                  <td className="py-1.5 text-ink/50 whitespace-nowrap">{fmtDate(r.cash_date)}</td>
                   <td className="py-1.5">{r.description}</td>
-                  <td className="py-1.5 text-black/50">{r.type}</td>
+                  <td className="py-1.5 text-ink/50">{r.type}</td>
                   <td className="py-1.5 text-right font-medium">{baht(r.amount)}</td>
                 </tr>
               ))}

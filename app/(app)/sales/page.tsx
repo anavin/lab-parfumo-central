@@ -34,13 +34,13 @@ export default async function SalesPage() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title="สรุปรายเดือน">
           <table className="w-full text-sm">
-            <thead><tr className="text-black/40 text-xs text-left border-b"><th className="pb-2">เดือน</th><th className="pb-2 text-right">ใบเสร็จ</th><th className="pb-2 text-right">ชิ้น</th><th className="pb-2 text-right">รายได้</th></tr></thead>
+            <thead><tr className="text-ink/40 text-xs text-left border-b"><th className="pb-2">เดือน</th><th className="pb-2 text-right">ใบเสร็จ</th><th className="pb-2 text-right">ชิ้น</th><th className="pb-2 text-right">รายได้</th></tr></thead>
             <tbody>
               {monthly.map((m) => (
                 <tr key={m.month} className="border-b last:border-0">
                   <td className="py-2 font-medium">{m.month}</td>
-                  <td className="py-2 text-right text-black/60">{num(m.receipts)}</td>
-                  <td className="py-2 text-right text-black/60">{num(m.qty)}</td>
+                  <td className="py-2 text-right text-ink/60">{num(m.receipts)}</td>
+                  <td className="py-2 text-right text-ink/60">{num(m.qty)}</td>
                   <td className="py-2 text-right font-medium">{baht(m.revenue)}</td>
                 </tr>
               ))}
@@ -51,15 +51,15 @@ export default async function SalesPage() {
         <Card title="รายการขายล่าสุด (60)">
           <div className="max-h-[520px] overflow-auto">
             <table className="w-full text-sm">
-              <thead className="text-black/40 text-xs text-left sticky top-0 bg-white"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายการ</th><th className="pb-2 text-right">จำนวน</th><th className="pb-2 text-right">ยอด</th></tr></thead>
+              <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายการ</th><th className="pb-2 text-right">จำนวน</th><th className="pb-2 text-right">ยอด</th></tr></thead>
               <tbody>
                 {recent.map((r, i) => (
                   <tr key={i} className="border-b last:border-0">
-                    <td className="py-1.5 text-black/50 whitespace-nowrap">{fmtDate(r.sale_date)}</td>
-                    <td className="py-1.5">{r.item} <span className="text-black/35">{r.size}</span>
+                    <td className="py-1.5 text-ink/50 whitespace-nowrap">{fmtDate(r.sale_date)}</td>
+                    <td className="py-1.5">{r.item} <span className="text-ink/35">{r.size}</span>
                       {r.nation && <Badge tone={r.nation === "Foreign" ? "info" : "gray"}>{r.nation}</Badge>}
                     </td>
-                    <td className="py-1.5 text-right text-black/60">{num(r.qty)}</td>
+                    <td className="py-1.5 text-right text-ink/60">{num(r.qty)}</td>
                     <td className="py-1.5 text-right font-medium">{baht(r.total)}</td>
                   </tr>
                 ))}

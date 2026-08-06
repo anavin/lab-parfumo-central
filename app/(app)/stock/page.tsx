@@ -42,7 +42,7 @@ export default async function StockPage() {
       <Card title={`รายการสินค้า (${rows.length} SKU) · เรียงตามคงเหลือน้อยสุด`}>
         <div className="max-h-[600px] overflow-auto">
           <table className="w-full text-sm">
-            <thead className="text-black/40 text-xs text-left sticky top-0 bg-white"><tr className="border-b">
+            <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b">
               <th className="pb-2">กลิ่น</th><th className="pb-2">ขนาด</th>
               <th className="pb-2 text-right">ส่งไป</th><th className="pb-2 text-right">ขาย</th>
               <th className="pb-2 text-right">คืน</th><th className="pb-2 text-right">คงเหลือ</th><th className="pb-2">สถานะ</th>
@@ -51,10 +51,10 @@ export default async function StockPage() {
               {rows.map((r, i) => (
                 <tr key={i} className="border-b last:border-0">
                   <td className="py-1.5 font-medium">{r.scent}</td>
-                  <td className="py-1.5 text-black/50">{r.size}</td>
-                  <td className="py-1.5 text-right text-black/60">{num(r.shipped)}</td>
-                  <td className="py-1.5 text-right text-black/60">{num(r.sold)}</td>
-                  <td className="py-1.5 text-right text-black/40">{r.returned ? num(r.returned) : "-"}</td>
+                  <td className="py-1.5 text-ink/50">{r.size}</td>
+                  <td className="py-1.5 text-right text-ink/60">{num(r.shipped)}</td>
+                  <td className="py-1.5 text-right text-ink/60">{num(r.sold)}</td>
+                  <td className="py-1.5 text-right text-ink/40">{r.returned ? num(r.returned) : "-"}</td>
                   <td className="py-1.5 text-right font-semibold">{num(r.remaining)}</td>
                   <td className="py-1.5"><Badge tone={tone(r.remaining)}>{r.remaining <= 0 ? "หมด" : r.remaining <= 3 ? "ใกล้หมด" : "ปกติ"}</Badge></td>
                 </tr>

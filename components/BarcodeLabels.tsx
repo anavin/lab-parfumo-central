@@ -128,7 +128,7 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
           <div className="relative flex-1 min-w-[180px]">
             <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด / SKU"
-              className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:border-brand" />
+              className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-surface focus:outline-none focus:border-brand" />
           </div>
           <button onClick={toggleAllShown} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm text-ink hover:bg-canvas shrink-0">
             {allShownSelected ? <CheckSquare className="w-4 h-4 text-brand-dark" /> : <Square className="w-4 h-4 text-muted" />}
