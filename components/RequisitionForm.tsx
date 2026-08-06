@@ -109,7 +109,7 @@ export function RequisitionForm({
         <button onClick={addRow} className="mt-3 text-sm text-gold-dark font-medium hover:underline">+ เพิ่มรายการ</button>
       </div>
 
-      {err && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{err}</div>}
+      {err && <div className="text-sm text-danger bg-danger-soft border border-danger/30 rounded-lg px-4 py-2">{err}</div>}
       <div className="flex gap-2">
         <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-ink text-white font-medium hover:bg-black disabled:opacity-50">
           {pending ? "กำลังบันทึก…" : mode === "new" ? "สร้างใบเบิก" : "บันทึกการแก้ไข"}

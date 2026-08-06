@@ -26,7 +26,7 @@ export default async function StockPage() {
       </div>
 
       {lowCount > 0 && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3">
           <div className="flex items-center gap-2 text-sm text-amber-900">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
             มีสินค้าใกล้หมด/หมด <b>{lowCount}</b> รายการ — ควรเบิกเพิ่ม

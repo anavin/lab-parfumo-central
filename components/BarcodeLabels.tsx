@@ -180,11 +180,11 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
                       <td className="px-3 py-2 align-middle text-right tabular-nums text-ink whitespace-nowrap">{baht(r.price)}</td>
                       <td className="px-3 py-2 align-middle">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => setQ(r.id, n - 1)} disabled={!on} className="w-7 h-7 rounded-md border border-line text-muted hover:bg-canvas disabled:opacity-30 flex items-center justify-center"><Minus className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setQ(r.id, n - 1)} disabled={!on} className="w-9 h-9 rounded-md border border-line text-muted hover:bg-canvas disabled:opacity-30 flex items-center justify-center"><Minus className="w-3.5 h-3.5" /></button>
                           <input inputMode="numeric" value={n || ""} placeholder="0"
                             onChange={(e) => setQ(r.id, parseInt(e.target.value.replace(/\D/g, "") || "0", 10))}
                             className="w-12 text-center border border-line rounded-md py-1 text-sm tabular-nums" />
-                          <button onClick={() => setQ(r.id, (n || 0) + 1)} className="w-7 h-7 rounded-md border border-line text-muted hover:bg-canvas flex items-center justify-center"><Plus className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setQ(r.id, (n || 0) + 1)} className="w-9 h-9 rounded-md border border-line text-muted hover:bg-canvas flex items-center justify-center"><Plus className="w-3.5 h-3.5" /></button>
                         </div>
                       </td>
                     </tr>

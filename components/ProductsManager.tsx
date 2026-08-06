@@ -77,7 +77,7 @@ export function ProductsManager({ rows }: { rows: ProductRow[] }) {
                   <td className="px-3 py-2 text-right font-medium">{num(r.sold)}</td>
                   <td className="px-3 py-2 text-right">
                     <button onClick={() => setForm({ id: r.id, barcode: r.barcode, scent: r.scent, grade: r.grade || "", size: r.size || "", sku: r.sku || "", price: r.price ?? 0 })}
-                      className="p-1.5 rounded-lg text-muted hover:bg-canvas hover:text-ink" aria-label="แก้ไข"><Pencil className="w-4 h-4" /></button>
+                      className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-ink" aria-label="แก้ไข"><Pencil className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}

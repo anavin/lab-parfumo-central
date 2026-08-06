@@ -22,7 +22,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
       <a href={`/requisitions/${id}/edit`} className="px-3.5 py-2 rounded-lg border border-black/10 text-sm font-medium hover:bg-black/5">✎ แก้ไข</a>
       <button
         onClick={() => { if (confirm("ลบใบเบิกนี้?")) start(() => deleteRequisition(id)); }}
-        className="px-3.5 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50"
+        className="px-3.5 py-2 rounded-lg border border-danger/30 text-danger text-sm font-medium hover:bg-danger-soft"
         disabled={pending}
       >🗑 ลบ</button>
     </div>

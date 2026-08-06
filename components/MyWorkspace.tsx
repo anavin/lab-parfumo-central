@@ -144,7 +144,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       )}
 
       {bill && viewingPast && (
-        <div className="mb-3 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2.5">
+        <div className="mb-3 text-sm bg-warn-soft border border-warn/30 text-warn rounded-lg px-4 py-2.5">
           คุณกำลังดูวันย้อนหลัง — บิลนี้จะบันทึกลง <b>วันนี้</b> ตามปกติ
         </div>
       )}
@@ -336,7 +336,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
                       className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-surface")} />
                   </div>
                   {tenders.length > 2 && !last && (
-                    <button type="button" onClick={() => removeTender(i)} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => removeTender(i)} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
                   )}
                 </div>
               );
@@ -400,7 +400,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         <PhotoPicker value={state.attachments} onChange={(a) => set({ attachments: a })} />
       </div>
 
-      {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
+      {missing.length > 0 && <div className="mb-3 text-sm bg-danger-soft border border-danger/30 text-danger rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
 
       <div className="border-t border-line pt-3">
         <div className="space-y-0.5 text-sm mb-3">
@@ -457,7 +457,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
           </div>}
         </div>
         <input className="w-[70px] shrink-0 border border-line rounded-lg px-1.5 py-2 text-sm text-center text-muted focus:outline-none focus:border-brand" value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
-        <button onClick={onRemove} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
+        <button onClick={onRemove} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
       </div>
       {/* qty · price · discount — wider now that size moved up */}
       <div className="grid grid-cols-3 gap-2.5 pl-7">
@@ -505,8 +505,8 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
 
 // ---------------------------------------------------------------- list item
 function StatusPill({ status }: { status: string }) {
-  if (status === "approved") return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700"><Check className="w-3 h-3" /> เข้าระบบแล้ว</span>;
-  if (status === "rejected") return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700"><XCircle className="w-3 h-3" /> ตีกลับ</span>;
+  if (status === "approved") return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-success-soft text-success"><Check className="w-3 h-3" /> เข้าระบบแล้ว</span>;
+  if (status === "rejected") return <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-danger-soft text-danger"><XCircle className="w-3 h-3" /> ตีกลับ</span>;
   return null; // pending — not shown
 }
 
@@ -556,7 +556,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
             )}
             <span className="text-ink whitespace-nowrap tabular-nums">{baht(r.total ?? 0)}</span>
             {r.status !== "approved" && (
-              <button onClick={() => onDelete(r)} disabled={pending} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => onDelete(r)} disabled={pending} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
             )}
           </li>
         ))}
@@ -682,7 +682,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Field>
         <Field label="ช่องทางขาย"><Select value={state.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTIONS} className="py-2.5" /></Field>
       </div>
-      {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
+      {missing.length > 0 && <div className="mb-3 text-sm bg-danger-soft border border-danger/30 text-danger rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
       {(split ? (state.tenders ?? []).some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr key={qrKey} />}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>

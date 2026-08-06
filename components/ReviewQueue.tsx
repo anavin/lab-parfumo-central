@@ -168,8 +168,8 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 <span className="flex-1 text-ink">ลูกค้า {num(r.customers ?? 0)} ราย · ไทย {num(r.thai ?? 0)} · ต่างชาติ {num(r.foreign_cnt ?? 0)}</span>
                               )}
                               <button onClick={() => setEditId(editId === r.id ? null : r.id)} disabled={pending}
-                                className={`p-1 rounded shrink-0 ${editId === r.id ? "text-brand-dark bg-brand/10" : "text-muted/60 hover:text-brand-dark"}`} aria-label="แก้ไขรายการนี้">
-                                <Pencil className="w-3.5 h-3.5" />
+                                className={`w-8 h-8 flex items-center justify-center rounded-lg shrink-0 ${editId === r.id ? "text-brand-dark bg-brand/10" : "text-muted/60 hover:text-brand-dark hover:bg-canvas"}`} aria-label="แก้ไขรายการนี้">
+                                <Pencil className="w-4 h-4" />
                               </button>
                             </div>
                             {editId === r.id && (
@@ -190,7 +190,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                       {/* per-bill actions */}
                       <div className="flex gap-2 justify-end mt-3 pt-2.5 border-t border-line">
                         <button onClick={() => rejectBill(bill)} disabled={pending}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50">
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-danger text-sm font-medium hover:bg-danger-soft disabled:opacity-50">
                           <X className="w-4 h-4" /> ตีกลับ
                         </button>
                         <button onClick={() => approveBill(bill)} disabled={pending}
@@ -239,7 +239,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                         const isSale = first.kind === "sale";
                         return (
                           <div key={bill.key} className="rounded-xl border border-green-200 bg-surface shadow-sm overflow-hidden">
-                            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-green-50/70 border-b border-green-100">
+                            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-success-soft/60 border-b border-success/20">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0">#{day.bills.length - i}</span>
                                 <div className="min-w-0">
@@ -276,7 +276,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
                               <div className="flex justify-end mt-3 pt-2.5 border-t border-line">
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
-                                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-red-300 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-50">
+                                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-danger/40 text-danger text-sm font-semibold hover:bg-danger-soft disabled:opacity-50">
                                   {busy === bill.key ? <Clock className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} ยกเลิกการอนุมัติ
                                 </button>
                               </div>

@@ -78,7 +78,7 @@ export function PhotoPicker({ value, onChange, max = 6 }:
       <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => add(e.target.files)} />
       <input ref={libRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => add(e.target.files)} />
       {inApp && (
-        <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 leading-snug">
+        <div className="mt-2 text-[11px] text-warn bg-warn-soft border border-warn/30 rounded-lg px-2.5 py-2 leading-snug">
           ถ้ากล้องเปิดไม่ได้ในหน้านี้ ให้กด <b>“เลือกรูป”</b> (เลือกกล้องได้) หรือเปิดลิงก์ใน <b>Chrome / Samsung Internet</b> — หรือกด “เพิ่มลงในหน้าจอหลัก” เพื่อใช้เป็นแอป
         </div>
       )}
