@@ -6,7 +6,7 @@ import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PromptPayButton } from "@/components/PromptPayButton";
+import { KShopQrButton } from "@/components/KShopQrButton";
 import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
 import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
@@ -26,6 +26,8 @@ const payOptions = (cur?: string) => {
 };
 const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
 const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
+// K Shop channels share the shop's static QR (shown for the customer to scan)
+const isKShop = (v?: string) => v === "K Shop" || v === "K Shop Credit Card";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   // min-w-0 lets the field shrink inside a grid/flex cell — without it iOS native
@@ -242,10 +244,6 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     set(patch); clearMiss("ช่องทางชำระ");
   };
 
-  // the PromptPay portion of the bill (what the QR should charge)
-  const promptpayNet = split
-    ? tenders.reduce((s, t, i) => s + (t.channel === "PromptPay" ? tenderAmount(i) : 0), 0)
-    : lines.filter((l) => l.channel === "PromptPay").reduce((s, l) => s + l.total, 0);
   // net grouped by channel — shown when payment is split, so saving isn't confusing
   const payBreakdown = state.splitPay
     ? Object.entries(lines.reduce<Record<string, number>>((m, l) => { const k = l.channel || "?"; m[k] = (m[k] || 0) + l.total; return m; }, {}))
@@ -408,7 +406,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
           {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
           <div className="flex justify-between items-baseline font-semibold text-ink pt-0.5"><span>รวมสุทธิ</span><span className="text-brand-dark text-2xl">{baht(net)}</span></div>
         </div>
-        {promptpayNet > 0 && <div className="mb-3"><PromptPayButton amount={promptpayNet} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
+        {(split ? tenders.some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <div className="mb-3"><KShopQrButton /></div>}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
           <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
@@ -626,9 +624,6 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
   const split = isSplit(state.payment_channel);
   const tendersOk = splitOk(state.tenders ?? [], total);
-  const promptpayAmount = split
-    ? resolveTenders(state.tenders ?? [], total).reduce((s, t) => s + (t.channel === "PromptPay" ? t.amount : 0), 0)
-    : (state.payment_channel === "PromptPay" ? total : 0);
   const paymentPick = (v: string) => {
     s("payment_channel", v); clearMiss("ช่องทางชำระ");
     if (isSplit(v) && (state.tenders?.length ?? 0) < 2) setState({ ...state, payment_channel: v, tenders: [{ channel: "", amount: "" }, { channel: "", amount: "" }] });
@@ -684,7 +679,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="ช่องทางขาย"><Select value={state.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTIONS} className="py-2.5" /></Field>
       </div>
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
-      {promptpayAmount > 0 && <div className="mb-3"><PromptPayButton amount={promptpayAmount} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
+      {(split ? (state.tenders ?? []).some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <div className="mb-3"><KShopQrButton /></div>}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
         <div className="flex gap-2 shrink-0">
