@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SwRegister } from "@/components/SwRegister";
 
 export const metadata: Metadata = {
   title: "Lab Parfumo — Central",
   description: "ระบบใบเบิก & Dashboard เครือ Central",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Lab Parfumo" },
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#15161a",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -17,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">{children}<SwRegister /></body>
     </html>
   );
 }

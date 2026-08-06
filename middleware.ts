@@ -3,7 +3,7 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 // Edge middleware only checks that a session cookie exists; the real DB verify
 // happens in the (app) layout via requireUser(). Mirrors lab-parfumo-next.
-const PUBLIC = new Set(["/login", "/api/login"]);
+const PUBLIC = new Set(["/login", "/api/login", "/offline", "/manifest.webmanifest"]);
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -24,5 +24,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.svg).*)"],
+  // skip auth for framework internals, the service worker, the manifest and
+  // static image assets (PWA icons) so they're served without a session.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|webp|ico)).*)"],
 };
