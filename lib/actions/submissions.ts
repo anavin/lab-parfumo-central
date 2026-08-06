@@ -184,6 +184,42 @@ export async function deleteMySubmission(id: number) {
   revalidatePath("/my"); revalidatePath("/review");
 }
 
+// Admin edits any pending submission (fix data before approving). Reviewer-only.
+export async function updateSubmissionByAdmin(id: number, input: unknown) {
+  await requirePermission("review");
+  const [row] = await q<{ kind: string; status: string }>(`select kind, status from submissions where id = $1`, [id]);
+  if (!row) throw new Error("ไม่พบรายการ");
+  if (row.status !== "pending") throw new Error("รายการนี้ถูกตรวจแล้ว แก้ไขไม่ได้");
+
+  if (row.kind === "sale") {
+    const parsed = saleSchema.safeParse(input);
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
+    const d = parsed.data;
+    const sub = d.qty * (d.unit_price ?? 0);
+    const discount = Math.min(sub, d.discount ?? 0);
+    const total = sub - discount;
+    await q(
+      `update submissions set
+         entry_date=$2, source=$3, sale_time=$4, receipt_no=$5, item=$6, barcode=$7, size=$8,
+         qty=$9, unit_price=$10, discount=$11, total=$12, payment_channel=$13, nation=$14, updated_at=now()
+       where id=$1`,
+      [id, d.sale_date, d.source || "CTW", d.sale_time || null, d.receipt_no || null, d.item,
+       d.barcode || null, d.size || null, d.qty, d.unit_price ?? 0, discount, total,
+       d.payment_channel || null, d.nation || null]);
+    await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
+    await logAudit("update", "submission", id, `แอดมินแก้ไข: ${d.item}`);
+  } else {
+    const parsed = customerDaySchema.safeParse(input);
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
+    const d = parsed.data;
+    await q(
+      `update submissions set entry_date=$2, customers=$3, sell_amount=$4, thai=$5, foreign_cnt=$6, updated_at=now() where id=$1`,
+      [id, d.cust_date, d.customers, d.sell_amount ?? 0, d.thai ?? null, d.foreign ?? null]);
+    await logAudit("update", "submission", id, `แอดมินแก้ไขลูกค้า: ${d.cust_date}`);
+  }
+  revalidatePath("/review"); revalidatePath("/my");
+}
+
 // ---------------------------------------------------------------- admin: review
 // Approving copies the row into the live table (created_by preserved) so the
 // dashboard aggregates it and can break it down by salesperson.

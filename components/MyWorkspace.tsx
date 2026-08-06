@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PromptPayButton } from "@/components/PromptPayButton";
 import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
 import { compressImage } from "@/lib/img";
+import { PAYMENTS } from "@/lib/payments";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow, BillAttachment } from "@/lib/queries";
 
@@ -20,18 +21,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   // <input type="time"/date"> keep their intrinsic width and overflow onto the neighbour.
   return <label className="block min-w-0"><span className="text-xs text-muted mb-1 block">{label}</span>{children}</label>;
 }
-
-// payment channels — values match the existing sales data so the dashboard groups correctly
-const PAYMENTS = [
-  { v: "Cash", label: "เงินสด" },
-  { v: "EDC Credit Card", label: "บัตรเครดิต (EDC)" },
-  { v: "K Shop", label: "K SHOP" },
-  { v: "K Shop Credit Card", label: "K SHOP บัตรเครดิต" },
-  { v: "EDC Alipay/WeChat", label: "Alipay / WeChat" },
-  { v: "EDC Thai QR Payment", label: "Thai QR" },
-  { v: "EDC PromptCard", label: "PromptCard" },
-  { v: "PromptPay", label: "พร้อมเพย์ (PromptPay)" },
-];
 
 // ---- bill (multi-item) types ----
 // Per-item price is already discounted; discount_pct is an extra bill-level

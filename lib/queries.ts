@@ -250,7 +250,7 @@ export type SubmissionRow = {
 };
 
 const SUB_COLS = `
-  s.id, s.kind, s.status, s.created_by, u.full_name author, s.ba, s.entry_date,
+  s.id, s.kind, s.status, s.created_by, u.full_name author, s.ba, s.entry_date::text entry_date,
   s.source, s.sale_time::text sale_time, s.receipt_no, s.item, s.barcode, s.size,
   s.qty::float qty, s.unit_price::float unit_price, s.discount::float discount, s.total::float total,
   s.payment_channel, s.nation, s.customers, s.thai::float thai, s.foreign_cnt::float foreign_cnt,
