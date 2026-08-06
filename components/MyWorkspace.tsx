@@ -190,6 +190,8 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 }) {
   const [scanning, setScanning] = useState(!!autoScan);
   const [missing, setMissing] = useState<string[]>([]);
+  const [qrKey, setQrKey] = useState(0);   // bump to re-pop the K Shop QR (even on same-value pick)
+  const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
   const addItem = (patch: Partial<BillItem> = {}) => setState({ ...state, items: [...state.items, newItem(patch)] });
@@ -309,7 +311,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
             </label>
           )}
         </div>
-        <Select value={state.payment_channel} onValueChange={paymentPick}
+        <Select value={state.payment_channel} onValueChange={paymentPick} onPick={bumpQr}
           options={[...payOptions(split ? "" : state.payment_channel), { value: SPLIT2, label: "จ่าย 2 ช่องทาง (แยกยอด)" }]}
           placeholder="- เลือกช่องทางชำระ -"
           className={"py-2.5" + (state.splitPay || split ? "" : errRing("ช่องทางชำระ"))} />
@@ -323,7 +325,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
               return (
                 <div key={i} className="flex gap-2 items-center">
                   <div className="flex-1 min-w-0">
-                    <Select value={t.channel} onValueChange={(v) => { setTender(i, { channel: v }); clearMiss("ช่องทางชำระ"); }}
+                    <Select value={t.channel} onValueChange={(v) => { setTender(i, { channel: v }); clearMiss("ช่องทางชำระ"); }} onPick={bumpQr}
                       options={payOptions(t.channel)} placeholder="- เลือกช่องทาง -"
                       className={"py-2" + (missing.includes("ช่องทางชำระ") && !t.channel ? " ring-1 ring-red-400 border-red-400" : "")} />
                   </div>
@@ -406,7 +408,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
           {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
           <div className="flex justify-between items-baseline font-semibold text-ink pt-0.5"><span>รวมสุทธิ</span><span className="text-brand-dark text-2xl">{baht(net)}</span></div>
         </div>
-        {(split ? tenders.some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr />}
+        {(split ? tenders.some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr key={qrKey} />}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
           <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
@@ -605,6 +607,8 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   const [acOpen, setAcOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
+  const [qrKey, setQrKey] = useState(0);
+  const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
   const s = (k: keyof SaleState, v: any) => setState({ ...state, [k]: v });
   // numeric field: select-all on focus + strip leading zeros so a default 0 disappears when typing
   const numFld = (k: "qty" | "unit_price" | "discount") => ({
@@ -660,7 +664,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <Field label="ช่องทางชำระ *">
-          <Select value={state.payment_channel} onValueChange={paymentPick}
+          <Select value={state.payment_channel} onValueChange={paymentPick} onPick={bumpQr}
             options={[...payOptions(split ? "" : state.payment_channel), { value: SPLIT2, label: "จ่าย 2 ช่องทาง (แยกยอด)" }]}
             placeholder="- เลือกช่องทางชำระ -"
             className={"py-2.5" + (split ? "" : errRing("ช่องทางชำระ"))} />
@@ -671,7 +675,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       {split && (
         <div className="mb-3">
           <div className="text-xs text-muted mb-1">แยกยอดแต่ละช่องทาง (รวมต้องเท่ากับ {baht(total)})</div>
-          <SplitTenders value={state.tenders ?? []} onChange={(t) => { s("tenders", t); clearMiss("ยอดชำระ 2 ช่องทางให้ครบและตรงกับยอดบิล"); }} net={total} />
+          <SplitTenders value={state.tenders ?? []} onChange={(t) => { s("tenders", t); clearMiss("ยอดชำระ 2 ช่องทางให้ครบและตรงกับยอดบิล"); }} net={total} onPick={bumpQr} />
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -679,7 +683,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="ช่องทางขาย"><Select value={state.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTIONS} className="py-2.5" /></Field>
       </div>
       {missing.length > 0 && <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
-      {(split ? (state.tenders ?? []).some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr />}
+      {(split ? (state.tenders ?? []).some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr key={qrKey} />}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <div className="text-sm text-muted">รวม <span className="ml-1 text-2xl font-bold text-brand-dark align-middle">{baht(total)}</span></div>
         <div className="flex gap-2 shrink-0">

@@ -8,7 +8,7 @@ const PAY_OPTIONS = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
 
 // Presentational split-tender editor: pick each channel + amount; the last row
 // auto-fills the remainder. Used by the new-bill edit forms (staff + admin).
-export function SplitTenders({ value, onChange, net }: { value: Tender[]; onChange: (t: Tender[]) => void; net: number }) {
+export function SplitTenders({ value, onChange, net, onPick }: { value: Tender[]; onChange: (t: Tender[]) => void; net: number; onPick?: (v: string) => void }) {
   const amounts = splitAmounts(value, net);
   const sum = splitSum(value, net);
   const matches = net > 0 && Math.round(sum) === Math.round(net);
@@ -20,7 +20,7 @@ export function SplitTenders({ value, onChange, net }: { value: Tender[]; onChan
         return (
           <div key={i} className="flex gap-2 items-center">
             <div className="flex-1 min-w-0">
-              <Select value={t.channel} onValueChange={(v) => setT(i, { channel: v })} options={PAY_OPTIONS} placeholder="- เลือกช่องทาง -" className="py-2" />
+              <Select value={t.channel} onValueChange={(v) => setT(i, { channel: v })} onPick={onPick} options={PAY_OPTIONS} placeholder="- เลือกช่องทาง -" className="py-2" />
             </div>
             <div className="relative w-28 shrink-0">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
