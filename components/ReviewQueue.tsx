@@ -6,7 +6,9 @@ import { approveMany, rejectMany, unapproveMany, updateSubmissionByAdmin } from 
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS } from "@/lib/payments";
-import type { SubmissionRow, BillAttachment } from "@/lib/queries";
+import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
+
+const chLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v;
 
 const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:border-brand";
 const numAttrs = (v: any, on: (s: string) => void) => ({
@@ -38,8 +40,18 @@ function groupDays(rows: SubmissionRow[]): Day[] {
   return days;
 }
 
-export function ReviewQueue({ rows, approved = [], attachments = {} }:
-  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
+function SplitTenders({ tenders }: { tenders?: BillTender[] }) {
+  if (!tenders?.length) return null;
+  return (
+    <div className="mt-2 pt-2 border-t border-line/60 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
+      <span className="font-medium text-ink">จ่าย {tenders.length} ช่องทาง:</span>
+      {tenders.map((t, i) => <span key={i}>{chLabel(t.channel)} <b className="text-ink tabular-nums">{baht(t.amount)}</b></span>)}
+    </div>
+  );
+}
+
+export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {} }:
+  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);      // bill key being processed
@@ -161,6 +173,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {} }:
                         ))}
                       </ul>
 
+                      <SplitTenders tenders={payments[bill.ref]} />
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
 
                       {/* per-bill actions */}
@@ -248,7 +261,8 @@ export function ReviewQueue({ rows, approved = [], attachments = {} }:
                                   </li>
                                 ))}
                               </ul>
-                              {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
+                              <SplitTenders tenders={payments[bill.ref]} />
+                      {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
                               <div className="flex justify-end mt-3 pt-2.5 border-t border-line">
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
                                   className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-red-300 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-50">

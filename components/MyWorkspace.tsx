@@ -10,7 +10,7 @@ import { PromptPayButton } from "@/components/PromptPayButton";
 import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
 import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
-import { PAYMENTS } from "@/lib/payments";
+import { PAYMENTS, SPLIT2, isSplit } from "@/lib/payments";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow, BillAttachment } from "@/lib/queries";
 
@@ -34,12 +34,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
 type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string };
-type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[]; attachments: string[]; splitPay: boolean };
+type Tender = { channel: string; amount: any };
+type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[]; attachments: string[]; splitPay: boolean; tenders: Tender[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number; payment_channel: string };
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [], splitPay: false });
+const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string };
@@ -77,13 +78,13 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
     wasOpen.current = open;
   });
 
-  const submitTheBill = (items: BillItemPayload[]) => start(async () => {
+  const submitTheBill = (items: BillItemPayload[], tenders?: { channel: string; amount: number }[]) => start(async () => {
     if (!bill) return;
     try {
       await submitBill({
         sale_date: bill.sale_date, sale_time: bill.sale_time, source: bill.source,
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
-        items, attachments: bill.attachments,
+        items, attachments: bill.attachments, tenders,
       });
       setBill(null);
       // the sale is recorded for today — jump to today's view so it's visible
@@ -174,7 +175,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
 
 // ---------------------------------------------------------------- bill builder
 function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[]) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
+  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[]) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
 }) {
   const [scanning, setScanning] = useState(!!autoScan);
   const [missing, setMissing] = useState<string[]>([]);
@@ -214,8 +215,28 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const billDiscTotal = discountTotal - itemDiscTotal;   // baht from the bill-level %
   const net = subtotal - discountTotal;
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
+
+  // ---- split tender: one bill paid across 2+ channels by amount ----
+  const split = isSplit(state.payment_channel);
+  const tenders: Tender[] = state.tenders ?? [];
+  const othersSum = tenders.slice(0, -1).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  // the last row is auto-filled with whatever is left of the bill total
+  const tenderAmount = (i: number) => (i < tenders.length - 1 ? Number(tenders[i].amount) || 0 : Math.max(0, net - othersSum));
+  const tenderSum = tenders.reduce((s, _t, i) => s + tenderAmount(i), 0);
+  const tenderMatches = net > 0 && Math.round(tenderSum) === Math.round(net);
+  const setTender = (i: number, patch: Partial<Tender>) => set({ tenders: tenders.map((t, idx) => (idx === i ? { ...t, ...patch } : t)) });
+  const addTender = () => set({ tenders: [...tenders, { channel: "", amount: "" }] });
+  const removeTender = (i: number) => set({ tenders: tenders.filter((_, idx) => idx !== i) });
+  const paymentPick = (v: string) => {
+    const patch: Partial<BillState> = { payment_channel: v };
+    if (isSplit(v)) { patch.splitPay = false; if ((state.tenders?.length ?? 0) < 2) patch.tenders = [{ channel: "", amount: "" }, { channel: "", amount: "" }]; }
+    set(patch); clearMiss("ช่องทางชำระ");
+  };
+
   // the PromptPay portion of the bill (what the QR should charge)
-  const promptpayNet = lines.filter((l) => l.channel === "PromptPay").reduce((s, l) => s + l.total, 0);
+  const promptpayNet = split
+    ? tenders.reduce((s, t, i) => s + (t.channel === "PromptPay" ? tenderAmount(i) : 0), 0)
+    : lines.filter((l) => l.channel === "PromptPay").reduce((s, l) => s + l.total, 0);
   // net grouped by channel — shown when payment is split, so saving isn't confusing
   const payBreakdown = state.splitPay
     ? Object.entries(lines.reduce<Record<string, number>>((m, l) => { const k = l.channel || "?"; m[k] = (m[k] || 0) + l.total; return m; }, {}))
@@ -224,14 +245,20 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
   const submit = () => {
     const m: string[] = [];
-    if (state.splitPay) {
+    if (split) {
+      if (tenders.some((t) => !String(t.channel || "").trim())) m.push("ช่องทางชำระ");
+      else if (!tenderMatches) m.push("ยอดชำระให้ตรงกับยอดบิล");
+    } else if (state.splitPay) {
       if (lines.some((l) => !String(l.channel || "").trim())) m.push("ช่องทางชำระให้ครบทุกชิ้น");
     } else if (!String(state.payment_channel || "").trim()) m.push("ช่องทางชำระ");
     if (!String(state.nation || "").trim()) m.push("สัญชาติ");
     if (state.items.length === 0) m.push("สินค้า");
     else if (state.items.some((it) => !String(it.item || "").trim())) m.push("ชื่อสินค้าให้ครบ");
     setMissing(m);
-    if (m.length === 0) onSubmit(lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel })));
+    if (m.length > 0) return;
+    const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel }));
+    const outTenders = split ? tenders.map((t, i) => ({ channel: t.channel, amount: tenderAmount(i) })) : undefined;
+    onSubmit(items, outTenders);
   };
   const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-red-400 border-red-400" : "");
 
@@ -268,15 +295,53 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-muted">ช่องทางชำระ *{state.splitPay ? " (ค่าเริ่มต้นทุกชิ้น)" : ""}</span>
-          <label className="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
-            <input type="checkbox" checked={state.splitPay} onChange={(e) => set({ splitPay: e.target.checked })} className="accent-brand w-3.5 h-3.5" />
-            แยกจ่ายรายชิ้น
-          </label>
+          {!split && (
+            <label className="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
+              <input type="checkbox" checked={state.splitPay} onChange={(e) => set({ splitPay: e.target.checked })} className="accent-brand w-3.5 h-3.5" />
+              แยกจ่ายรายชิ้น
+            </label>
+          )}
         </div>
-        <Select value={state.payment_channel} onValueChange={(v) => { set({ payment_channel: v }); clearMiss("ช่องทางชำระ"); }}
-          options={payOptions(state.payment_channel)} placeholder="- เลือกช่องทางชำระ -"
-          className={"py-2.5" + (state.splitPay ? "" : errRing("ช่องทางชำระ"))} />
+        <Select value={state.payment_channel} onValueChange={paymentPick}
+          options={[...payOptions(split ? "" : state.payment_channel), { value: SPLIT2, label: "จ่าย 2 ช่องทาง (แยกยอด)" }]}
+          placeholder="- เลือกช่องทางชำระ -"
+          className={"py-2.5" + (state.splitPay || split ? "" : errRing("ช่องทางชำระ"))} />
         {state.splitPay && <div className="mt-1.5 text-[11px] text-muted">เลือกช่องทางของแต่ละชิ้นที่การ์ดสินค้าด้านบน (ไม่เลือก = ใช้ค่าเริ่มต้นนี้)</div>}
+
+        {/* split tender rows: pick each channel + amount; last row auto-fills the remainder */}
+        {split && (
+          <div className="mt-2 space-y-2">
+            {tenders.map((t, i) => {
+              const last = i === tenders.length - 1;
+              return (
+                <div key={i} className="flex gap-2 items-center">
+                  <div className="flex-1 min-w-0">
+                    <Select value={t.channel} onValueChange={(v) => { setTender(i, { channel: v }); clearMiss("ช่องทางชำระ"); }}
+                      options={payOptions(t.channel)} placeholder="- เลือกช่องทาง -"
+                      className={"py-2" + (missing.includes("ช่องทางชำระ") && !t.channel ? " ring-1 ring-red-400 border-red-400" : "")} />
+                  </div>
+                  <div className="relative w-28 shrink-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
+                    <input inputMode="numeric" value={last ? String(Math.round(tenderAmount(i))) : (t.amount ?? "")} readOnly={last}
+                      onChange={(e) => setTender(i, { amount: e.target.value.replace(/[^\d]/g, "") })} onFocus={(e) => e.target.select()}
+                      className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-white")} />
+                  </div>
+                  {tenders.length > 2 && !last && (
+                    <button type="button" onClick={() => removeTender(i)} className="p-1 rounded text-muted hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
+                  )}
+                </div>
+              );
+            })}
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" onClick={addTender} disabled={tenders.length >= 3}
+                className="text-xs text-brand-dark hover:underline disabled:opacity-40 disabled:no-underline inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> เพิ่มช่องทาง</button>
+              <span className={"text-xs font-medium " + (tenderMatches ? "text-green-600" : "text-danger")}>
+                รวมชำระ {baht(tenderSum)}{tenderMatches ? " · ตรงกับยอดบิล" : (tenderSum < net ? ` · ขาด ${baht(net - tenderSum)}` : ` · เกิน ${baht(tenderSum - net)}`)}
+              </span>
+            </div>
+          </div>
+        )}
+
         {payBreakdown.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
             {payBreakdown.map(([v, amt]) => <span key={v} className={v === "?" ? "text-danger" : "text-muted"}>{chLabel(v)}: <b className="text-ink tabular-nums">{baht(amt)}</b></span>)}
@@ -337,7 +402,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         {promptpayNet > 0 && <div className="mb-3"><PromptPayButton amount={promptpayNet} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-brand text-brand-dark text-sm font-semibold hover:bg-brand-soft disabled:opacity-50" /></div>}
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={submit} disabled={pending} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
+          <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
         </div>
       </div>
 

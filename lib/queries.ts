@@ -1,4 +1,5 @@
 import { q } from "./db";
+import { SPLIT2 } from "@/lib/payments";
 
 // ---- filters --------------------------------------------------------------
 // months: subset of month labels ('Nov-25') to include, or null = all.
@@ -296,6 +297,18 @@ export function mySubmissions(userId: number, date: string) {
 
 export type BillAttachment = { id: number; bill_ref: string; data: string; created_by: number };
 
+export type BillTender = { channel: string; amount: number };
+/** Split-tender breakdown for a set of bill refs → map ref -> [{channel, amount}]. */
+export async function paymentsForRefs(refs: string[]): Promise<Record<string, BillTender[]>> {
+  const uniq = [...new Set((refs || []).filter(Boolean))];
+  if (!uniq.length) return {};
+  const rows = await q<{ bill_ref: string; channel: string; amount: number }>(
+    `select bill_ref, channel, amount::float amount from bill_payments where bill_ref = any($1) order by id`, [uniq]);
+  const map: Record<string, BillTender[]> = {};
+  for (const r of rows) (map[r.bill_ref] ??= []).push({ channel: r.channel, amount: r.amount });
+  return map;
+}
+
 /** Photo evidence for a set of bill refs → map ref -> attachments (in order). */
 export async function attachmentsForRefs(refs: string[]): Promise<Record<string, BillAttachment[]>> {
   const uniq = [...new Set((refs || []).filter(Boolean))];
@@ -311,24 +324,36 @@ export async function attachmentsForRefs(refs: string[]): Promise<Record<string,
  * everything they entered that has not been rejected), so their view reflects
  * their own work regardless of review state. */
 export async function myDayKpis(userId: number, date: string) {
-  const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number; cash_revenue: number; cash_bills: number }>(`
+  const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float qty,
            -- one bill per shared receipt/bill-ref; legacy rows with none count individually
            count(distinct coalesce(nullif(receipt_no,''), 'i'||id))::int bills,
-           count(*) filter (where status='pending')::int pending,
-           -- cash-only split, for the daily payment breakdown
-           coalesce(sum(total) filter (where payment_channel='Cash'),0)::float cash_revenue,
-           count(distinct coalesce(nullif(receipt_no,''), 'i'||id)) filter (where payment_channel='Cash')::int cash_bills
+           count(*) filter (where status='pending')::int pending
     from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2`,
     [userId, date]);
-  // customers is derived from bills (one bill ≈ one customer) — no separate entry
+
+  // Per-channel breakdown for the daily summary: single-channel lines grouped by
+  // their channel, PLUS the per-channel amounts of split ("จ่าย 2 ทาง") bills.
+  const lineCh = await q<{ channel: string; revenue: number }>(`
+    select coalesce(nullif(payment_channel,''),'ไม่ระบุ') channel, sum(total)::float revenue
+    from submissions
+    where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2
+      and coalesce(payment_channel,'') <> $3
+    group by 1`, [userId, date, SPLIT2]);
+  const tenderCh = await q<{ channel: string; revenue: number }>(`
+    select channel, sum(amount)::float revenue
+    from bill_payments where created_by=$1 and entry_date=$2 group by 1`, [userId, date]);
+
+  const map = new Map<string, number>();
+  for (const r of [...lineCh, ...tenderCh]) map.set(r.channel, (map.get(r.channel) ?? 0) + (r.revenue ?? 0));
+  const channels = [...map.entries()]
+    .map(([channel, revenue]) => ({ channel, revenue }))
+    .filter((c) => Math.round(c.revenue) > 0)
+    .sort((a, b) => b.revenue - a.revenue);
+
   const aov = sale.bills ? sale.revenue / sale.bills : 0;
-  return {
-    revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: sale.bills, aov,
-    cashRevenue: sale.cash_revenue, cashBills: sale.cash_bills,
-    otherRevenue: sale.revenue - sale.cash_revenue, otherBills: sale.bills - sale.cash_bills,
-  };
+  return { revenue: sale.revenue, qty: sale.qty, bills: sale.bills, pending: sale.pending, customers: sale.bills, aov, channels };
 }
 
 /** Last `days` days of a staff member's own revenue (for the mini trend). */

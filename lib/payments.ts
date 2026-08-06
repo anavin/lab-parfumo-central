@@ -10,3 +10,8 @@ export const PAYMENTS = [
   { v: "EDC PromptCard", label: "PromptCard" },
   { v: "PromptPay", label: "พร้อมเพย์ (PromptPay)" },
 ];
+
+// Marker value used when a bill is paid across two channels; the per-channel
+// amounts are stored separately (bill_payments) so reports stay accurate.
+export const SPLIT2 = "จ่าย 2 ทาง";
+export const isSplit = (v?: string | null) => v === SPLIT2;

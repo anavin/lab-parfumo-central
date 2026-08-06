@@ -5,9 +5,12 @@ import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
 import { DateNav } from "@/components/DateNav";
 import { MyWorkspace } from "@/components/MyWorkspace";
+import { PAYMENTS } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
+const CH_LABEL: Record<string, string> = Object.fromEntries(PAYMENTS.map((p) => [p.v, p.label.replace(/\s*\(.*\)$/, "")]));
+const chLabel = (c: string) => CH_LABEL[c] ?? c;
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const thaiDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
@@ -48,7 +51,10 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-5">
         <Stat label="ยอดขายวันนี้" value={baht(kpi.revenue)} tone="brand" />
-        <Stat label="เงินสด" value={baht(kpi.cashRevenue)} sub={`${num(kpi.cashBills)} บิล`} />
+        {/* per-channel breakdown — only channels that actually took money today */}
+        {kpi.channels.map((c) => (
+          <Stat key={c.channel} label={chLabel(c.channel)} value={baht(c.revenue)} />
+        ))}
         <Stat label="บิล" value={num(kpi.bills)} sub="ใบเสร็จ" />
         <Stat label="จำนวน" value={num(kpi.qty)} sub="ชิ้น" />
         <Stat label="ลูกค้า" value={num(kpi.customers)} sub="ราย" />

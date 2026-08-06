@@ -2,6 +2,7 @@
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { saleSchema, customerDaySchema, billSchema } from "./schemas";
+import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
 import { requirePermission } from "@/lib/auth/require-user";
@@ -60,13 +61,24 @@ export async function submitBill(input: unknown) {
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
   if (!d.nation?.trim()) throw new Error("กรุณาเลือกสัญชาติลูกค้า");
-  // each line's channel = its own override, else the bill default; all required
   const billPc = d.payment_channel?.trim() || "";
-  if (d.items.some((it) => !((it.payment_channel?.trim() || billPc)))) throw new Error("กรุณาเลือกช่องทางชำระให้ครบทุกชิ้น");
+  const split = isSplit(billPc);
+  // each line's channel = its own override, else the bill default; all required
+  if (!split && d.items.some((it) => !((it.payment_channel?.trim() || billPc)))) throw new Error("กรุณาเลือกช่องทางชำระให้ครบทุกชิ้น");
+
+  // split tender: the per-channel amounts must add up to the bill total
+  const billTotal = d.items.reduce((s, it) => s + (it.qty * (it.unit_price ?? 0) - (it.discount ?? 0)), 0);
+  const tenders = split ? (d.tenders ?? []).filter((t) => t.channel?.trim() && t.amount > 0) : [];
+  if (split) {
+    if (tenders.length < 2) throw new Error("จ่าย 2 ทาง: เลือกช่องทางและใส่ยอดให้ครบอย่างน้อย 2 ช่องทาง");
+    const tsum = Math.round(tenders.reduce((s, t) => s + t.amount, 0));
+    if (tsum !== Math.round(billTotal)) throw new Error(`ยอดชำระรวม ฿${tsum.toLocaleString()} ไม่เท่ากับยอดบิล ฿${Math.round(billTotal).toLocaleString()}`);
+  }
+
   const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, d.source || "CTW"));
   let count = 0, sum = 0;
   for (const it of d.items) {
-    const pc = it.payment_channel?.trim() || billPc;
+    const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
     const total = it.qty * (it.unit_price ?? 0) - (it.discount ?? 0);
     const [row] = await q<{ id: number }>(
       `insert into submissions
@@ -78,6 +90,10 @@ export async function submitBill(input: unknown) {
        pc, d.nation]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
     count++; sum += total;
+  }
+  for (const t of tenders) {
+    await q(`insert into bill_payments (bill_ref, created_by, entry_date, channel, amount) values ($1,$2,$3,$4,$5)`,
+      [ref, user.id, d.sale_date, t.channel.trim(), t.amount]);
   }
   for (const a of d.attachments ?? []) {
     await q(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3)`, [ref, user.id, a]);
@@ -191,10 +207,13 @@ export async function deleteMySubmission(id: number) {
   await ownRow(id, user.id, ["pending", "rejected"]);   // allow removing a bounced entry
   const [ref] = await q<{ receipt_no: string | null }>(`select receipt_no from submissions where id = $1`, [id]);
   await q(`delete from submissions where id = $1`, [id]);
-  // if that was the bill's last line, remove its now-orphaned photo evidence
+  // if that was the bill's last line, remove its now-orphaned photo + split records
   if (ref?.receipt_no) {
     const [left] = await q<{ n: number }>(`select count(*)::int n from submissions where receipt_no = $1`, [ref.receipt_no]);
-    if (!left?.n) await q(`delete from bill_attachments where bill_ref = $1`, [ref.receipt_no]);
+    if (!left?.n) {
+      await q(`delete from bill_attachments where bill_ref = $1`, [ref.receipt_no]);
+      await q(`delete from bill_payments where bill_ref = $1`, [ref.receipt_no]);
+    }
   }
   await logAudit("delete", "submission", id, "ลบรายการที่กรอก");
   revalidatePath("/my"); revalidatePath("/review");
@@ -348,15 +367,18 @@ export async function unapproveMany(ids: number[]) {
 export async function rejectMany(ids: number[], note?: string) {
   const admin = await requirePermission("review");
   let ok = 0;
+  const refs = new Set<string>();
   for (const id of ids) {
     try {
-      const res = await q<{ id: number }>(
+      const res = await q<{ id: number; receipt_no: string | null }>(
         `update submissions set status='rejected', reviewed_by=$2, reviewed_at=now(), review_note=$3, updated_at=now()
-         where id=$1 and status <> 'approved' returning id`,
+         where id=$1 and status <> 'approved' returning id, receipt_no`,
         [id, admin.id, note?.trim() || null]);
-      if (res.length) ok++;
+      if (res.length) { ok++; if (res[0].receipt_no) refs.add(res[0].receipt_no); }
     } catch (e) { console.error("[rejectMany] failed", id, e); }
   }
+  // a rejected split bill's per-channel amounts must stop counting toward cash
+  for (const ref of refs) await q(`delete from bill_payments where bill_ref = $1`, [ref]);
   await logAudit("reject", "submission", null, `ตีกลับ ${ok} รายการ${note ? ` · ${note}` : ""}`);
   revalidatePath("/review"); revalidatePath("/my");
   return ok;
