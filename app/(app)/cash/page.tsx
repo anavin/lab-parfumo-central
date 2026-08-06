@@ -2,6 +2,7 @@ import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, fmtDate } from "@/lib/format";
 import { AddCash } from "@/components/EntryForms";
 import { Wallet } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
 import { q } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function CashPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1000px] mx-auto">
-      <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" />
+      <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" action={<ExportButton kind="cash" />} />
       <AddCash />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Stat label="เงินสดสะสม" value={baht(agg.total)} tone="success" />

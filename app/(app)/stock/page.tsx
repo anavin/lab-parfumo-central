@@ -1,6 +1,7 @@
 import { PageHeader, Stat, Card, Badge } from "@/components/ui";
 import { num } from "@/lib/format";
 import { stockLive, stockSummary } from "@/lib/queries";
+import { ExportButton } from "@/components/ExportButton";
 import { Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export default async function StockPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
-      <PageHeader icon={Package} title="สต๊อกคงเหลือ" subtitle="คำนวณสดจาก ส่งไป − ขาย (อัปเดตอัตโนมัติเมื่อบันทึกส่ง/ขาย)" />
+      <PageHeader icon={Package} title="สต๊อกคงเหลือ" subtitle="คำนวณสดจาก ส่งไป − ขาย (อัปเดตอัตโนมัติเมื่อบันทึกส่ง/ขาย)" action={<ExportButton kind="stock" />} />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Stat label="คงเหลือรวม" value={num(s.remaining)} tone="success" />
         <Stat label="ส่งไปทั้งหมด" value={num(s.shipped)} />
