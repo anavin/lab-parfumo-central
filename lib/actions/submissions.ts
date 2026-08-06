@@ -313,3 +313,21 @@ export async function approveMany(ids: number[]) {
   if (failed.length) throw new Error(`อนุมัติสำเร็จ ${ok} รายการ · ล้มเหลว ${failed.length} รายการ กรุณาลองใหม่`);
   return ok;
 }
+
+// Reject a whole bill (all its rows) at once.
+export async function rejectMany(ids: number[], note?: string) {
+  const admin = await requirePermission("review");
+  let ok = 0;
+  for (const id of ids) {
+    try {
+      const res = await q<{ id: number }>(
+        `update submissions set status='rejected', reviewed_by=$2, reviewed_at=now(), review_note=$3, updated_at=now()
+         where id=$1 and status <> 'approved' returning id`,
+        [id, admin.id, note?.trim() || null]);
+      if (res.length) ok++;
+    } catch (e) { console.error("[rejectMany] failed", id, e); }
+  }
+  await logAudit("reject", "submission", null, `ตีกลับ ${ok} รายการ${note ? ` · ${note}` : ""}`);
+  revalidatePath("/review"); revalidatePath("/my");
+  return ok;
+}
