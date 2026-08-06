@@ -397,6 +397,22 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
         <Cell label="ส่วนลด"><input {...numAttrs("discount")} className={fld} /></Cell>
       </div>
+      {/* quick per-item discount — the shop's standard amounts; tap to apply, tap again to clear */}
+      <div className="mt-2 pl-7 flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] text-muted mr-0.5">ลดเร็ว</span>
+        {[200, 100, 50].map((v) => {
+          const active = Number(it.discount) === v;
+          return (
+            <button key={v} type="button" onClick={() => onChange({ discount: active ? 0 : v })}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border transition ${active ? "bg-brand text-white border-brand" : "border-line text-ink hover:bg-canvas"}`}>
+              −฿{v}
+            </button>
+          );
+        })}
+        {Number(it.discount) > 0 && (
+          <button type="button" onClick={() => onChange({ discount: 0 })} className="px-2 py-1 rounded-full text-xs text-muted hover:bg-canvas">ล้าง</button>
+        )}
+      </div>
       {showPayment && (
         <div className="mt-2.5 pl-7">
           <span className="block text-[10px] text-muted mb-0.5">ช่องทางชำระชิ้นนี้</span>
