@@ -403,15 +403,24 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {missing.length > 0 && <div className="mb-3 text-sm bg-danger-soft border border-danger/30 text-danger rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
 
       <div className="border-t border-line pt-3">
-        <div className="space-y-0.5 text-sm mb-3">
+        <div className="space-y-0.5 text-sm">
           <div className="flex justify-between text-muted"><span>ยอดรวม</span><span>{baht(subtotal)}</span></div>
           {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
-          <div className="flex justify-between items-baseline font-semibold text-ink pt-0.5"><span>รวมสุทธิ</span><span className="text-brand-dark text-2xl">{baht(net)}</span></div>
         </div>
-        {(split ? tenders.some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr key={qrKey} />}
-        <div className="flex gap-2 justify-end">
-          <button onClick={onCancel} className="px-4 py-2.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
+        {(split ? tenders.some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <div className="mt-3"><KShopQr key={qrKey} /></div>}
+      </div>
+
+      {/* sticky action bar — net total + save stay reachable no matter how long the
+          bill gets on a phone; pins to the viewport bottom while scrolling the form */}
+      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-5 mt-3 px-4 sm:px-5 pt-3 bg-surface/95 backdrop-blur border-t border-line flex items-center justify-between gap-3 shadow-[0_-4px_14px_rgba(0,0,0,0.05)]"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <div className="min-w-0 leading-tight">
+          <div className="text-[11px] text-muted">รวมสุทธิ</div>
+          <div className="text-brand-dark text-xl font-bold tabular-nums truncate">{baht(net)}</div>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={onCancel} className="px-4 min-h-[48px] rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
+          <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-6 min-h-[48px] rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
         </div>
       </div>
 
@@ -431,6 +440,9 @@ const Cell = ({ label, children }: { label: string; children: React.ReactNode })
 function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "" }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
+  const qtyRef = useRef<HTMLInputElement>(null);
+  // after a product is picked, jump straight to จำนวน so the next entry needs no extra tap
+  const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); setTimeout(() => qtyRef.current?.focus(), 60); };
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
   // clamp per-item discount to the line subtotal so the card never shows a
@@ -453,12 +465,13 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
         <div className="flex-1 relative min-w-0">
           <input className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
           {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
-            {res.map((p) => <button key={p.id} onMouseDown={() => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
+            {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
         </div>
-        {/* size stays hidden until there's a name — keeps the search field big &
-            easy to tap; it appears (auto-filled from the pick, or editable) after. */}
-        {it.item.trim() !== "" && (
+        {/* size stays hidden WHILE searching (dropdown open) so the search field stays
+            full-width & easy to read; it appears only after a product is chosen or the
+            name is committed (dropdown closed on pick/blur) — editable for manual items. */}
+        {it.item.trim() !== "" && !acOpen && (
           <input className="w-[76px] shrink-0 border border-line rounded-lg px-1.5 py-2 text-sm text-center text-ink focus:outline-none focus:border-brand" value={it.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" />
         )}
         <button onClick={onRemove} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
@@ -468,7 +481,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
         <Cell label="จำนวน">
           <div className="flex items-stretch rounded-lg border border-line overflow-hidden min-h-[44px]">
             <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-10 flex items-center justify-center text-muted hover:bg-canvas active:bg-line" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input {...numAttrs("qty")} className="w-full min-w-0 text-center text-sm tabular-nums outline-none" />
+            <input {...numAttrs("qty")} ref={qtyRef} className="w-full min-w-0 text-center text-sm tabular-nums outline-none" />
             <button onClick={() => onChange({ qty: q + 1 })} className="w-10 flex items-center justify-center text-muted hover:bg-canvas active:bg-line" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
         </Cell>
