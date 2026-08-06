@@ -267,6 +267,17 @@ export function pendingSubmissions() {
     order by s.created_by, s.entry_date, s.created_at`);
 }
 
+/** Recently approved submissions (last 7 days) so an admin can undo a wrong approval. */
+export function recentlyApprovedSubmissions() {
+  return q<SubmissionRow>(`
+    select ${SUB_COLS}
+    from submissions s
+    join users u on u.id = s.created_by
+    left join users r on r.id = s.reviewed_by
+    where s.status = 'approved' and s.reviewed_at >= now() - interval '7 days'
+    order by s.entry_date desc, s.created_at`);
+}
+
 /** Count of pending items — drives the sidebar badge. */
 export function pendingCount() {
   return q<{ n: number }>(`select count(*)::int n from submissions where status='pending'`).then((r) => r[0].n);

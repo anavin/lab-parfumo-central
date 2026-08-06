@@ -314,6 +314,32 @@ export async function approveMany(ids: number[]) {
   return ok;
 }
 
+// Undo an approval: pull the copied live row back out and return the
+// submission(s) to 'pending' so the bill re-enters the review queue. Used when
+// an admin approved a bill by mistake. Reviewer-only.
+export async function unapproveMany(ids: number[]) {
+  const admin = await requirePermission("review");
+  let ok = 0;
+  const failed: number[] = [];
+  for (const id of ids) {
+    try {
+      const [s] = await q<{ kind: string; status: string }>(`select kind, status from submissions where id = $1`, [id]);
+      if (!s || s.status !== "approved") continue;   // only approved rows can be undone
+      // remove the live sale/customer row this approval created (restores stock & dashboard)
+      if (s.kind === "sale") await q(`delete from sales where submission_id = $1`, [id]);
+      else await q(`delete from daily_customers where submission_id = $1`, [id]);
+      const res = await q<{ id: number }>(
+        `update submissions set status='pending', reviewed_by=null, reviewed_at=null, approved_id=null, review_note=null, updated_at=now()
+         where id=$1 and status='approved' returning id`, [id]);
+      if (res.length) ok++;
+    } catch (e) { console.error("[unapproveMany] failed", id, e); failed.push(id); }
+  }
+  await logAudit("update", "submission", null, `ยกเลิกการอนุมัติ ${ok} รายการ`);
+  revalidatePath("/review"); revalidatePath("/my"); revalidatePath("/sales"); revalidatePath("/");
+  if (failed.length) throw new Error(`ยกเลิกสำเร็จ ${ok} รายการ · ล้มเหลว ${failed.length} รายการ`);
+  return ok;
+}
+
 // Reject a whole bill (all its rows) at once.
 export async function rejectMany(ids: number[], note?: string) {
   const admin = await requirePermission("review");

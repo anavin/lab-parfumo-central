@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, CheckCheck, Clock, Pencil, CalendarDays } from "lucide-react";
-import { approveMany, rejectMany, updateSubmissionByAdmin } from "@/lib/actions/submissions";
+import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck } from "lucide-react";
+import { approveMany, rejectMany, unapproveMany, updateSubmissionByAdmin } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS } from "@/lib/payments";
@@ -23,14 +23,8 @@ const fmtThaiDay = (d: string) =>
 type Bill = { key: string; ref: string; author: string; rows: SubmissionRow[] };
 type Day = { date: string; bills: Bill[] };
 
-export function ReviewQueue({ rows, attachments = {} }: { rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [busy, setBusy] = useState<string | null>(null);      // bill key being processed
-  const [editId, setEditId] = useState<number | null>(null);
-  const refresh = () => router.refresh();
-
-  // group pending rows by DAY, then by BILL (shared receipt/ref), preserving order
+// group rows by DAY, then by BILL (shared receipt/ref), preserving order
+function groupDays(rows: SubmissionRow[]): Day[] {
   const days: Day[] = [];
   for (const r of rows) {
     let day = days.find((d) => d.date === r.entry_date);
@@ -41,6 +35,21 @@ export function ReviewQueue({ rows, attachments = {} }: { rows: SubmissionRow[];
     bill.rows.push(r);
   }
   days.sort((a, b) => (a.date < b.date ? 1 : -1));   // newest day first
+  return days;
+}
+
+export function ReviewQueue({ rows, approved = [], attachments = {} }:
+  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]> }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [busy, setBusy] = useState<string | null>(null);      // bill key being processed
+  const [editId, setEditId] = useState<number | null>(null);
+  const [showApproved, setShowApproved] = useState(false);
+  const refresh = () => router.refresh();
+
+  const days = groupDays(rows);
+  const approvedDays = groupDays(approved);
+  const approvedBillCount = approvedDays.reduce((s, d) => s + d.bills.length, 0);
 
   const approveBill = (bill: Bill) => start(async () => {
     setBusy(bill.key);
@@ -61,13 +70,21 @@ export function ReviewQueue({ rows, attachments = {} }: { rows: SubmissionRow[];
     if (!confirm(`อนุมัติทั้งวัน ${fmtThaiDay(day.date)} · ${day.bills.length} บิล?`)) return;
     start(async () => { try { await approveMany(ids); refresh(); } catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } });
   };
-
-  if (rows.length === 0) {
-    return <div className="card px-4 py-16 text-center text-muted"><CheckCheck className="w-8 h-8 mx-auto mb-2 text-green-500" /><div className="text-sm">ไม่มีรายการรอตรวจสอบ</div></div>;
-  }
+  const unapproveBill = (bill: Bill) => {
+    if (!confirm("ยกเลิกการอนุมัติบิลนี้?\nยอดจะถูกดึงออกจากระบบการขาย และบิลจะกลับไปสถานะ ‘รอตรวจ’")) return;
+    start(async () => {
+      setBusy(bill.key);
+      try { await unapproveMany(bill.rows.map((r) => r.id)); refresh(); }
+      catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } finally { setBusy(null); }
+    });
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {rows.length === 0 ? (
+        <div className="card px-4 py-16 text-center text-muted"><CheckCheck className="w-8 h-8 mx-auto mb-2 text-green-500" /><div className="text-sm">ไม่มีรายการรอตรวจสอบ</div></div>
+      ) : (
+      <div className="space-y-6">
       {days.map((day) => {
         const dayTotal = day.bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.total ?? 0), 0), 0);
         return (
@@ -165,6 +182,91 @@ export function ReviewQueue({ rows, attachments = {} }: { rows: SubmissionRow[];
           </div>
         );
       })}
+      </div>
+      )}
+
+      {/* -------- approved bills (undo an approval) -------- */}
+      {approved.length > 0 && (
+        <div>
+          <button onClick={() => setShowApproved((v) => !v)}
+            className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
+            <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+            <span className="text-sm font-semibold">อนุมัติแล้ว (ยกเลิกได้)</span>
+            <span className="text-xs text-muted">· {approvedBillCount} บิล · 7 วันล่าสุด</span>
+            <ChevronDown className={`w-4 h-4 text-muted ml-auto transition-transform ${showApproved ? "rotate-180" : ""}`} />
+          </button>
+
+          {showApproved && (
+            <div className="space-y-6 mt-3">
+              {approvedDays.map((day) => {
+                const dayTotal = day.bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.total ?? 0), 0), 0);
+                return (
+                  <div key={day.date}>
+                    <div className="flex items-center gap-2 mb-2.5 text-ink min-w-0">
+                      <CalendarDays className="w-4 h-4 text-brand-dark shrink-0" />
+                      <span className="text-sm font-semibold">{fmtThaiDay(day.date)}</span>
+                      <span className="text-xs text-muted whitespace-nowrap">· {day.bills.length} บิล · {baht(dayTotal)}</span>
+                    </div>
+                    <div className="space-y-3">
+                      {day.bills.map((bill, i) => {
+                        const first = bill.rows[0];
+                        const total = bill.rows.reduce((s, r) => s + (r.total ?? 0), 0);
+                        const photos = attachments[bill.ref] || [];
+                        const isSale = first.kind === "sale";
+                        return (
+                          <div key={bill.key} className="rounded-xl border border-green-200 bg-white shadow-sm overflow-hidden">
+                            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-green-50/70 border-b border-green-100">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0">#{day.bills.length - i}</span>
+                                <div className="min-w-0">
+                                  <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
+                                  <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
+                                    {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
+                                    {first.payment_channel && <span>· {first.payment_channel}</span>}
+                                    {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
+                                    {isSale && <span>· {bill.rows.length} รายการ</span>}
+                                    {first.reviewer && <span>· โดย {first.reviewer}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-sm font-bold text-ink tabular-nums shrink-0">{baht(total)}</span>
+                            </div>
+                            <div className="px-3.5 py-2.5">
+                              <ul className="space-y-1.5">
+                                {bill.rows.map((r, ri) => (
+                                  <li key={r.id} className="flex items-center gap-2 text-sm">
+                                    <span className="w-4 h-4 shrink-0 rounded-full bg-canvas text-muted text-[10px] font-semibold tabular-nums flex items-center justify-center">{ri + 1}</span>
+                                    {isSale ? (
+                                      <>
+                                        <span className="text-muted text-xs w-8 shrink-0 text-right">{num(r.qty ?? 0)}×</span>
+                                        <span className="flex-1 min-w-0 truncate text-ink">{r.item} <span className="text-muted text-xs">{r.size}</span></span>
+                                        <span className="text-ink tabular-nums whitespace-nowrap">{baht(r.total ?? 0)}</span>
+                                      </>
+                                    ) : (
+                                      <span className="flex-1 text-ink">ลูกค้า {num(r.customers ?? 0)} ราย · ไทย {num(r.thai ?? 0)} · ต่างชาติ {num(r.foreign_cnt ?? 0)}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                              {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
+                              <div className="flex justify-end mt-3 pt-2.5 border-t border-line">
+                                <button onClick={() => unapproveBill(bill)} disabled={pending}
+                                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-red-300 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-50">
+                                  {busy === bill.key ? <Clock className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} ยกเลิกการอนุมัติ
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
