@@ -150,21 +150,19 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {} }:
         })} />}
 
       {/* list */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-line flex items-center justify-between">
-          <span className="text-sm font-semibold text-ink">บิลวันนี้</span>
-          <span className="text-xs text-muted">{activeBillCount} บิล</span>
-        </div>
-        {bills.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
-        ) : (
-          <div className="divide-y divide-line">
-            {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending}
-              onEdit={editRow} onDelete={setDel} photos={attachments[b.rows[0].receipt_no || ""] || []}
-              onAddPhotos={addPhotos} onDeletePhoto={delPhoto} />)}
-          </div>
-        )}
+      <div className="flex items-center justify-between px-1 mb-2">
+        <span className="text-sm font-semibold text-ink">บิลวันนี้</span>
+        <span className="text-xs text-muted">{activeBillCount} บิล</span>
       </div>
+      {bills.length === 0 ? (
+        <div className="card px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
+      ) : (
+        <div className="space-y-3">
+          {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending}
+            onEdit={editRow} onDelete={setDel} photos={attachments[b.rows[0].receipt_no || ""] || []}
+            onAddPhotos={addPhotos} onDeletePhoto={delPhoto} />)}
+        </div>
+      )}
 
       <ConfirmDialog open={!!del} title="ลบรายการนี้?" danger confirmLabel="ลบ" pending={pending}
         message={del ? `${del.item}${del.size ? ` ${del.size}` : ""}` : ""}
@@ -427,19 +425,24 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
   const ref = first.receipt_no || "";
   const canEditPhotos = status === "pending" && !!ref;
   return (
-    <div className="px-4 py-3">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="text-xs text-muted flex flex-wrap items-center gap-x-2">
-          <span className="font-semibold text-ink/70">บิล #{index}</span>
-          {first.sale_time && <span>· {first.sale_time.slice(0, 5)}</span>}
-          {first.payment_channel && <span>· {first.payment_channel}</span>}
-          {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
+    <div className="rounded-xl border border-line bg-white shadow-sm overflow-hidden">
+      {/* header bar — makes each bill clearly its own card */}
+      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0">#{index}</span>
+          <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 min-w-0">
+            {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
+            {first.payment_channel && <span>· {first.payment_channel}</span>}
+            {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
+            <span>· {rows.length} รายการ</span>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <StatusPill status={status} />
-          <span className="text-sm font-bold text-ink">{baht(total)}</span>
+          <span className="text-sm font-bold text-ink tabular-nums">{baht(total)}</span>
         </div>
       </div>
+      <div className="px-3.5 py-2.5">
       <ul className="space-y-1">
         {rows.map((r) => (
           <li key={r.id} className="flex items-center gap-2 text-sm">
@@ -467,6 +470,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
         </div>
       )}
       {note && <div className="text-xs text-red-600 mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
+      </div>
     </div>
   );
 }
