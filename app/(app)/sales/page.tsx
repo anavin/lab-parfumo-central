@@ -33,7 +33,7 @@ export default async function SalesPage() {
         <Stat label="เฉลี่ย/เดือน" value={baht(monthly.length ? tot.revenue / monthly.length : 0)} />
       </div>
 
-      <div className="mb-6"><DailyReport /></div>
+      <div className="mb-6"><DailyReport revision={`${tot.revenue}|${recent.length}`} /></div>
 
       <div className="grid lg:grid-cols-5 gap-4 items-start">
         <Card title="สรุปรายเดือน" className="lg:col-span-2">

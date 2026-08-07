@@ -18,7 +18,7 @@ export default async function ReviewPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader icon={ClipboardCheck} title="ตรวจสอบยอดขาย"
         subtitle={rows.length ? `${rows.length} รายการรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
-      <div className="mb-6"><DailyReport /></div>
+      <div className="mb-6"><DailyReport revision={`${rows.length}|${approved.length}`} /></div>
       <ReviewQueue rows={rows} approved={approved} attachments={attachments} payments={payments} />
     </div>
   );

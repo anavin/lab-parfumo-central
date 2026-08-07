@@ -9,7 +9,7 @@ const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 const ddmmyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y.slice(2)}`; };
 
-export function DailyReport({ defaultSource = "CTW" }: { defaultSource?: string }) {
+export function DailyReport({ defaultSource = "CTW", revision }: { defaultSource?: string; revision?: string | number }) {
   const [date, setDate] = useState(bkkToday());
   const source = defaultSource;   // single location (CTW) — no branch picker
   const [data, setData] = useState<ReportData | null>(null);
@@ -18,9 +18,11 @@ export function DailyReport({ defaultSource = "CTW" }: { defaultSource?: string 
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
 
+  // re-fetch on date change AND whenever `revision` changes (the page re-renders it
+  // after a bill is saved/approved via router.refresh, so the report stays live)
   useEffect(() => {
     start(async () => { try { setData(await getDailyReport(date, source)); } catch { setData(null); } });
-  }, [date, source]);
+  }, [date, source, revision]);
 
   const openingN = Number(opening) || 0;
   const depositN = Number(deposit) || 0;
