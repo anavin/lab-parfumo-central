@@ -97,11 +97,38 @@ export function sizeMix(f: Filter = ALL) {
     from sales where ${SW} group by 1 order by qty desc`, [f.months, f.source]);
 }
 
-export function paymentMix(f: Filter = ALL) {
-  return q<{ channel: string; revenue: number; n: number }>(`
-    select coalesce(payment_channel,'ไม่ระบุ') channel,
+export async function paymentMix(f: Filter = ALL) {
+  // single-channel lines straight from sales (exclude the "จ่าย 2 ทาง" marker)
+  const lines = await q<{ channel: string; revenue: number; n: number }>(`
+    select coalesce(nullif(payment_channel,''),'ไม่ระบุ') channel,
            sum(total)::float revenue, count(*)::int n
-    from sales where ${SW} group by 1 order by revenue desc`, [f.months, f.source]);
+    from sales where ${SW} and coalesce(payment_channel,'') <> $3
+    group by 1`, [f.months, f.source, SPLIT2]);
+
+  // per-channel amounts of split ("จ่าย 2 ทาง") bills, pulled from bill_payments for
+  // the split bills in the filtered sales set — so the breakdown reflects the real
+  // cash/card split instead of one lumped "จ่าย 2 ทาง" bucket.
+  let split: { channel: string; revenue: number; n: number }[] = [];
+  try {
+    split = await q<{ channel: string; revenue: number; n: number }>(`
+      select bp.channel, sum(bp.amount)::float revenue, count(*)::int n
+      from bill_payments bp
+      where bp.bill_ref in (
+        select distinct receipt_no from sales
+        where ${SW} and payment_channel = $3 and coalesce(receipt_no,'') <> '')
+      group by 1`, [f.months, f.source, SPLIT2]);
+  } catch (e) { if (!missingTable(e)) throw e; }
+
+  const map = new Map<string, { revenue: number; n: number }>();
+  for (const r of [...lines, ...split]) {
+    const cur = map.get(r.channel) ?? { revenue: 0, n: 0 };
+    cur.revenue += r.revenue ?? 0; cur.n += r.n ?? 0;
+    map.set(r.channel, cur);
+  }
+  return [...map.entries()]
+    .map(([channel, v]) => ({ channel, revenue: v.revenue, n: v.n }))
+    .filter((c) => Math.round(c.revenue) !== 0)
+    .sort((a, b) => b.revenue - a.revenue);
 }
 
 export function nationMix(f: Filter = ALL) {
