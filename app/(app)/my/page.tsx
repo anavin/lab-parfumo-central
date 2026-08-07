@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs } from "@/lib/queries";
@@ -8,6 +9,16 @@ import { MyWorkspace } from "@/components/MyWorkspace";
 import { PAYMENTS } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
+
+// Salesperson page is mobile-only and used for fast data entry at the counter.
+// Lock zoom so pinch/double-tap can't shift the layout and — most importantly —
+// iOS doesn't auto-zoom when tapping the 14px number inputs. Only this route.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 const CH_LABEL: Record<string, string> = Object.fromEntries(PAYMENTS.map((p) => [p.v, p.label.replace(/\s*\(.*\)$/, "")]));
 const chLabel = (c: string) => CH_LABEL[c] ?? c;
