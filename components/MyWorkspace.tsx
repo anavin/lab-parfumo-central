@@ -24,6 +24,13 @@ const payOptions = (cur?: string) => {
   if (cur && !PAYMENTS.some((p) => p.v === cur)) base.unshift({ value: cur, label: cur });
   return base;
 };
+// quantity picker — 1–20 covers virtually every perfume line; a value outside that
+// range (e.g. legacy data) is prepended so it stays selectable.
+const QTY_OPTS = Array.from({ length: 20 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
+const qtyOptions = (cur?: any) => {
+  const c = Number(cur) || 0;
+  return c > 20 ? [{ value: String(c), label: String(c) }, ...QTY_OPTS] : QTY_OPTS;
+};
 const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
 const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
 // K Shop channels share the shop's static QR (shown for the customer to scan)
@@ -441,18 +448,8 @@ const Cell = ({ label, children }: { label: string; children: React.ReactNode })
 function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "" }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
-  const qtyRef = useRef<HTMLInputElement>(null);
-  // after a product is picked, jump straight to จำนวน so the next entry needs no extra tap.
-  // programmatic focus alone doesn't reliably scroll on mobile (and the keyboard/sticky
-  // bar can cover the field), so scroll it to the middle of the viewport ourselves.
-  const pick = (p: any) => {
-    onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price });
-    setAcOpen(false);
-    setTimeout(() => {
-      qtyRef.current?.focus({ preventScroll: true });
-      qtyRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, 80);
-  };
+  // qty is a dropdown now (no keyboard) — just fill the product and close the list
+  const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); };
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
   // clamp per-item discount to the line subtotal so the card never shows a
@@ -461,7 +458,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const line = q * up - dc;
   const fld = "w-full border border-line rounded-lg px-1.5 py-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
   // numeric field: select-all on focus + strip leading zeros so a leading 0 disappears when typing
-  const numAttrs = (k: "qty" | "unit_price" | "discount") => ({
+  const numAttrs = (k: "unit_price" | "discount") => ({
     value: it[k] as any,
     inputMode: "numeric" as const,
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
@@ -489,11 +486,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       {/* qty · price · discount — wider now that size moved up */}
       <div className="grid grid-cols-3 gap-2.5 pl-7">
         <Cell label="จำนวน">
-          <div className="flex items-stretch rounded-lg border border-line overflow-hidden min-h-[44px]">
-            <button onClick={() => onChange({ qty: Math.max(0, q - 1) })} className="w-10 flex items-center justify-center text-muted hover:bg-canvas active:bg-line" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input {...numAttrs("qty")} ref={qtyRef} className="w-full min-w-0 text-center text-sm tabular-nums outline-none" />
-            <button onClick={() => onChange({ qty: q + 1 })} className="w-10 flex items-center justify-center text-muted hover:bg-canvas active:bg-line" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
-          </div>
+          <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty)} className="py-2.5 justify-center min-h-[44px]" />
         </Cell>
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
         <Cell label="ส่วนลด"><input {...numAttrs("discount")} className={fld} /></Cell>
@@ -684,7 +677,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         </div>}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-        <Field label="จำนวน"><input {...numFld("qty")} className={inp} /></Field>
+        <Field label="จำนวน"><Select value={String(Number(state.qty) || 1)} onValueChange={(v) => s("qty", Number(v))} options={qtyOptions(state.qty)} className="py-2.5" /></Field>
         <Field label="ราคา/หน่วย"><input {...numFld("unit_price")} className={inp} /></Field>
         <Field label="ส่วนลด"><input {...numFld("discount")} className={inp} /></Field>
         <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
