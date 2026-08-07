@@ -143,15 +143,6 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
               <Kpi label="เฉลี่ย/บิล" value={`฿${nf(aov)}`} />
             </div>
 
-            {/* price breakdown: full − discount = net */}
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border border-neutral-400 rounded-lg px-4 py-2.5 mb-6 text-[13px]">
-              <span className="flex items-baseline gap-1.5"><span className="text-neutral-500">ราคาเต็ม</span><span className="font-semibold tabular-nums">฿{nf(price.gross)}</span></span>
-              <span className="text-neutral-400">−</span>
-              <span className="flex items-baseline gap-1.5"><span className="text-neutral-500">ส่วนลด</span><span className="font-semibold tabular-nums">฿{nf(price.disc)}</span></span>
-              <span className="text-neutral-400">=</span>
-              <span className="flex items-baseline gap-1.5 ml-auto"><span className="text-neutral-500">ราคาขายสุทธิ</span><span className="font-bold text-[15px] tabular-nums">฿{nf(data!.total)}</span></span>
-            </div>
-
             {/* breakdowns — payment + nationality side by side */}
             <div className="grid grid-cols-2 gap-x-10 mb-6">
               <div>
@@ -235,8 +226,16 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-black">
-                      <td colSpan={5} className="py-2 font-bold">รวม {bills.length} บิล</td>
-                      <td className="py-2 text-right font-bold text-[13px] tabular-nums">{nf(data!.total)}</td>
+                      <td colSpan={2} className="py-2 font-bold align-baseline">รวม {bills.length} บิล</td>
+                      <td className="py-2 align-baseline">
+                        <div className="flex items-baseline gap-2 text-[11px] font-semibold">
+                          <span className="flex-1" />
+                          <span className="w-24 text-right tabular-nums">เต็ม ฿{nf(price.gross)}</span>
+                          <span className="w-20 text-right tabular-nums">ลด ฿{nf(price.disc)}</span>
+                        </div>
+                      </td>
+                      <td colSpan={2} className="align-baseline" />
+                      <td className="py-2 text-right font-bold text-[13px] tabular-nums align-baseline">{nf(data!.total)}</td>
                     </tr>
                   </tfoot>
                 </table>
