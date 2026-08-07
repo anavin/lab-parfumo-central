@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Printer, FileText } from "lucide-react";
 import { getDailyReport, getDailyBills } from "@/lib/actions/report";
 import { PAYMENTS } from "@/lib/payments";
@@ -33,7 +33,19 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
   const [date, setDate] = useState(bkkToday());
   const [data, setData] = useState<ReportData | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [showDetail, setShowDetail] = useState(true);   // toggle the per-bill detail table
   const [pending, start] = useTransition();
+
+  // per-salesperson roll-up for the summary block
+  const byPerson = useMemo(() => {
+    const m = new Map<string, { bills: number; total: number }>();
+    for (const b of bills) {
+      const cur = m.get(b.author) ?? { bills: 0, total: 0 };
+      cur.bills += 1; cur.total += b.total;
+      m.set(b.author, cur);
+    }
+    return [...m.entries()].map(([author, v]) => ({ author, ...v })).sort((a, b) => b.total - a.total);
+  }, [bills]);
 
   useEffect(() => {
     start(async () => {
@@ -55,10 +67,15 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
           <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
           <div>
             <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน (สำหรับปริ้น)</h3>
-            <p className="text-xs text-muted">เลือกวันที่แล้วกดปริ้น · มีรายละเอียดแต่ละบิล</p>
+            <p className="text-xs text-muted">เลือกวันที่แล้วกดปริ้น · สรุปแยกตามพนักงาน</p>
           </div>
         </div>
-        <label className="ml-auto flex items-center gap-2 text-sm">
+        <label className="ml-auto flex items-center gap-2 text-sm select-none cursor-pointer">
+          <input type="checkbox" checked={showDetail} onChange={(e) => setShowDetail(e.target.checked)}
+            className="w-4 h-4 accent-brand" />
+          <span className="text-ink">แสดงรายละเอียดแต่ละบิล</span>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
           <span className="text-muted">วันที่</span>
           <input type="date" value={date} max={bkkToday()} onChange={(e) => setDate(e.target.value)}
             className="border border-line rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
@@ -92,50 +109,78 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
               <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>โอน / เครดิต</span><span className="font-medium tabular-nums">{nf(data!.nonCash)} บาท</span></div>
               {data!.otherCount > 0 && <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>อื่นๆ ({data!.otherCount})</span><span className="font-medium tabular-nums">{nf(data!.otherAmt)} บาท</span></div>}
             </div>
-            <div className="flex justify-between items-baseline border-y-2 border-black py-2 mb-6">
+            <div className="flex justify-between items-baseline border-y-2 border-black py-2 mb-5">
               <span className="font-bold text-[15px]">รวมเป็นเงินทั้งสิ้น</span>
               <span className="font-bold text-xl tabular-nums">{nf(data!.total)} บาท</span>
             </div>
 
-            {/* per-bill detail */}
-            <div className="text-sm font-bold mb-1.5">รายละเอียดแต่ละบิล</div>
-            <table className="w-full text-[12px] border-collapse mb-6">
-              <thead>
-                <tr className="border-y-2 border-black text-left">
-                  <th className="py-1.5 pr-2 w-7 font-semibold">#</th>
-                  <th className="py-1.5 pr-2 w-12 font-semibold">เวลา</th>
-                  <th className="py-1.5 pr-2 font-semibold">พนักงาน / รายการ</th>
-                  <th className="py-1.5 pr-2 w-24 font-semibold">ชำระ</th>
-                  <th className="py-1.5 pr-2 w-14 font-semibold">สัญชาติ</th>
-                  <th className="py-1.5 text-right w-20 font-semibold">ยอด (บาท)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.map((b) => (
-                  <tr key={b.key} className="border-b border-neutral-300 align-top">
-                    <td className="py-2 pr-2 font-semibold tabular-nums">{b.no}</td>
-                    <td className="py-2 pr-2 tabular-nums">{b.time || "-"}</td>
-                    <td className="py-2 pr-2">
-                      <div className="font-medium">{b.author}</div>
-                      <ul className="text-[11px] text-neutral-600 mt-0.5 space-y-0.5">
-                        {b.rows.map((r) => (
-                          <li key={r.id}>{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""} — ฿{nf(r.total ?? 0)}</li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className="py-2 pr-2">{payLabel(b.pay)}</td>
-                    <td className="py-2 pr-2">{natLabel(b.nation)}</td>
-                    <td className="py-2 text-right font-semibold tabular-nums">{nf(b.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-black">
-                  <td colSpan={5} className="py-2 font-bold">รวม {bills.length} บิล</td>
-                  <td className="py-2 text-right font-bold text-[13px] tabular-nums">{nf(data!.total)}</td>
-                </tr>
-              </tfoot>
-            </table>
+            {/* per-salesperson summary */}
+            {byPerson.length > 0 && (
+              <div className="mb-6">
+                <div className="text-sm font-bold mb-1.5">สรุปตามพนักงานขาย</div>
+                <table className="w-full text-[13px] border-collapse">
+                  <thead>
+                    <tr className="border-y-2 border-black text-left">
+                      <th className="py-1.5 pr-2 font-semibold">พนักงานขาย</th>
+                      <th className="py-1.5 pr-2 w-24 text-right font-semibold">จำนวนบิล</th>
+                      <th className="py-1.5 w-28 text-right font-semibold">ยอด (บาท)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byPerson.map((p) => (
+                      <tr key={p.author} className="border-b border-neutral-300">
+                        <td className="py-1.5 pr-2 font-medium">{p.author}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{p.bills}</td>
+                        <td className="py-1.5 text-right font-semibold tabular-nums">{nf(p.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* per-bill detail (toggle) */}
+            {showDetail && (
+              <>
+                <div className="text-sm font-bold mb-1.5">รายละเอียดแต่ละบิล</div>
+                <table className="w-full text-[12px] border-collapse mb-6">
+                  <thead>
+                    <tr className="border-y-2 border-black text-left">
+                      <th className="py-1.5 pr-2 w-7 font-semibold">#</th>
+                      <th className="py-1.5 pr-2 w-12 font-semibold">เวลา</th>
+                      <th className="py-1.5 pr-2 font-semibold">รายการ</th>
+                      <th className="py-1.5 pr-2 w-24 font-semibold">ชำระ</th>
+                      <th className="py-1.5 pr-2 w-14 font-semibold">สัญชาติ</th>
+                      <th className="py-1.5 text-right w-20 font-semibold">ยอด (บาท)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bills.map((b) => (
+                      <tr key={b.key} className="border-b border-neutral-300 align-top">
+                        <td className="py-2 pr-2 font-semibold tabular-nums">{b.no}</td>
+                        <td className="py-2 pr-2 tabular-nums">{b.time || "-"}</td>
+                        <td className="py-2 pr-2">
+                          <ul className="text-[11px] text-neutral-700 space-y-0.5">
+                            {b.rows.map((r) => (
+                              <li key={r.id}>{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""} — ฿{nf(r.total ?? 0)}</li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td className="py-2 pr-2">{payLabel(b.pay)}</td>
+                        <td className="py-2 pr-2">{natLabel(b.nation)}</td>
+                        <td className="py-2 text-right font-semibold tabular-nums">{nf(b.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-black">
+                      <td colSpan={5} className="py-2 font-bold">รวม {bills.length} บิล</td>
+                      <td className="py-2 text-right font-bold text-[13px] tabular-nums">{nf(data!.total)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </>
+            )}
 
             {/* signatures */}
             <div className="grid grid-cols-2 gap-10 pt-10 text-[13px]">
