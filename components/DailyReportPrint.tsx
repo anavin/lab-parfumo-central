@@ -72,6 +72,17 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
   const sellers = byPerson.map((p) => p.author);   // usually one salesperson per day
   const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 
+  // Print / Save-as-PDF with a tidy filename, e.g. "CTW-Report-2026-08-07" —
+  // browsers use document.title as the default PDF name, so set it just for the print.
+  const printReport = () => {
+    const prev = document.title;
+    document.title = `${defaultSource}-Report-${date}`;
+    const restore = () => { document.title = prev; window.removeEventListener("afterprint", restore); };
+    window.addEventListener("afterprint", restore);
+    window.print();
+    setTimeout(restore, 1000);   // fallback if afterprint doesn't fire
+  };
+
   const Kpi = ({ label, value, primary = false }: { label: string; value: string; primary?: boolean }) => (
     <div className={`border rounded-lg px-3 py-2.5 ${primary ? "border-black border-2" : "border-neutral-400"}`}>
       <div className="text-[10px] uppercase tracking-wide text-neutral-500">{label}</div>
@@ -111,9 +122,9 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
           <input type="date" value={date} max={bkkToday()} onChange={(e) => setDate(e.target.value)}
             className="border border-line rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
         </label>
-        <button onClick={() => window.print()} disabled={!ready}
+        <button onClick={printReport} disabled={!ready}
           className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
-          <Printer className="w-4 h-4" /> ปริ้นรายงาน
+          <Printer className="w-4 h-4" /> ปริ้น / บันทึก PDF
         </button>
       </div>
 
