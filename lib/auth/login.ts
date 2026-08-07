@@ -14,7 +14,7 @@ async function logAttempt(username: string, success: boolean) {
 async function failedAttempts(username: string): Promise<number> {
   const [r] = await q<{ n: number }>(
     `select count(*)::int n from login_attempts
-     where username = $1 and success = false
+     where lower(username) = lower($1) and success = false
      and created_at > now() - ($2 || ' minutes')::interval`,
     [username, String(LOCKOUT_MIN)]);
   return r?.n ?? 0;
@@ -29,7 +29,7 @@ export async function loginWithPassword(username: string, password: string): Pro
   }
 
   const [user] = await q<User & { password_hash: string }>(
-    `select * from users where username = $1 and is_active = true`, [username]);
+    `select * from users where lower(username) = lower($1) and is_active = true`, [username]);
 
   const bad = async () => {
     await logAttempt(username, false);
