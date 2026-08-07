@@ -126,6 +126,23 @@ export async function setUserActive(id: number, active: boolean) {
   revalidatePath("/users");
 }
 
+export async function updateUserProfile(id: number, input: { full_name: string; username: string }) {
+  const me = await requirePermission("users");
+  const [u] = await q<{ username: string; role: string }>(`select username, role from users where id = $1`, [id]);
+  if (!u) throw new Error("ไม่พบผู้ใช้");
+  if (u.role === "admin" && me.role !== "admin") throw new Error(ADMIN_ONLY);
+  const full_name = input.full_name.trim();
+  const username = input.username.trim().toLowerCase();
+  if (!full_name) throw new Error("กรุณากรอกชื่อ-นามสกุล");
+  if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw new Error("username ใช้ได้เฉพาะ a-z 0-9 . _ - (3-40 ตัว)");
+  const [dup] = await q<{ id: number }>(`select id from users where username = $1 and id <> $2`, [username, id]);
+  if (dup) throw new Error("username นี้มีอยู่แล้ว");
+  await q(`update users set full_name = $2, username = $3 where id = $1`, [id, full_name, username]);
+  const detail = username !== u.username ? `${full_name} · @${u.username} → @${username}` : full_name;
+  await logAudit("update", "user", username, detail);
+  revalidatePath("/users");
+}
+
 export async function resetPassword(id: number, password: string) {
   const me = await requirePermission("users");
   const [u] = await q<{ username: string; role: string }>(`select username, role from users where id = $1`, [id]);

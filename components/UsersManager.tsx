@@ -1,8 +1,8 @@
 "use client";
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, KeyRound, Power, ShieldCheck, Check, ChevronDown, RotateCcw } from "lucide-react";
-import { createUser, setUserActive, resetPassword, updateUserAccess } from "@/lib/actions/auth";
+import { UserPlus, KeyRound, Power, ShieldCheck, Check, ChevronDown, RotateCcw, Pencil } from "lucide-react";
+import { createUser, setUserActive, resetPassword, updateUserAccess, updateUserProfile } from "@/lib/actions/auth";
 import { Badge } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import {
@@ -32,6 +32,7 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
   const [f, setF] = useState({ username: "", full_name: "", role: "staff", password: "" });
   const [msg, setMsg] = useState("");
   const [editId, setEditId] = useState<number | null>(null);
+  const [profileId, setProfileId] = useState<number | null>(null);
   const s = (k: string, v: string) => setF((o) => ({ ...o, [k]: v }));
 
   const add = () => start(async () => {
@@ -101,7 +102,11 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                   <td className="px-3 py-3">{u.is_active ? <Badge tone="success">ใช้งาน</Badge> : <Badge tone="danger">ปิด</Badge>}</td>
                   <td className="px-3 py-3 text-muted text-xs hidden sm:table-cell">{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" }) : "-"}</td>
                   <td className="px-5 py-3 text-right whitespace-nowrap">
-                    <button onClick={() => setEditId((v) => (v === u.id ? null : u.id))} disabled={pending} title="จัดการสิทธิ์"
+                    <button onClick={() => { setProfileId((v) => (v === u.id ? null : u.id)); setEditId(null); }} disabled={pending} title="แก้ไขชื่อ / username"
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-line-soft ${profileId === u.id ? "text-brand-dark bg-brand/10" : "text-muted hover:text-ink"}`}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => { setEditId((v) => (v === u.id ? null : u.id)); setProfileId(null); }} disabled={pending} title="จัดการสิทธิ์"
                       className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-line-soft ${editId === u.id ? "text-brand-dark bg-brand/10" : "text-muted hover:text-ink"}`}>
                       <ShieldCheck className="w-3.5 h-3.5" /><ChevronDown className={`w-3 h-3 transition-transform ${editId === u.id ? "rotate-180" : ""}`} />
                     </button>
@@ -111,6 +116,13 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                     )}
                   </td>
                 </tr>
+                {profileId === u.id && (
+                  <tr className="border-b border-line-soft bg-canvas">
+                    <td colSpan={5} className="px-5 py-4">
+                      <ProfileEditor u={u} onClose={() => setProfileId(null)} onSaved={() => { setProfileId(null); router.refresh(); }} />
+                    </td>
+                  </tr>
+                )}
                 {editId === u.id && (
                   <tr className="border-b border-line-soft bg-canvas">
                     <td colSpan={5} className="px-5 py-4">
@@ -123,6 +135,36 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// edit a user's display name + login username
+function ProfileEditor({ u, onClose, onSaved }: { u: U; onClose: () => void; onSaved: () => void }) {
+  const [pending, start] = useTransition();
+  const [fullName, setFullName] = useState(u.full_name);
+  const [username, setUsername] = useState(u.username);
+  const [err, setErr] = useState("");
+  const save = () => start(async () => {
+    setErr("");
+    try { await updateUserProfile(u.id, { full_name: fullName, username }); onSaved(); }
+    catch (e: any) { setErr(e?.message ?? "บันทึกไม่สำเร็จ"); }
+  });
+  return (
+    <div className="max-w-lg">
+      <div className="text-[13px] font-medium text-ink mb-2">แก้ไขข้อมูลผู้ใช้</div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="block"><span className="text-xs text-muted mb-1 block">ชื่อ-นามสกุล</span>
+          <input className={inp} value={fullName} onChange={(e) => setFullName(e.target.value)} /></label>
+        <label className="block"><span className="text-xs text-muted mb-1 block">Username (ใช้ล็อกอิน)</span>
+          <input className={inp} value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} placeholder="a-z 0-9 . _ -" /></label>
+      </div>
+      <div className="text-[11px] text-muted-soft mt-1.5">เปลี่ยน username แล้ว ผู้ใช้ต้องล็อกอินด้วยชื่อใหม่ในครั้งถัดไป</div>
+      {err && <div className="text-xs text-danger mt-2">{err}</div>}
+      <div className="flex gap-2 justify-end mt-3">
+        <button onClick={onClose} className="px-3 py-1.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
+        <button onClick={save} disabled={pending} className="px-4 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึก</button>
+      </div>
     </div>
   );
 }
