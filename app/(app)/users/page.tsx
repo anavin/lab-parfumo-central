@@ -16,7 +16,7 @@ export default async function UsersPage() {
   const logins = await loginHistory(5);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1000px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader icon={Users} title="จัดการผู้ใช้ & สิทธิ์" subtitle={`${users.length} บัญชี · กำหนดบทบาทและสิทธิ์การเข้าถึงรายเมนู`} />
       <Card bodyClass="p-0">
         <UsersManager users={users} meId={me.id} />

@@ -27,7 +27,7 @@ export function TrashManager({ rows }: { rows: Row[] }) {
       </tr></thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.id} className="border-b border-line-soft last:border-0">
+          <tr key={r.id} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
             <td className="px-5 py-3 font-semibold text-ink">{r.po_number}</td>
             <td className="px-3 py-3 text-ink-soft">{r.branch_label}</td>
             <td className="px-3 py-3 text-right text-muted tabular-nums">{num(r.qty)} ({r.lines})</td>

@@ -4,8 +4,12 @@ import { AddSale, AddCustomerDay } from "@/components/EntryForms";
 import { ExportButton } from "@/components/ExportButton";
 import { Receipt } from "lucide-react";
 import { q } from "@/lib/db";
+import { PAYMENTS } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
+
+const CH_LABEL: Record<string, string> = Object.fromEntries(PAYMENTS.map((p) => [p.v, p.label.replace(/\s*\(.*\)$/, "")]));
+const chLabel = (c: string) => CH_LABEL[c] ?? c;
 
 export default async function SalesPage() {
   const monthly = await q<{ month: string; revenue: number; qty: number; receipts: number }>(`
@@ -21,7 +25,7 @@ export default async function SalesPage() {
     `select coalesce(sum(total),0)::float revenue, coalesce(sum(qty),0)::float qty from sales`);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader icon={Receipt} title="การขาย" subtitle="รายเดือน + รายการล่าสุด" action={<ExportButton kind="sales" />} />
       <div className="flex gap-3 flex-wrap"><AddSale /><AddCustomerDay /></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -37,7 +41,7 @@ export default async function SalesPage() {
             <thead><tr className="text-ink/40 text-xs text-left border-b"><th className="pb-2">เดือน</th><th className="pb-2 text-right">ใบเสร็จ</th><th className="pb-2 text-right">ชิ้น</th><th className="pb-2 text-right">รายได้</th></tr></thead>
             <tbody>
               {monthly.map((m) => (
-                <tr key={m.month} className="border-b last:border-0">
+                <tr key={m.month} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
                   <td className="py-2 font-medium">{m.month}</td>
                   <td className="py-2 text-right text-ink/60">{num(m.receipts)}</td>
                   <td className="py-2 text-right text-ink/60">{num(m.qty)}</td>
@@ -51,15 +55,17 @@ export default async function SalesPage() {
         <Card title="รายการขายล่าสุด (60)">
           <div className="max-h-[520px] overflow-auto">
             <table className="w-full text-sm">
-              <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายการ</th><th className="pb-2 text-right">จำนวน</th><th className="pb-2 text-right">ยอด</th></tr></thead>
+              <thead className="text-muted text-xs text-left sticky top-0 bg-surface"><tr className="border-b border-line-soft"><th className="pb-2">วันที่</th><th className="pb-2">รายการ</th><th className="pb-2">BA</th><th className="pb-2">ช่องทาง</th><th className="pb-2 text-right">จำนวน</th><th className="pb-2 text-right">ยอด</th></tr></thead>
               <tbody>
                 {recent.map((r, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-1.5 text-ink/50 whitespace-nowrap">{fmtDate(r.sale_date)}</td>
-                    <td className="py-1.5">{r.item} <span className="text-ink/35">{r.size}</span>
-                      {r.nation && <Badge tone={r.nation === "Foreign" ? "info" : "gray"}>{r.nation}</Badge>}
+                  <tr key={i} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
+                    <td className="py-1.5 text-muted whitespace-nowrap">{fmtDate(r.sale_date)}</td>
+                    <td className="py-1.5">{r.item} <span className="text-muted-soft">{r.size}</span>
+                      {r.nation && <Badge tone={r.nation === "Foreign" ? "info" : "gray"}>{r.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</Badge>}
                     </td>
-                    <td className="py-1.5 text-right text-ink/60">{num(r.qty)}</td>
+                    <td className="py-1.5 text-muted whitespace-nowrap">{r.ba || "-"}</td>
+                    <td className="py-1.5 text-muted whitespace-nowrap">{r.payment_channel ? chLabel(r.payment_channel) : "-"}</td>
+                    <td className="py-1.5 text-right text-muted">{num(r.qty)}</td>
                     <td className="py-1.5 text-right font-medium">{baht(r.total)}</td>
                   </tr>
                 ))}

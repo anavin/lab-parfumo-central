@@ -14,10 +14,10 @@ export default async function ShipmentsPage() {
     from shipment_items`);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader icon={Truck} title="ส่ง / คืนสินค้า" subtitle="ติดตามการส่งสินค้าระดับหน่วย (SKU)"
         action={<div className="flex gap-2"><LinkBtn href="/shipments/return" variant="ghost">↩ บันทึกคืน</LinkBtn><LinkBtn href="/shipments/new">+ บันทึกส่งสินค้า</LinkBtn></div>} />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
         <Stat label="หน่วยที่ส่ง" value={num(agg.units)} tone="brand" />
         <Stat label="จำนวน PO" value={num(agg.pos)} />
         <Stat label="คืนแล้ว" value={num(agg.returned)} tone="danger" />
@@ -31,7 +31,7 @@ export default async function ShipmentsPage() {
             </tr></thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.po_number} className="border-b last:border-0">
+                <tr key={r.po_number} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
                   <td className="py-1.5 font-semibold">{r.po_number}</td>
                   <td className="py-1.5 text-ink/50">{fmtDate(r.ship_date)}</td>
                   <td className="py-1.5 text-ink/60">{r.branch_label}</td>

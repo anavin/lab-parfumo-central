@@ -18,7 +18,7 @@ export default async function CashPage() {
     from cash_entries group by 1 order by total desc`);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1000px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" action={<ExportButton kind="cash" />} />
       <AddCash />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -32,7 +32,7 @@ export default async function CashPage() {
             <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายละเอียด</th><th className="pb-2">ประเภท</th><th className="pb-2 text-right">จำนวนเงิน</th></tr></thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={i} className="border-b last:border-0">
+                <tr key={i} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
                   <td className="py-1.5 text-ink/50 whitespace-nowrap">{fmtDate(r.cash_date)}</td>
                   <td className="py-1.5">{r.description}</td>
                   <td className="py-1.5 text-ink/50">{r.type}</td>

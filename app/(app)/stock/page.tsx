@@ -15,7 +15,7 @@ export default async function StockPage() {
   const canRequisition = !!user && can(user, "requisitions");
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader icon={Package} title="สต๊อกคงเหลือ" subtitle="คำนวณสดจาก ส่งไป − ขาย (อัปเดตอัตโนมัติเมื่อบันทึกส่ง/ขาย)" action={<ExportButton kind="stock" />} />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Stat label="คงเหลือรวม" value={num(s.remaining)} tone="success" />
@@ -27,8 +27,8 @@ export default async function StockPage() {
 
       {lowCount > 0 && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-amber-900">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-ink">
+            <AlertTriangle className="w-5 h-5 text-warn shrink-0" />
             มีสินค้าใกล้หมด/หมด <b>{lowCount}</b> รายการ — ควรเบิกเพิ่ม
           </div>
           {canRequisition && (
@@ -49,7 +49,7 @@ export default async function StockPage() {
             </tr></thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={i} className="border-b last:border-0">
+                <tr key={i} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
                   <td className="py-1.5 font-medium">{r.scent}</td>
                   <td className="py-1.5 text-ink/50">{r.size}</td>
                   <td className="py-1.5 text-right text-ink/60">{num(r.shipped)}</td>
