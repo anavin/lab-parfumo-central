@@ -24,9 +24,11 @@ export default async function SalesPage() {
     `select coalesce(sum(total),0)::float revenue, coalesce(sum(qty),0)::float qty from sales`);
 
   // monthly discount breakdown — gross (before discount) vs discount vs net
+  // ราคาเต็ม (ก่อนหักส่วนลด) = ยอดสุทธิ + ส่วนลด — same definition the dashboard uses, so it
+  // always reconciles (gross − discount = net) even for legacy rows where qty×unit_price drifts.
   const disc = await q<{ month: string; gross: number; discount: number; net: number }>(`
     select month,
-           coalesce(sum(qty*unit_price),0)::float gross,
+           (coalesce(sum(total),0) + coalesce(sum(discount),0))::float gross,
            coalesce(sum(discount),0)::float discount,
            coalesce(sum(total),0)::float net
     from sales where month is not null group by month order by min(sale_date) desc`);

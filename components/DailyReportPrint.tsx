@@ -64,12 +64,13 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
     return [...m.entries()].map(([author, v]) => ({ author, ...v })).sort((a, b) => b.total - a.total);
   }, [bills]);
   const totalQty = useMemo(() => bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.qty ?? 0), 0), 0), [bills]);
-  // price roll-up: full (before discount) − discount = net selling price
+  // price roll-up: full (before discount) = net + discount, so it always reconciles
+  // (full − discount = net) even for legacy rows where qty×unit_price drifts.
   const price = useMemo(() => {
     let gross = 0, disc = 0;
     for (const b of bills) for (const r of b.rows) {
-      gross += (r.qty ?? 0) * (r.unit_price ?? 0);
       disc += r.discount ?? 0;
+      gross += (r.total ?? 0) + (r.discount ?? 0);
     }
     return { gross, disc };
   }, [bills]);
@@ -231,7 +232,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
                         <td className="py-2 pr-2">
                           <ul className="text-[11px] text-neutral-700 space-y-0.5">
                             {b.rows.map((r) => {
-                              const g = (r.qty ?? 0) * (r.unit_price ?? 0);
+                              const g = (r.total ?? 0) + (r.discount ?? 0);   // full = net + discount
                               return (
                                 <li key={r.id} className="flex items-baseline gap-2">
                                   <span className="flex-1 min-w-0 truncate text-black">{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</span>
