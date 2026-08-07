@@ -55,8 +55,8 @@ export function PhotoPicker({ value, onChange, max = 6 }:
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={src} alt="" className="w-full h-full object-cover cursor-zoom-in" onClick={() => setView(src)} />
             <button type="button" onClick={() => remove(i)} aria-label="ลบรูป"
-              className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black">
-              <X className="w-3 h-3" />
+              className="absolute top-0.5 right-0.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black">
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         ))}
@@ -101,7 +101,7 @@ export function PhotoStrip({ photos, onDelete, size = 56 }:
           <img src={p.data} alt="หลักฐาน" className="w-full h-full object-cover cursor-zoom-in" onClick={() => setView(p.data)} />
           {onDelete && p.id != null && (
             <button type="button" onClick={() => onDelete(p.id!)} aria-label="ลบรูป"
-              className="absolute top-0 right-0 w-4 h-4 rounded-bl bg-black/60 text-white flex items-center justify-center hover:bg-red-600">
+              className="absolute top-0 right-0 w-4 h-4 rounded-bl bg-black/60 text-white flex items-center justify-center hover:bg-danger">
               <Trash2 className="w-2.5 h-2.5" />
             </button>
           )}
