@@ -78,7 +78,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
   const srcLabel = SRC_LABEL[defaultSource] ?? defaultSource;
   const aov = ready ? data!.total / data!.orders : 0;
   const sellers = byPerson.map((p) => p.author);   // usually one salesperson per day
-  const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 
   // Print / Save-as-PDF with a tidy filename, e.g. "CTW-Daily-Report-2026-08-07" —
   // browsers use document.title as the default PDF name, so set it just for the print.

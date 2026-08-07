@@ -22,7 +22,7 @@ function groupBills(rows: TRow[]): TBill[] {
   return bills;
 }
 
-const fmtWhen = (d: string) => new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtWhen = (d: string) => new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
 const fmtDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
 export function TrashedBills({ rows }: { rows: TRow[] }) {
