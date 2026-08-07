@@ -200,8 +200,11 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const [qrKey, setQrKey] = useState(0);   // bump to re-pop the K Shop QR (even on same-value pick)
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
+  const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
   const addItem = (patch: Partial<BillItem> = {}) => setState({ ...state, items: [...state.items, newItem(patch)] });
+  // manual add: append an empty row and mark it so its card scrolls up + focuses the search box
+  const addManual = () => { const it = newItem(); setFocusKey(it.key); setState({ ...state, items: [...state.items, it] }); };
   const removeItem = (key: number) => setState({ ...state, items: state.items.filter((it) => it.key !== key) });
   const clearMiss = (f: string) => setMissing((m) => m.filter((x) => x !== f));
 
@@ -287,14 +290,14 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
       {/* items */}
       <div className="space-y-2 mb-3">
-        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} />)}
+        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} />)}
         {state.items.length === 0 && <div className="text-center text-sm text-muted py-6 border border-dashed border-line rounded-xl">ยังไม่มีสินค้า — กด “สแกนเพิ่ม” หรือ “เพิ่มเอง”</div>}
       </div>
 
       {/* add item */}
       <div className="flex gap-2 mb-4">
         <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
-        <button onClick={() => addItem()} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
+        <button onClick={addManual} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
       </div>
 
       {/* nationality — big toggle */}
@@ -445,9 +448,17 @@ const Cell = ({ label, children }: { label: string; children: React.ReactNode })
   <div><span className="block text-[10px] text-muted text-center mb-0.5">{label}</span>{children}</div>
 );
 
-function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "" }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string }) {
+function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  // when this card was just added via "เพิ่มเอง", bring it into view and focus the
+  // search box so the user can start typing the next item immediately
+  useEffect(() => {
+    if (!autoFocus) return;
+    nameRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setTimeout(() => nameRef.current?.focus({ preventScroll: true }), 120);
+  }, [autoFocus]);
   // qty is a dropdown now (no keyboard) — just fill the product and close the list
   const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); };
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
@@ -470,7 +481,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       <div className="flex items-center gap-2 mb-2.5">
         <span className="w-5 text-center text-xs font-medium text-muted shrink-0">{index + 1}</span>
         <div className="flex-1 relative min-w-0">
-          <input className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
+          <input ref={nameRef} className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
           {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
             {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
