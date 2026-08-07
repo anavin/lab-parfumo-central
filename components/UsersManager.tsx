@@ -1,8 +1,8 @@
 "use client";
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, KeyRound, Power, ShieldCheck, Check, ChevronDown, RotateCcw, Pencil } from "lucide-react";
-import { createUser, setUserActive, resetPassword, updateUserAccess, updateUserProfile } from "@/lib/actions/auth";
+import { UserPlus, KeyRound, Power, ShieldCheck, Check, ChevronDown, RotateCcw, Pencil, Trash2 } from "lucide-react";
+import { createUser, setUserActive, resetPassword, updateUserAccess, updateUserProfile, deleteUser } from "@/lib/actions/auth";
 import { Badge } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import {
@@ -47,6 +47,13 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
     try { const r = await setUserActive(u.id, !u.is_active); if (r?.ok) router.refresh(); else alert(r?.error ?? "ทำไม่สำเร็จ"); }
     catch { alert("ทำไม่สำเร็จ ลองใหม่อีกครั้ง"); }
   });
+  const del = (u: U) => {
+    if (!confirm(`ลบผู้ใช้ @${u.username} ถาวร?\nผู้ใช้ที่มีประวัติการขายจะลบไม่ได้ — ให้ใช้ “ปิดบัญชี” แทน`)) return;
+    start(async () => {
+      try { const r = await deleteUser(u.id); if (r?.ok) router.refresh(); else alert(r?.error ?? "ลบไม่สำเร็จ"); }
+      catch { alert("ลบไม่สำเร็จ ลองใหม่อีกครั้ง"); }
+    });
+  };
   const reset = (u: U) => {
     const pw = prompt(`ตั้งรหัสผ่านใหม่ให้ @${u.username} (อย่างน้อย 8 ตัว มีตัวอักษร+ตัวเลข)`);
     if (!pw) return;
@@ -122,6 +129,9 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                     <button onClick={() => reset(u)} disabled={pending} title="รีเซ็ตรหัสผ่าน" className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink px-2 py-1 rounded hover:bg-line-soft"><KeyRound className="w-3.5 h-3.5" /></button>
                     {u.id !== meId && (
                       <button onClick={() => toggle(u)} disabled={pending} title={u.is_active ? "ปิดบัญชี" : "เปิดบัญชี"} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-line-soft ${u.is_active ? "text-danger" : "text-success"}`}><Power className="w-3.5 h-3.5" /></button>
+                    )}
+                    {u.id !== meId && (
+                      <button onClick={() => del(u)} disabled={pending} title="ลบผู้ใช้ถาวร" className="inline-flex items-center gap-1 text-xs text-danger px-2 py-1 rounded hover:bg-danger-soft"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                   </td>
                 </tr>

@@ -119,6 +119,37 @@ export async function updateUserAccess(id: number, role: string, permissions: st
   return { ok: true };
 }
 
+// Permanently delete a user. Only allowed when they have NO sales/review history —
+// those records reference the user (Postgres RESTRICT) and must be preserved; direct
+// such accounts to "ปิดบัญชี" instead. Sessions/daily_cash cascade, audit/payments null out.
+export async function deleteUser(id: number): Promise<{ ok: boolean; error?: string }> {
+  const me = await requirePermission("users");
+  if (me.id === id) return { ok: false, error: "ลบบัญชีตัวเองไม่ได้" };
+  const [u] = await q<{ username: string; role: string }>(`select username, role from users where id = $1`, [id]);
+  if (!u) return { ok: false, error: "ไม่พบผู้ใช้" };
+  if (u.role === "admin" && me.role !== "admin") return { ok: false, error: ADMIN_ONLY };
+  // best-effort history check for a friendly message (Postgres also RESTRICTs these)
+  try {
+    const [h] = await q<{ n: number }>(`
+      select ((select count(*) from submissions where created_by = $1 or reviewed_by = $1)
+            + (select count(*) from sales where created_by = $1)
+            + (select count(*) from daily_customers where created_by = $1)
+            + (select count(*) from bill_attachments where created_by = $1))::int n`, [id]);
+    if ((h?.n ?? 0) > 0) return { ok: false, error: "ผู้ใช้นี้มีประวัติการขาย/ตรวจสอบ ลบถาวรไม่ได้ — ใช้ “ปิดบัญชี” แทนเพื่อเก็บประวัติ" };
+  } catch { /* a missing table shouldn't block; the delete below still guards via FK */ }
+  try {
+    await q(`delete from user_sessions where user_id = $1`, [id]);
+    await q(`delete from users where id = $1`, [id]);
+  } catch (e: any) {
+    if (e?.code === "23503") return { ok: false, error: "ผู้ใช้นี้มีประวัติการขาย/ตรวจสอบ ลบถาวรไม่ได้ — ใช้ “ปิดบัญชี” แทน" };
+    console.error("[deleteUser] failed", e);
+    return { ok: false, error: "ลบไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  await logAudit("delete", "user", u.username, `ลบผู้ใช้ถาวร · ${u.username}`);
+  revalidatePath("/users");
+  return { ok: true };
+}
+
 export async function setUserActive(id: number, active: boolean): Promise<{ ok: boolean; error?: string }> {
   const me = await requirePermission("users");
   if (me.id === id && !active) return { ok: false, error: "ปิดบัญชีตัวเองไม่ได้" };
