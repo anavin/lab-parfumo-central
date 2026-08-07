@@ -1,43 +1,82 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ReferenceLine } from "recharts";
 import { getMonthlyDaily } from "@/lib/actions/report";
-import { Columns } from "@/components/charts";
+
+const BRAND = "#a17c48";      // gold — revenue
+const HILITE = "#6f5327";     // darker gold — today
+const GRID = "#eef0f3";
+const axisTick = { fontSize: 11, fill: "#98a1b0" };
 
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
+const bahtK = (v: number) =>
+  Math.abs(v) >= 1e6 ? "฿" + (v / 1e6).toFixed(1) + "M" : Math.abs(v) >= 1e3 ? "฿" + (v / 1e3).toFixed(0) + "K" : "฿" + Math.round(v);
 const monthLabel = (m: string) => {
   const [y, mo] = m.split("-").map(Number);
   return new Date(y, mo - 1, 1).toLocaleDateString("th-TH", { month: "long", year: "numeric" });
 };
 
+type Day = { label: string; value: number; orders: number; qty: number };
+
+function DayTip({ active, payload, month }: any) {
+  if (!active || !payload?.length) return null;
+  const d: Day = payload[0].payload;
+  const [y, m] = month.split("-").map(Number);
+  const dateLabel = new Date(y, m - 1, Number(d.label)).toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "short" });
+  const aov = d.orders ? d.value / d.orders : 0;
+  const Row = ({ k, v }: { k: string; v: string }) => (
+    <div className="flex items-center justify-between gap-6"><span className="text-muted">{k}</span><span className="font-semibold text-ink tabular-nums">{v}</span></div>
+  );
+  return (
+    <div className="rounded-lg border border-line bg-surface shadow-pop px-3 py-2 text-xs min-w-[160px]">
+      <div className="font-semibold text-ink mb-1.5">{dateLabel}</div>
+      <div className="space-y-0.5">
+        <Row k="ยอดขาย" v={`฿${nf(d.value)}`} />
+        <Row k="จำนวนบิล" v={`${d.orders} บิล`} />
+        <Row k="จำนวนชิ้น" v={`${Math.round(d.qty)} ชิ้น`} />
+        <Row k="เฉลี่ย/บิล" v={`฿${nf(aov)}`} />
+      </div>
+    </div>
+  );
+}
+
 /** Review-page overview: each day's sales for the selected month, as a column chart. */
 export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { defaultSource?: string; revision?: string | number }) {
-  const [month, setMonth] = useState(bkkToday().slice(0, 7));   // 'YYYY-MM'
-  const [rows, setRows] = useState<{ d: string; total: number }[]>([]);
+  const thisMonth = bkkToday().slice(0, 7);
+  const [month, setMonth] = useState(thisMonth);
+  const [rows, setRows] = useState<{ d: string; total: number; orders: number; qty: number }[]>([]);
   const [pending, start] = useTransition();
 
   useEffect(() => {
     start(async () => { try { setRows(await getMonthlyDaily(month, defaultSource)); } catch { setRows([]); } });
   }, [month, defaultSource, revision]);
 
-  // fill every day of the month (0 for days with no sales) so the axis is continuous
-  const { data, monthTotal, avg, best, sellingDays } = useMemo(() => {
+  const shiftMonth = (delta: number) => {
+    const [y, m] = month.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  };
+
+  const { data, monthTotal, avg, best, sellingDays, totalOrders, totalQty } = useMemo(() => {
     const [y, m] = month.split("-").map(Number);
     const days = new Date(y, m, 0).getDate();
     const byDate = new Map(rows.map((r) => [r.d, r]));
-    const data = Array.from({ length: days }, (_, i) => {
-      const iso = `${month}-${String(i + 1).padStart(2, "0")}`;
-      const r = byDate.get(iso);
-      return { label: String(i + 1), value: r?.total ?? 0 };
+    const data: Day[] = Array.from({ length: days }, (_, i) => {
+      const r = byDate.get(`${month}-${String(i + 1).padStart(2, "0")}`);
+      return { label: String(i + 1), value: r?.total ?? 0, orders: r?.orders ?? 0, qty: r?.qty ?? 0 };
     });
     const monthTotal = data.reduce((s, d) => s + d.value, 0);
     const selling = data.filter((d) => d.value > 0);
-    const best = data.reduce((a, b) => (b.value > a.value ? b : a), data[0] ?? { label: "-", value: 0 });
-    return { data, monthTotal, avg: selling.length ? monthTotal / selling.length : 0, best, sellingDays: selling.length };
+    const best = data.reduce((a, b) => (b.value > a.value ? b : a), data[0] ?? { label: "-", value: 0, orders: 0, qty: 0 });
+    return {
+      data, monthTotal, avg: selling.length ? monthTotal / selling.length : 0, best, sellingDays: selling.length,
+      totalOrders: data.reduce((s, d) => s + d.orders, 0), totalQty: data.reduce((s, d) => s + d.qty, 0),
+    };
   }, [rows, month]);
 
-  const todayDay = month === bkkToday().slice(0, 7) ? String(Number(bkkToday().slice(8, 10))) : undefined;
+  const todayDay = month === thisMonth ? String(Number(bkkToday().slice(8, 10))) : undefined;
   const hasData = monthTotal > 0;
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
@@ -54,29 +93,54 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { default
           <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><BarChart3 className="w-5 h-5" /></div>
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-ink leading-tight">ยอดขายรายวัน</h3>
-            <p className="text-xs text-muted truncate">{monthLabel(month)} · แยกตามวัน</p>
+            <p className="text-xs text-muted truncate">แตะที่แท่งเพื่อดูรายละเอียดของแต่ละวัน</p>
           </div>
         </div>
-        <input type="month" value={month} max={bkkToday().slice(0, 7)} onChange={(e) => setMonth(e.target.value)}
-          className="ml-auto border border-line rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
+        {/* month navigator */}
+        <div className="ml-auto flex items-center gap-1 rounded-xl border border-line bg-surface p-1">
+          <button onClick={() => shiftMonth(-1)} aria-label="เดือนก่อนหน้า"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-canvas transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="min-w-[120px] text-center text-sm font-semibold text-ink tabular-nums select-none">{monthLabel(month)}</span>
+          <button onClick={() => shiftMonth(1)} disabled={month >= thisMonth} aria-label="เดือนถัดไป"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-canvas disabled:opacity-30 disabled:hover:bg-transparent transition-colors"><ChevronRight className="w-4 h-4" /></button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-4 border-y border-line-soft py-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 border-y border-line-soft py-3">
         <Stat label="ยอดรวมเดือนนี้" value={`฿${nf(monthTotal)}`} />
-        <Stat label="เฉลี่ย/วันที่ขาย" value={`฿${nf(avg)}`} />
+        <Stat label="จำนวนบิล" value={`${totalOrders} บิล`} />
+        <Stat label="จำนวนชิ้น" value={`${Math.round(totalQty)} ชิ้น`} />
         <Stat label="วันขายดีสุด" value={best.value > 0 ? `฿${nf(best.value)} · วันที่ ${best.label}` : "-"} />
       </div>
 
-      <div style={{ height: 240 }}>
+      <div style={{ height: 260 }}>
         {pending && !rows.length ? (
           <div className="h-full flex items-center justify-center text-sm text-muted">กำลังโหลด…</div>
         ) : !hasData ? (
           <div className="h-full flex items-center justify-center text-sm text-muted">ยังไม่มียอดขายในเดือนนี้</div>
         ) : (
-          <Columns data={data} money highlight={todayDay} />
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
+              <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} interval={0} />
+              <YAxis tickFormatter={bahtK} tick={axisTick} tickLine={false} axisLine={false} width={44} />
+              <Tooltip cursor={{ fill: "rgba(0,0,0,0.04)" }} content={<DayTip month={month} />} />
+              {avg > 0 && (
+                <ReferenceLine y={avg} stroke="#98a1b0" strokeDasharray="5 4"
+                  label={{ value: `เฉลี่ย ฿${nf(avg)}`, position: "insideTopRight", fontSize: 10, fill: "#98a1b0" }} />
+              )}
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={26}>
+                {data.map((d, i) => <Cell key={i} fill={todayDay && d.label === todayDay ? HILITE : BRAND} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         )}
       </div>
-      {hasData && <p className="text-[11px] text-muted mt-2">มียอดขาย {sellingDays} วันในเดือนนี้{todayDay ? " · แท่งสีเข้ม = วันนี้" : ""}</p>}
+      {hasData && (
+        <p className="text-[11px] text-muted mt-2">
+          มียอดขาย {sellingDays} วันในเดือนนี้ · เส้นประ = ค่าเฉลี่ยต่อวันที่ขาย{todayDay ? " · แท่งสีเข้ม = วันนี้" : ""}
+        </p>
+      )}
     </div>
   );
 }
