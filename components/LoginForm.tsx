@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 export function LoginForm({ next }: { next: string }) {
   const [busy, setBusy] = useState(false);          // covers both request + redirect
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | undefined>(undefined);
+  const [showPw, setShowPw] = useState(false);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -42,8 +44,15 @@ export function LoginForm({ next }: { next: string }) {
       </div>
       <div>
         <label className="block text-xs text-muted mb-1">รหัสผ่าน</label>
-        <input name="password" type="password" autoComplete="current-password"
-          className="w-full border border-line rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand" />
+        <div className="relative">
+          <input name="password" type={showPw ? "text" : "password"} autoComplete="current-password"
+            className="w-full border border-line rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:border-brand" />
+          <button type="button" onClick={() => setShowPw((v) => !v)} tabIndex={-1}
+            aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} title={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-muted hover:text-ink hover:bg-canvas">
+            {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
         <input name="remember" type="checkbox" className="accent-brand w-4 h-4" />
