@@ -442,8 +442,17 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const qtyRef = useRef<HTMLInputElement>(null);
-  // after a product is picked, jump straight to จำนวน so the next entry needs no extra tap
-  const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); setTimeout(() => qtyRef.current?.focus(), 60); };
+  // after a product is picked, jump straight to จำนวน so the next entry needs no extra tap.
+  // programmatic focus alone doesn't reliably scroll on mobile (and the keyboard/sticky
+  // bar can cover the field), so scroll it to the middle of the viewport ourselves.
+  const pick = (p: any) => {
+    onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price });
+    setAcOpen(false);
+    setTimeout(() => {
+      qtyRef.current?.focus({ preventScroll: true });
+      qtyRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 80);
+  };
   const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
   // clamp per-item discount to the line subtotal so the card never shows a
