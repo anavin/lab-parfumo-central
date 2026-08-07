@@ -20,6 +20,13 @@ const monthLabel = (m: string) => {
 
 type Day = { label: string; value: number; orders: number; qty: number };
 
+// compact number for on-bar labels: 26000→"26K", 5520→"5.5K", 450→"450"
+const barNum = (v: number) => (v >= 1000 ? (v >= 10000 ? Math.round(v / 1000) + "K" : (v / 1000).toFixed(1) + "K") : String(Math.round(v)));
+function BarValueLabel({ x, y, width, value }: any) {
+  if (!value) return <g />;   // skip zero-sale days
+  return <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={9} fontWeight={700} fill="#7a5c30">{barNum(value)}</text>;
+}
+
 function DayTip({ active, payload, month }: any) {
   if (!active || !payload?.length) return null;
   const d: Day = payload[0].payload;
@@ -125,7 +132,7 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision, onPickDay, 
           <div className="h-full flex items-center justify-center text-sm text-muted">ยังไม่มียอดขายในเดือนนี้</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 14, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={data} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} interval={0} />
               <YAxis tickFormatter={bahtK} tick={axisTick} tickLine={false} axisLine={false} width={44} />
@@ -134,7 +141,7 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision, onPickDay, 
                 <ReferenceLine y={avg} stroke="#98a1b0" strokeDasharray="5 4"
                   label={{ value: `เฉลี่ย ฿${nf(avg)}`, position: "insideTopRight", fontSize: 10, fill: "#98a1b0" }} />
               )}
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={26} cursor="pointer"
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={26} cursor="pointer" label={BarValueLabel}
                 onClick={(bar: any) => onPickDay?.(`${month}-${String(bar.label).padStart(2, "0")}`)}>
                 {data.map((d, i) => <Cell key={i} fill={emphasis && d.label === emphasis ? HILITE : BRAND} />)}
               </Bar>
