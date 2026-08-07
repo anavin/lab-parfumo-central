@@ -13,7 +13,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
   const [date, setDate] = useState(bkkToday());
   const source = defaultSource;   // single location (CTW) — no branch picker
   const [data, setData] = useState<ReportData | null>(null);
-  const [opening, setOpening] = useState("");   // เงินทอนยกมา (opening float carried from the previous day)
+  const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (opening float carried from the previous day)
   const [deposit, setDeposit] = useState("");
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
@@ -44,7 +44,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
       `คนต่างชาติ ${data.foreignCount} ราย เป็นเงิน ${nf(data.foreignAmt)} บาท`,
       ...(data.otherCount > 0 ? [`อื่นๆ/ไม่ระบุ ${data.otherCount} ราย เป็นเงิน ${nf(data.otherAmt)} บาท`] : []),
       ``,
-      `เงินทอนยกมา ${nf(openingN)} บาท`,
+      `เงินสดหน้าร้านยกมา ${nf(openingN)} บาท`,
       `💵 เงินสดหน้าร้าน ${nf(change)} บาท`,
       `🏦 เข้าธนาคาร ${nf(depositN)} บาท`,
     ];
@@ -87,7 +87,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} max={bkkToday()} className={inp} />
         </label>
         <label className="block">
-          <span className="text-xs text-muted mb-1 block">เงินทอนยกมา</span>
+          <span className="text-xs text-muted mb-1 block">เงินสดหน้าร้านยกมา</span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
             <input inputMode="numeric" value={opening} onFocus={(e) => e.target.select()}
@@ -134,7 +134,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
             </div>
             <Rule />
             <div className="space-y-1.5">
-              <Line label="เงินทอนยกมา" value={`${nf(openingN)} บาท`} />
+              <Line label="เงินสดหน้าร้านยกมา" value={`${nf(openingN)} บาท`} />
               <Line label="💵 เงินสดหน้าร้าน" value={`${nf(change)} บาท`} strong />
               <Line label="🏦 เข้าธนาคาร" value={`${nf(depositN)} บาท`} />
             </div>
@@ -142,7 +142,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
         )}
       </div>
 
-      <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = เงินทอนยกมา + เงินสดรับ − ฝากเข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
+      <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = เงินสดหน้าร้านยกมา + เงินสดรับ − ฝากเข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
 
       <button onClick={copy} disabled={!ready}
         className="w-full mt-3 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
