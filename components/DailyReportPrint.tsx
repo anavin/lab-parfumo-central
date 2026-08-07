@@ -28,24 +28,13 @@ function groupBills(rows: SubmissionRow[]): Bill[] {
   });
 }
 
-/** Printable A4 branch daily sales report — summary + per-bill detail. */
+/** Printable A4 daily sales report — professional, black-on-white, easy to scan. */
 export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultSource?: string; revision?: string | number }) {
   const [date, setDate] = useState(bkkToday());
   const [data, setData] = useState<ReportData | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
-  const [showDetail, setShowDetail] = useState(true);   // toggle the per-bill detail table
+  const [showDetail, setShowDetail] = useState(true);
   const [pending, start] = useTransition();
-
-  // per-salesperson roll-up for the summary block
-  const byPerson = useMemo(() => {
-    const m = new Map<string, { bills: number; total: number }>();
-    for (const b of bills) {
-      const cur = m.get(b.author) ?? { bills: 0, total: 0 };
-      cur.bills += 1; cur.total += b.total;
-      m.set(b.author, cur);
-    }
-    return [...m.entries()].map(([author, v]) => ({ author, ...v })).sort((a, b) => b.total - a.total);
-  }, [bills]);
 
   useEffect(() => {
     start(async () => {
@@ -56,8 +45,36 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
     });
   }, [date, defaultSource, revision]);
 
+  const byPerson = useMemo(() => {
+    const m = new Map<string, { bills: number; total: number }>();
+    for (const b of bills) {
+      const cur = m.get(b.author) ?? { bills: 0, total: 0 };
+      cur.bills += 1; cur.total += b.total;
+      m.set(b.author, cur);
+    }
+    return [...m.entries()].map(([author, v]) => ({ author, ...v })).sort((a, b) => b.total - a.total);
+  }, [bills]);
+  const totalQty = useMemo(() => bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.qty ?? 0), 0), 0), [bills]);
+
   const ready = !!data && data.orders > 0;
   const srcLabel = SRC_LABEL[defaultSource] ?? defaultSource;
+  const aov = ready ? data!.total / data!.orders : 0;
+  const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  const Kpi = ({ label, value, primary = false }: { label: string; value: string; primary?: boolean }) => (
+    <div className={`border rounded-lg px-3 py-2.5 ${primary ? "border-black border-2" : "border-neutral-400"}`}>
+      <div className="text-[10px] uppercase tracking-wide text-neutral-500">{label}</div>
+      <div className={`tabular-nums font-bold leading-tight ${primary ? "text-[22px]" : "text-lg"}`}>{value}</div>
+    </div>
+  );
+  const SecTitle = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[11px] font-bold uppercase tracking-wide text-neutral-500 border-b border-black pb-1 mb-2">{children}</div>
+  );
+  const KV = ({ k, v }: { k: string; v: string }) => (
+    <div className="flex justify-between items-baseline py-1 border-b border-dashed border-neutral-300 text-[13px]">
+      <span>{k}</span><span className="font-semibold tabular-nums">{v}</span>
+    </div>
+  );
 
   return (
     <div>
@@ -71,8 +88,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
           </div>
         </div>
         <label className="ml-auto flex items-center gap-2 text-sm select-none cursor-pointer">
-          <input type="checkbox" checked={showDetail} onChange={(e) => setShowDetail(e.target.checked)}
-            className="w-4 h-4 accent-brand" />
+          <input type="checkbox" checked={showDetail} onChange={(e) => setShowDetail(e.target.checked)} className="w-4 h-4 accent-brand" />
           <span className="text-ink">แสดงรายละเอียดแต่ละบิล</span>
         </label>
         <label className="flex items-center gap-2 text-sm">
@@ -88,10 +104,16 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
 
       {/* printable A4 sheet — always white so it prints cleanly in any theme */}
       <div className="print-area daily-sheet mx-auto w-full max-w-[760px] rounded-xl border border-line bg-white text-black shadow-sm px-10 py-8">
-        <div className="text-center border-b-2 border-black pb-3 mb-5">
-          <div className="text-xl font-bold">รายงานสรุปยอดขายประจำวัน</div>
-          <div className="text-sm mt-1">Lab Parfumo · {srcLabel}</div>
-          <div className="text-sm text-neutral-600 mt-0.5">{thaiDate(date)}</div>
+        {/* header */}
+        <div className="flex items-start justify-between gap-6 border-b-2 border-black pb-3 mb-5">
+          <div>
+            <div className="text-[22px] font-extrabold tracking-tight leading-none">Lab Parfumo</div>
+            <div className="text-[13px] text-neutral-600 mt-1.5">รายงานสรุปยอดขายประจำวัน · {srcLabel}</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-[15px] font-bold leading-tight">{thaiDate(date)}</div>
+            <div className="text-[11px] text-neutral-500 mt-1">ออกรายงานเมื่อ {generatedAt} น.</div>
+          </div>
         </div>
 
         {pending && !data ? (
@@ -100,37 +122,46 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
           <div className="py-12 text-center text-sm text-neutral-500">ยังไม่มียอดขายของวันนี้</div>
         ) : (
           <>
-            {/* summary */}
-            <div className="grid grid-cols-2 gap-x-10 gap-y-1.5 mb-5 text-[13px]">
-              <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>จำนวนออเดอร์</span><span className="font-medium tabular-nums">{data!.orders} รายการ</span></div>
-              <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>คนไทย ({data!.thaiCount})</span><span className="font-medium tabular-nums">{nf(data!.thaiAmt)} บาท</span></div>
-              <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>เงินสด</span><span className="font-medium tabular-nums">{nf(data!.cash)} บาท</span></div>
-              <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>ต่างชาติ ({data!.foreignCount})</span><span className="font-medium tabular-nums">{nf(data!.foreignAmt)} บาท</span></div>
-              <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>โอน / เครดิต</span><span className="font-medium tabular-nums">{nf(data!.nonCash)} บาท</span></div>
-              {data!.otherCount > 0 && <div className="flex justify-between border-b border-dashed border-neutral-300 py-1"><span>อื่นๆ ({data!.otherCount})</span><span className="font-medium tabular-nums">{nf(data!.otherAmt)} บาท</span></div>}
+            {/* KPI band */}
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              <Kpi label="ยอดขายรวม" value={`฿${nf(data!.total)}`} primary />
+              <Kpi label="จำนวนบิล" value={`${data!.orders}`} />
+              <Kpi label="จำนวนชิ้น" value={`${Math.round(totalQty)}`} />
+              <Kpi label="เฉลี่ย/บิล" value={`฿${nf(aov)}`} />
             </div>
-            <div className="flex justify-between items-baseline border-y-2 border-black py-2 mb-5">
-              <span className="font-bold text-[15px]">รวมเป็นเงินทั้งสิ้น</span>
-              <span className="font-bold text-xl tabular-nums">{nf(data!.total)} บาท</span>
+
+            {/* breakdowns — payment + nationality side by side */}
+            <div className="grid grid-cols-2 gap-x-10 mb-6">
+              <div>
+                <SecTitle>ช่องทางรับเงิน</SecTitle>
+                <KV k="เงินสด" v={`${nf(data!.cash)} บาท`} />
+                <KV k="โอน / เครดิต" v={`${nf(data!.nonCash)} บาท`} />
+              </div>
+              <div>
+                <SecTitle>สัญชาติลูกค้า</SecTitle>
+                <KV k={`คนไทย (${data!.thaiCount})`} v={`${nf(data!.thaiAmt)} บาท`} />
+                <KV k={`ต่างชาติ (${data!.foreignCount})`} v={`${nf(data!.foreignAmt)} บาท`} />
+                {data!.otherCount > 0 && <KV k={`อื่นๆ (${data!.otherCount})`} v={`${nf(data!.otherAmt)} บาท`} />}
+              </div>
             </div>
 
             {/* per-salesperson summary */}
             {byPerson.length > 0 && (
               <div className="mb-6">
-                <div className="text-sm font-bold mb-1.5">สรุปตามพนักงานขาย</div>
+                <SecTitle>สรุปตามพนักงานขาย</SecTitle>
                 <table className="w-full text-[13px] border-collapse">
                   <thead>
-                    <tr className="border-y-2 border-black text-left">
-                      <th className="py-1.5 pr-2 font-semibold">พนักงานขาย</th>
-                      <th className="py-1.5 pr-2 w-24 text-right font-semibold">จำนวนบิล</th>
-                      <th className="py-1.5 w-28 text-right font-semibold">ยอด (บาท)</th>
+                    <tr className="text-left text-neutral-500 text-[11px] uppercase tracking-wide">
+                      <th className="pb-1.5 font-semibold">พนักงานขาย</th>
+                      <th className="pb-1.5 w-24 text-right font-semibold">จำนวนบิล</th>
+                      <th className="pb-1.5 w-28 text-right font-semibold">ยอด (บาท)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {byPerson.map((p) => (
-                      <tr key={p.author} className="border-b border-neutral-300">
-                        <td className="py-1.5 pr-2 font-medium">{p.author}</td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums">{p.bills}</td>
+                      <tr key={p.author} className="border-t border-neutral-200">
+                        <td className="py-1.5 font-medium">{p.author}</td>
+                        <td className="py-1.5 text-right tabular-nums">{p.bills}</td>
                         <td className="py-1.5 text-right font-semibold tabular-nums">{nf(p.total)}</td>
                       </tr>
                     ))}
@@ -141,22 +172,22 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
 
             {/* per-bill detail (toggle) */}
             {showDetail && (
-              <>
-                <div className="text-sm font-bold mb-1.5">รายละเอียดแต่ละบิล</div>
-                <table className="w-full text-[12px] border-collapse mb-6">
+              <div className="mb-6">
+                <SecTitle>รายละเอียดแต่ละบิล</SecTitle>
+                <table className="w-full text-[12px] border-collapse">
                   <thead>
-                    <tr className="border-y-2 border-black text-left">
-                      <th className="py-1.5 pr-2 w-7 font-semibold">#</th>
-                      <th className="py-1.5 pr-2 w-12 font-semibold">เวลา</th>
-                      <th className="py-1.5 pr-2 font-semibold">รายการ</th>
-                      <th className="py-1.5 pr-2 w-24 font-semibold">ชำระ</th>
-                      <th className="py-1.5 pr-2 w-14 font-semibold">สัญชาติ</th>
-                      <th className="py-1.5 text-right w-20 font-semibold">ยอด (บาท)</th>
+                    <tr className="text-left text-neutral-500 text-[11px] uppercase tracking-wide">
+                      <th className="pb-1.5 pr-2 w-7 font-semibold">#</th>
+                      <th className="pb-1.5 pr-2 w-12 font-semibold">เวลา</th>
+                      <th className="pb-1.5 pr-2 font-semibold">รายการ</th>
+                      <th className="pb-1.5 pr-2 w-24 font-semibold">ชำระ</th>
+                      <th className="pb-1.5 pr-2 w-14 font-semibold">สัญชาติ</th>
+                      <th className="pb-1.5 text-right w-20 font-semibold">ยอด (บาท)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {bills.map((b) => (
-                      <tr key={b.key} className="border-b border-neutral-300 align-top">
+                      <tr key={b.key} className="border-t border-neutral-200 align-top">
                         <td className="py-2 pr-2 font-semibold tabular-nums">{b.no}</td>
                         <td className="py-2 pr-2 tabular-nums">{b.time || "-"}</td>
                         <td className="py-2 pr-2">
@@ -179,11 +210,11 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
                     </tr>
                   </tfoot>
                 </table>
-              </>
+              </div>
             )}
 
             {/* signatures */}
-            <div className="grid grid-cols-2 gap-10 pt-10 text-[13px]">
+            <div className="grid grid-cols-2 gap-12 pt-12 text-[13px]">
               <div className="text-center"><div className="border-t border-black pt-1.5">ผู้จัดทำ</div></div>
               <div className="text-center"><div className="border-t border-black pt-1.5">ผู้ตรวจสอบ</div></div>
             </div>
