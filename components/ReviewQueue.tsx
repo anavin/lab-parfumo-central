@@ -2,7 +2,7 @@
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2 } from "lucide-react";
-import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin } from "@/lib/actions/submissions";
+import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -58,6 +58,34 @@ function SplitBreakdown({ tenders }: { tenders?: BillTender[] }) {
       <span className="font-medium text-ink">จ่าย {tenders.length} ช่องทาง:</span>
       {tenders.map((t, i) => <span key={i}>{chLabel(t.channel)} <b className="text-ink tabular-nums">{baht(t.amount)}</b></span>)}
     </div>
+  );
+}
+
+// Inline sale-time editor in a pending bill's header (applies to all rows of the bill).
+function BillTime({ bill, onSaved }: { bill: Bill; onSaved: () => void }) {
+  const cur = (bill.rows[0]?.sale_time || "").slice(0, 5);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(cur);
+  const [pending, start] = useTransition();
+  const save = () => start(async () => {
+    const r = await updateBillTime(bill.rows.map((x) => x.id), val);
+    if (r?.ok) { setEditing(false); onSaved(); } else alert(r?.error ?? "บันทึกเวลาไม่สำเร็จ");
+  });
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <input type="time" value={val} autoFocus onChange={(e) => setVal(e.target.value)}
+          className="border border-line rounded-md px-1.5 py-0.5 text-[11px] bg-surface text-ink focus:outline-none focus:border-brand" />
+        <button onClick={save} disabled={pending || !val} className="text-success disabled:opacity-40" aria-label="บันทึกเวลา"><Check className="w-3.5 h-3.5" /></button>
+        <button onClick={() => { setEditing(false); setVal(cur); }} className="text-muted hover:text-ink" aria-label="ยกเลิก"><X className="w-3.5 h-3.5" /></button>
+      </span>
+    );
+  }
+  return (
+    <button onClick={() => { setVal(cur); setEditing(true); }} title="แก้เวลาขายของบิลนี้"
+      className="inline-flex items-center gap-1 hover:text-brand-dark transition-colors">
+      <Clock className="w-3 h-3" />{cur || "ใส่เวลา"}<Pencil className="w-2.5 h-2.5 opacity-50" />
+    </button>
   );
 }
 
@@ -199,8 +227,8 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                         <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0">#{i + 1}</span>
                         <div className="min-w-0">
                           <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
-                          <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
-                            {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
+                          <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <BillTime bill={bill} onSaved={refresh} />
                             {first.payment_channel && <span>· {first.payment_channel}</span>}
                             {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
                             {isSale && <span>· {bill.rows.length} รายการ</span>}

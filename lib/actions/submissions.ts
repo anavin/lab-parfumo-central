@@ -388,6 +388,20 @@ export async function unapproveMany(ids: number[]) {
 }
 
 // Reject a whole bill (all its rows) at once.
+// Quick-edit the sale time for a whole bill (all its pending rows share one time).
+export async function updateBillTime(ids: number[], time: string): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("review");
+  if (!ids?.length) return { ok: true };
+  const t = (time || "").trim();
+  if (!/^\d{2}:\d{2}$/.test(t)) return { ok: false, error: "รูปแบบเวลาไม่ถูกต้อง (HH:MM)" };
+  try {
+    for (const id of ids) await q(`update submissions set sale_time = $2, updated_at = now() where id = $1 and status = 'pending'`, [id, t]);
+  } catch (e) { console.error("[updateBillTime] failed", e); return { ok: false, error: "บันทึกเวลาไม่สำเร็จ" }; }
+  await logAudit("update", "submission", null, `แก้เวลาขาย → ${t} น. (${ids.length} รายการ)`);
+  revalidatePath("/review"); revalidatePath("/my");
+  return { ok: true };
+}
+
 // Move bills to the trash instead of bouncing them back. Trashed (soft-deleted)
 // bills drop out of the review queue and the salesperson's /my views, but can be
 // restored or purged on /trash. Returns { ok, error } so a pre-migration prod (no
