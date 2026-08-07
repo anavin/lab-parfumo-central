@@ -172,10 +172,15 @@ export function salesByHour(f: Filter = ALL) {
 }
 
 export function byBA(f: Filter = ALL, limit = 10) {
+  // group by the seller's CURRENT name (join users on created_by) so a rename doesn't
+  // split one person into two; fall back to the frozen ba for legacy rows with no user.
   return q<{ ba: string; revenue: number; qty: number }>(`
-    select ba, sum(total)::float revenue, sum(qty)::float qty
-    from sales where ba is not null and ba <> '#N/A' and ${SW}
-    group by ba order by revenue desc limit $3`, [f.months, f.source, limit]);
+    select coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ') ba,
+           sum(s.total)::float revenue, sum(s.qty)::float qty
+    from sales s left join users u on u.id = s.created_by
+    where coalesce(u.full_name, nullif(s.ba,''), '') not in ('', '#N/A') and ${SWs}
+    group by coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ')
+    order by revenue desc limit $3`, [f.months, f.source, limit]);
 }
 
 export function monthlyCash() {
