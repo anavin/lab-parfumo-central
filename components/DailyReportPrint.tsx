@@ -218,10 +218,10 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
                             {b.rows.map((r) => {
                               const g = (r.qty ?? 0) * (r.unit_price ?? 0);
                               return (
-                                <li key={r.id}>
-                                  <span className="text-black">{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</span>
-                                  <span className="text-neutral-500"> · เต็ม ฿{nf(g)} · ลด ฿{nf(r.discount ?? 0)} · ขาย </span>
-                                  <span className="font-semibold text-black">฿{nf(r.total ?? 0)}</span>
+                                <li key={r.id} className="flex items-baseline gap-2">
+                                  <span className="flex-1 min-w-0 truncate text-black">{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</span>
+                                  <span className="w-24 text-right tabular-nums text-neutral-500">เต็ม ฿{nf(g)}</span>
+                                  <span className="w-20 text-right tabular-nums text-neutral-500">ลด ฿{nf(r.discount ?? 0)}</span>
                                 </li>
                               );
                             })}
