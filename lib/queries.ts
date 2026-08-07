@@ -498,12 +498,12 @@ export type DaySaleRow = {
  *  daily report summary and the printable per-bill detail, so both include old data. */
 export async function dailySaleRows(date: string, source: string, userId: number | null = null): Promise<DaySaleRow[]> {
   return q<DaySaleRow>(`
-    select id, 'sale'::text src, receipt_no, item, size,
-           qty::float qty, unit_price::float unit_price, coalesce(discount,0)::float discount, total::float total,
-           payment_channel, nation, sale_time::text sale_time,
-           coalesce(ba,'') author, created_by, sale_date::text entry_date
-    from sales
-    where sale_date = $1 and source = $2 and ($3::bigint is null or created_by = $3)
+    select s.id, 'sale'::text src, s.receipt_no, s.item, s.size,
+           s.qty::float qty, s.unit_price::float unit_price, coalesce(s.discount,0)::float discount, s.total::float total,
+           s.payment_channel, s.nation, s.sale_time::text sale_time,
+           coalesce(u.full_name, nullif(s.ba,''), '') author, s.created_by, s.sale_date::text entry_date
+    from sales s left join users u on u.id = s.created_by
+    where s.sale_date = $1 and s.source = $2 and ($3::bigint is null or s.created_by = $3)
     union all
     select s.id, 'sub'::text src, s.receipt_no, s.item, s.size,
            s.qty::float, s.unit_price::float, coalesce(s.discount,0)::float, s.total::float,
