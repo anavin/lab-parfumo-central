@@ -59,6 +59,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
   const ready = !!data && data.orders > 0;
   const srcLabel = SRC_LABEL[defaultSource] ?? defaultSource;
   const aov = ready ? data!.total / data!.orders : 0;
+  const sellers = byPerson.map((p) => p.author);   // usually one salesperson per day
   const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   const Kpi = ({ label, value, primary = false }: { label: string; value: string; primary?: boolean }) => (
@@ -109,6 +110,9 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
           <div>
             <div className="text-[22px] font-extrabold tracking-tight leading-none">Lab Parfumo</div>
             <div className="text-[13px] text-neutral-600 mt-1.5">รายงานสรุปยอดขายประจำวัน · {srcLabel}</div>
+            {ready && sellers.length > 0 && (
+              <div className="text-[13px] text-neutral-700 mt-1">พนักงานขาย: <span className="font-semibold">{sellers.join(" · ")}</span></div>
+            )}
           </div>
           <div className="text-right shrink-0">
             <div className="text-[15px] font-bold leading-tight">{thaiDate(date)}</div>
@@ -145,8 +149,9 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
               </div>
             </div>
 
-            {/* per-salesperson summary */}
-            {byPerson.length > 0 && (
+            {/* per-salesperson summary — only when more than one sold that day
+                (a single seller is already named in the header) */}
+            {byPerson.length > 1 && (
               <div className="mb-6">
                 <SecTitle>สรุปตามพนักงานขาย</SecTitle>
                 <table className="w-full text-[13px] border-collapse">
