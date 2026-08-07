@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Download } from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { Badge } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
@@ -55,6 +55,24 @@ export function AuditTable({ rows }: { rows: Row[] }) {
 
   const opt = (all: string, items: { value: string; label: string }[]) => [{ value: ALL, label: all }, ...items];
 
+  // Export the currently-filtered rows to CSV. A UTF-8 BOM makes Excel read Thai.
+  const exportCSV = () => {
+    if (!filtered.length) return;
+    const esc = (v: unknown) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const header = ["วันที่", "เวลา", "ผู้ใช้", "บทบาท", "การกระทำ", "ประเภท", "รายละเอียด"];
+    const body = filtered.map((r) => [
+      fmtDateTH(r.created_at), fmtTimeTH(r.created_at), r.user_name, r.user_role,
+      ACTION[r.action]?.label ?? r.action, ENTITY[r.entity] ?? r.entity, r.detail,
+    ].map(esc).join(","));
+    const csv = "﻿" + [header.join(","), ...body].join("\r\n");
+    const stamp = new Date().toLocaleDateString("en-CA");   // YYYY-MM-DD (local)
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `ประวัติการใช้งาน-${stamp}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-line-soft bg-canvas/50">
@@ -70,6 +88,11 @@ export function AuditTable({ rows }: { rows: Row[] }) {
         <Select value={entity} onValueChange={setEntity} className="min-w-[130px]"
           options={opt("ประเภททั้งหมด", entities.map((e) => ({ value: e, label: ENTITY[e] ?? e })))} />
         <span className="text-xs text-muted whitespace-nowrap ml-auto">{filtered.length} / {rows.length} รายการ</span>
+        <button onClick={exportCSV} disabled={!filtered.length}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm font-medium text-ink bg-surface hover:bg-canvas disabled:opacity-50 whitespace-nowrap"
+          title="ส่งออกรายการที่กรองไว้เป็นไฟล์ CSV (เปิดใน Excel ได้)">
+          <Download className="w-4 h-4" /> ส่งออก CSV
+        </button>
       </div>
       <DataTable columns={columns} rows={filtered} rowKey={(r) => r.id} initialSort={{ key: "created_at", dir: "desc" }}
         cellPad="px-3 py-2.5" headPad="px-3 py-2.5" maxHeight="66vh" empty="ไม่พบรายการตามเงื่อนไข" />
