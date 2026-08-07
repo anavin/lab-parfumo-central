@@ -1,8 +1,9 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
-import { baht, fmtDate } from "@/lib/format";
+import { baht } from "@/lib/format";
 import { AddCash } from "@/components/EntryForms";
 import { Wallet } from "lucide-react";
 import { ExportButton } from "@/components/ExportButton";
+import { CashTable } from "@/components/CashTable";
 import { q } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -26,22 +27,8 @@ export default async function CashPage() {
         <Stat label="จำนวนรายการ" value={String(agg.n)} />
         {byType.slice(0, 2).map((t) => <Stat key={t.type} label={t.type} value={baht(t.total)} />)}
       </div>
-      <Card title={`รายการเงินสด (${rows.length})`}>
-        <div className="max-h-[560px] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b"><th className="pb-2">วันที่</th><th className="pb-2">รายละเอียด</th><th className="pb-2">ประเภท</th><th className="pb-2 text-right">จำนวนเงิน</th></tr></thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
-                  <td className="py-1.5 text-ink/50 whitespace-nowrap">{fmtDate(r.cash_date)}</td>
-                  <td className="py-1.5">{r.description}</td>
-                  <td className="py-1.5 text-ink/50">{r.type}</td>
-                  <td className="py-1.5 text-right font-medium">{baht(r.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`}>
+        <CashTable rows={rows} />
       </Card>
     </div>
   );
