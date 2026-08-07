@@ -469,16 +469,20 @@ export function salesByPerson(f: Filter = ALL) {
  * cash = single-channel Cash lines + the cash portion of split ("จ่าย 2 ทาง") bills;
  * everything else is transfer/credit (total − cash).
  */
-/** Daily sales totals across a month (for the review-page monthly chart). $1='YYYY-MM'. */
+/** Daily sales totals across a month for the review-page chart. $1='YYYY-MM'.
+ *  Combines the live `sales` table (approved + imported history) with still-pending
+ *  submissions (not yet copied to sales) so the chart shows old data too, no double-count. */
 export async function dailySalesByMonth(month: string, source: string) {
-  return q<{ d: string; total: number; orders: number }>(`
-    select entry_date::text d,
-           coalesce(sum(total),0)::float total,
-           count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int orders
-    from submissions
-    where kind = 'sale' and status <> 'rejected' and source = $2
-      and to_char(entry_date,'YYYY-MM') = $1${await aliveAnd("")}
-    group by entry_date order by entry_date`, [month, source]);
+  return q<{ d: string; total: number }>(`
+    select d::text d, coalesce(sum(total),0)::float total
+    from (
+      select sale_date d, total from sales
+      where sale_date is not null and to_char(sale_date,'YYYY-MM') = $1 and source = $2
+      union all
+      select entry_date d, total from submissions
+      where kind = 'sale' and status = 'pending' and to_char(entry_date,'YYYY-MM') = $1 and source = $2${await aliveAnd("")}
+    ) t
+    group by d order by d`, [month, source]);
 }
 
 /** Non-rejected sale lines for one day (for the printable per-bill detail). */

@@ -14,7 +14,7 @@ const monthLabel = (m: string) => {
 /** Review-page overview: each day's sales for the selected month, as a column chart. */
 export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { defaultSource?: string; revision?: string | number }) {
   const [month, setMonth] = useState(bkkToday().slice(0, 7));   // 'YYYY-MM'
-  const [rows, setRows] = useState<{ d: string; total: number; orders: number }[]>([]);
+  const [rows, setRows] = useState<{ d: string; total: number }[]>([]);
   const [pending, start] = useTransition();
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { default
     const data = Array.from({ length: days }, (_, i) => {
       const iso = `${month}-${String(i + 1).padStart(2, "0")}`;
       const r = byDate.get(iso);
-      return { label: String(i + 1), value: r?.total ?? 0, orders: r?.orders ?? 0 };
+      return { label: String(i + 1), value: r?.total ?? 0 };
     });
     const monthTotal = data.reduce((s, d) => s + d.value, 0);
     const selling = data.filter((d) => d.value > 0);
