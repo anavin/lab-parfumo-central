@@ -42,8 +42,11 @@ function DayTip({ active, payload, month }: any) {
   );
 }
 
-/** Review-page overview: each day's sales for the selected month, as a column chart. */
-export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { defaultSource?: string; revision?: string | number }) {
+/** Review-page overview: each day's sales for the selected month, as a column chart.
+ *  Clicking a bar calls onPickDay(isoDate) so a linked report can show that day. */
+export function MonthlyDailyChart({ defaultSource = "CTW", revision, onPickDay, selected }: {
+  defaultSource?: string; revision?: string | number; onPickDay?: (iso: string) => void; selected?: string;
+}) {
   const thisMonth = bkkToday().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
   const [rows, setRows] = useState<{ d: string; total: number; orders: number; qty: number }[]>([]);
@@ -77,6 +80,8 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { default
   }, [rows, month]);
 
   const todayDay = month === thisMonth ? String(Number(bkkToday().slice(8, 10))) : undefined;
+  const selDay = selected && selected.slice(0, 7) === month ? String(Number(selected.slice(8, 10))) : undefined;
+  const emphasis = selDay ?? todayDay;   // the highlighted bar: selected day, else today
   const hasData = monthTotal > 0;
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
@@ -93,7 +98,7 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { default
           <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><BarChart3 className="w-5 h-5" /></div>
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-ink leading-tight">ยอดขายรายวัน</h3>
-            <p className="text-xs text-muted truncate">แตะที่แท่งเพื่อดูรายละเอียดของแต่ละวัน</p>
+            <p className="text-xs text-muted truncate">คลิกแท่งเพื่อเปิดรายงานของวันนั้น</p>
           </div>
         </div>
         {/* month navigator */}
@@ -129,8 +134,9 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { default
                 <ReferenceLine y={avg} stroke="#98a1b0" strokeDasharray="5 4"
                   label={{ value: `เฉลี่ย ฿${nf(avg)}`, position: "insideTopRight", fontSize: 10, fill: "#98a1b0" }} />
               )}
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={26}>
-                {data.map((d, i) => <Cell key={i} fill={todayDay && d.label === todayDay ? HILITE : BRAND} />)}
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={26} cursor="pointer"
+                onClick={(bar: any) => onPickDay?.(`${month}-${String(bar.label).padStart(2, "0")}`)}>
+                {data.map((d, i) => <Cell key={i} fill={emphasis && d.label === emphasis ? HILITE : BRAND} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -138,7 +144,7 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision }: { default
       </div>
       {hasData && (
         <p className="text-[11px] text-muted mt-2">
-          มียอดขาย {sellingDays} วันในเดือนนี้ · เส้นประ = ค่าเฉลี่ยต่อวันที่ขาย{todayDay ? " · แท่งสีเข้ม = วันนี้" : ""}
+          มียอดขาย {sellingDays} วันในเดือนนี้ · เส้นประ = ค่าเฉลี่ยต่อวันที่ขาย · แท่งสีเข้ม = {selDay ? "วันที่เลือก" : "วันนี้"}
         </p>
       )}
     </div>

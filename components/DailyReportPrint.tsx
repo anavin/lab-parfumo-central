@@ -29,12 +29,20 @@ function groupBills(rows: DaySaleRow[]): Bill[] {
 }
 
 /** Printable A4 daily sales report — professional, black-on-white, easy to scan. */
-export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultSource?: string; revision?: string | number }) {
-  const [date, setDate] = useState(bkkToday());
+export function DailyReportPrint({ defaultSource = "CTW", revision, date: dateProp, onDateChange, open: openProp, onOpenChange }: {
+  defaultSource?: string; revision?: string | number;
+  date?: string; onDateChange?: (d: string) => void;   // controlled date (optional)
+  open?: boolean; onOpenChange?: (o: boolean) => void;  // controlled open (optional)
+}) {
+  const [dateI, setDateI] = useState(bkkToday());
+  const date = dateProp ?? dateI;
+  const setDate = onDateChange ?? setDateI;
+  const [openI, setOpenI] = useState(false);            // collapsed by default — click to reveal
+  const open = openProp ?? openI;
+  const setOpen = onOpenChange ?? setOpenI;
   const [data, setData] = useState<ReportData | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
   const [showDetail, setShowDetail] = useState(true);
-  const [open, setOpen] = useState(false);   // collapsed by default — click to reveal
   const [pending, start] = useTransition();
 
   useEffect(() => {
@@ -101,7 +109,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
   return (
     <div>
       {/* collapsed by default — click to reveal the printable report */}
-      <button onClick={() => setOpen((o) => !o)}
+      <button onClick={() => setOpen(!open)}
         className="no-print w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
         <FileText className="w-4 h-4 text-brand-dark shrink-0" />
         <span className="text-sm font-semibold">รายงานประจำวัน (สำหรับปริ้น)</span>
