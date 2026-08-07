@@ -404,3 +404,57 @@ export function salesByPerson(f: Filter = ALL) {
     group by coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ')
     order by revenue desc`, [f.months, f.source]);
 }
+
+/**
+ * Branch daily report: orders / cash vs transfer-credit / nationality split, from
+ * that day's non-rejected sale lines. `total` (from submissions) is authoritative;
+ * cash = single-channel Cash lines + the cash portion of split ("จ่าย 2 ทาง") bills;
+ * everything else is transfer/credit (total − cash).
+ */
+export async function dailyReport(date: string, source: string) {
+  const [tot] = await q<{ orders: number; total: number }>(`
+    select count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int orders,
+           coalesce(sum(total),0)::float total
+    from submissions
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2`, [date, source]);
+
+  const nat = await q<{ nation: string; cnt: number; amt: number }>(`
+    select coalesce(nullif(nation,''),'ไม่ระบุ') nation,
+           count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int cnt,
+           coalesce(sum(total),0)::float amt
+    from submissions
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
+    group by 1`, [date, source]);
+
+  const [cashLine] = await q<{ c: number }>(`
+    select coalesce(sum(total),0)::float c from submissions
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2 and payment_channel='Cash'`,
+    [date, source]);
+
+  let cashSplit = 0;
+  try {
+    const [r] = await q<{ c: number }>(`
+      select coalesce(sum(bp.amount),0)::float c from bill_payments bp
+      where bp.channel='Cash' and bp.entry_date=$1
+        and bp.bill_ref in (select distinct receipt_no from submissions
+                            where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
+                              and payment_channel=$3 and coalesce(receipt_no,'')<>'')`,
+      [date, source, SPLIT2]);
+    cashSplit = r?.c ?? 0;
+  } catch (e) { if (!missingTable(e)) throw e; }
+
+  const total = tot?.total ?? 0;
+  const cash = (cashLine?.c ?? 0) + cashSplit;
+  const nonCash = Math.max(0, total - cash);
+  const pick = (n: string) => nat.find((x) => x.nation === n);
+  const thai = pick("Thai"), foreign = pick("Foreign");
+  const other = nat.filter((x) => x.nation !== "Thai" && x.nation !== "Foreign");
+  return {
+    orders: tot?.orders ?? 0, total, cash, nonCash,
+    thaiCount: thai?.cnt ?? 0, thaiAmt: thai?.amt ?? 0,
+    foreignCount: foreign?.cnt ?? 0, foreignAmt: foreign?.amt ?? 0,
+    otherCount: other.reduce((s, x) => s + x.cnt, 0),
+    otherAmt: other.reduce((s, x) => s + x.amt, 0),
+  };
+}
+export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;

@@ -6,6 +6,7 @@ import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
 import { DateNav } from "@/components/DateNav";
 import { MyWorkspace } from "@/components/MyWorkspace";
+import { MyCashClose } from "@/components/MyCashClose";
 import { PAYMENTS } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,8 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <Stat label="จำนวน" value={num(kpi.qty)} sub="ชิ้น" />
         <Stat label="เฉลี่ย/บิล" value={baht(kpi.aov)} />
       </div>
+
+      <MyCashClose cash={kpi.channels.find((c) => c.channel === "Cash")?.revenue ?? 0} />
 
       <Card title="ยอดขายของฉัน 14 วันล่าสุด">
         {trend.every((t) => t.revenue === 0) ? (
