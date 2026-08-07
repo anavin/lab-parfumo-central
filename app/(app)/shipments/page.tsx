@@ -1,7 +1,8 @@
-import { PageHeader, Stat, Card, Badge, LinkBtn } from "@/components/ui";
+import { PageHeader, Stat, Card, LinkBtn } from "@/components/ui";
 import { Truck } from "lucide-react";
-import { fmtDate, num } from "@/lib/format";
+import { num } from "@/lib/format";
 import { shipmentSummary } from "@/lib/queries";
+import { ShipmentsTable } from "@/components/ShipmentsTable";
 import { q } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -22,27 +23,8 @@ export default async function ShipmentsPage() {
         <Stat label="จำนวน PO" value={num(agg.pos)} />
         <Stat label="คืนแล้ว" value={num(agg.returned)} tone="danger" />
       </div>
-      <Card title={`สรุปการส่งตาม PO (${rows.length})`}>
-        <div className="max-h-[600px] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="text-ink/40 text-xs text-left sticky top-0 bg-surface"><tr className="border-b">
-              <th className="pb-2">PO Number</th><th className="pb-2">วันที่</th><th className="pb-2">สาขา</th>
-              <th className="pb-2 text-right">หน่วย</th><th className="pb-2 text-right">รับแล้ว</th><th className="pb-2 text-right">คืน</th>
-            </tr></thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.po_number} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
-                  <td className="py-1.5 font-semibold">{r.po_number}</td>
-                  <td className="py-1.5 text-ink/50">{fmtDate(r.ship_date)}</td>
-                  <td className="py-1.5 text-ink/60">{r.branch_label}</td>
-                  <td className="py-1.5 text-right font-medium">{num(r.units)}</td>
-                  <td className="py-1.5 text-right">{r.received ? <Badge tone="success">{r.received}</Badge> : <span className="text-ink/30">-</span>}</td>
-                  <td className="py-1.5 text-right">{r.returned ? <Badge tone="danger">{r.returned}</Badge> : <span className="text-ink/30">-</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card title={`สรุปการส่งตาม PO (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`}>
+        <ShipmentsTable rows={rows} />
       </Card>
     </div>
   );

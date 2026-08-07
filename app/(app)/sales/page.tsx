@@ -1,15 +1,12 @@
-import { PageHeader, Stat, Card, Badge } from "@/components/ui";
-import { baht, num, fmtDate } from "@/lib/format";
+import { PageHeader, Stat, Card } from "@/components/ui";
+import { baht, num } from "@/lib/format";
 import { AddSale, AddCustomerDay } from "@/components/EntryForms";
 import { ExportButton } from "@/components/ExportButton";
+import { MonthlyTable, RecentSalesTable } from "@/components/SalesTables";
 import { Receipt } from "lucide-react";
 import { q } from "@/lib/db";
-import { PAYMENTS } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
-
-const CH_LABEL: Record<string, string> = Object.fromEntries(PAYMENTS.map((p) => [p.v, p.label.replace(/\s*\(.*\)$/, "")]));
-const chLabel = (c: string) => CH_LABEL[c] ?? c;
 
 export default async function SalesPage() {
   const monthly = await q<{ month: string; revenue: number; qty: number; receipts: number }>(`
@@ -35,43 +32,12 @@ export default async function SalesPage() {
         <Stat label="เฉลี่ย/เดือน" value={baht(monthly.length ? tot.revenue / monthly.length : 0)} />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card title="สรุปรายเดือน">
-          <table className="w-full text-sm">
-            <thead><tr className="text-ink/40 text-xs text-left border-b"><th className="pb-2">เดือน</th><th className="pb-2 text-right">ใบเสร็จ</th><th className="pb-2 text-right">ชิ้น</th><th className="pb-2 text-right">รายได้</th></tr></thead>
-            <tbody>
-              {monthly.map((m) => (
-                <tr key={m.month} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
-                  <td className="py-2 font-medium">{m.month}</td>
-                  <td className="py-2 text-right text-ink/60">{num(m.receipts)}</td>
-                  <td className="py-2 text-right text-ink/60">{num(m.qty)}</td>
-                  <td className="py-2 text-right font-medium">{baht(m.revenue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="grid lg:grid-cols-5 gap-4 items-start">
+        <Card title="สรุปรายเดือน" className="lg:col-span-2">
+          <MonthlyTable rows={monthly} />
         </Card>
-
-        <Card title="รายการขายล่าสุด (60)">
-          <div className="max-h-[520px] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="text-muted text-xs text-left sticky top-0 bg-surface"><tr className="border-b border-line-soft"><th className="pb-2">วันที่</th><th className="pb-2">รายการ</th><th className="pb-2">BA</th><th className="pb-2">ช่องทาง</th><th className="pb-2 text-right">จำนวน</th><th className="pb-2 text-right">ยอด</th></tr></thead>
-              <tbody>
-                {recent.map((r, i) => (
-                  <tr key={i} className="border-b border-line-soft last:border-0 hover:bg-canvas transition-colors">
-                    <td className="py-1.5 text-muted whitespace-nowrap">{fmtDate(r.sale_date)}</td>
-                    <td className="py-1.5">{r.item} <span className="text-muted-soft">{r.size}</span>
-                      {r.nation && <Badge tone={r.nation === "Foreign" ? "info" : "gray"}>{r.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</Badge>}
-                    </td>
-                    <td className="py-1.5 text-muted whitespace-nowrap">{r.ba || "-"}</td>
-                    <td className="py-1.5 text-muted whitespace-nowrap">{r.payment_channel ? chLabel(r.payment_channel) : "-"}</td>
-                    <td className="py-1.5 text-right text-muted">{num(r.qty)}</td>
-                    <td className="py-1.5 text-right font-medium">{baht(r.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <Card title="รายการขายล่าสุด (60) · คลิกหัวคอลัมน์เพื่อเรียง" className="lg:col-span-3">
+          <RecentSalesTable rows={recent} />
         </Card>
       </div>
     </div>
