@@ -72,11 +72,11 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
   const sellers = byPerson.map((p) => p.author);   // usually one salesperson per day
   const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 
-  // Print / Save-as-PDF with a tidy filename, e.g. "CTW-Report-2026-08-07" —
+  // Print / Save-as-PDF with a tidy filename, e.g. "CTW-Daily-Report-2026-08-07" —
   // browsers use document.title as the default PDF name, so set it just for the print.
   const printReport = () => {
     const prev = document.title;
-    document.title = `${defaultSource}-Report-${date}`;
+    document.title = `${defaultSource}-Daily-Report-${date}`;
     const restore = () => { document.title = prev; window.removeEventListener("afterprint", restore); };
     window.addEventListener("afterprint", restore);
     window.print();
