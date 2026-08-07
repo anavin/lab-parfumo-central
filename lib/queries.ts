@@ -469,6 +469,18 @@ export function salesByPerson(f: Filter = ALL) {
  * cash = single-channel Cash lines + the cash portion of split ("จ่าย 2 ทาง") bills;
  * everything else is transfer/credit (total − cash).
  */
+/** Daily sales totals across a month (for the review-page monthly chart). $1='YYYY-MM'. */
+export async function dailySalesByMonth(month: string, source: string) {
+  return q<{ d: string; total: number; orders: number }>(`
+    select entry_date::text d,
+           coalesce(sum(total),0)::float total,
+           count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int orders
+    from submissions
+    where kind = 'sale' and status <> 'rejected' and source = $2
+      and to_char(entry_date,'YYYY-MM') = $1${await aliveAnd("")}
+    group by entry_date order by entry_date`, [month, source]);
+}
+
 /** Non-rejected sale lines for one day (for the printable per-bill detail). */
 export async function dailySaleRows(date: string, source: string) {
   return q<SubmissionRow>(`

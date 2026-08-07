@@ -4,6 +4,7 @@ import { pendingSubmissions, recentlyApprovedSubmissions, attachmentsForRefs, pa
 import { PageHeader } from "@/components/ui";
 import { ReviewQueue } from "@/components/ReviewQueue";
 import { DailyReportPrint } from "@/components/DailyReportPrint";
+import { MonthlyDailyChart } from "@/components/MonthlyDailyChart";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function ReviewPage() {
         <PageHeader icon={ClipboardCheck} title="ตรวจสอบยอดขาย"
           subtitle={rows.length ? `${rows.length} รายการรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
       </div>
+      <div className="mb-6"><MonthlyDailyChart revision={`${rows.length}|${approved.length}`} /></div>
       <div className="no-print">
         <ReviewQueue rows={rows} approved={approved} attachments={attachments} payments={payments} />
       </div>
