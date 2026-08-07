@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Printer, FileText } from "lucide-react";
+import { Printer, FileText, ChevronDown } from "lucide-react";
 import { getDailyReport, getDailyBills } from "@/lib/actions/report";
 import { PAYMENTS } from "@/lib/payments";
 import type { DailyReport as ReportData, SubmissionRow } from "@/lib/queries";
@@ -34,6 +34,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
   const [data, setData] = useState<ReportData | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
   const [showDetail, setShowDetail] = useState(true);
+  const [open, setOpen] = useState(false);   // collapsed by default — click to reveal
   const [pending, start] = useTransition();
 
   useEffect(() => {
@@ -88,16 +89,20 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
 
   return (
     <div>
+      {/* collapsed by default — click to reveal the printable report */}
+      <button onClick={() => setOpen((o) => !o)}
+        className="no-print w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
+        <FileText className="w-4 h-4 text-brand-dark shrink-0" />
+        <span className="text-sm font-semibold">รายงานประจำวัน (สำหรับปริ้น)</span>
+        <span className="text-xs text-muted">· คลิกเพื่อดู / ปริ้น</span>
+        <ChevronDown className={`w-4 h-4 text-muted ml-auto transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+      <div className="mt-3">
       {/* controls — hidden when printing */}
       <div className="no-print flex flex-wrap items-center gap-3 mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
-          <div>
-            <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน (สำหรับปริ้น)</h3>
-            <p className="text-xs text-muted">เลือกวันที่แล้วกดปริ้น · สรุปแยกตามพนักงาน</p>
-          </div>
-        </div>
-        <label className="ml-auto flex items-center gap-2 text-sm select-none cursor-pointer">
+        <label className="flex items-center gap-2 text-sm select-none cursor-pointer">
           <input type="checkbox" checked={showDetail} onChange={(e) => setShowDetail(e.target.checked)} className="w-4 h-4 accent-brand" />
           <span className="text-ink">แสดงรายละเอียดแต่ละบิล</span>
         </label>
@@ -107,7 +112,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
             className="border border-line rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
         </label>
         <button onClick={() => window.print()} disabled={!ready}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
+          className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
           <Printer className="w-4 h-4" /> ปริ้นรายงาน
         </button>
       </div>
@@ -250,6 +255,8 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
           </>
         )}
       </div>
+      </div>
+      )}
     </div>
   );
 }
