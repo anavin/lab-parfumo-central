@@ -452,11 +452,12 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
-  // when this card was just added via "เพิ่มเอง", bring it into view and focus the
-  // search box so the user can start typing the next item immediately
+  // when this card was just added via "เพิ่มเอง", scroll it near the TOP (below the
+  // header via scroll-mt) so the keyboard + the search dropdown below the box have
+  // room, then focus the search box to start typing the next item immediately
   useEffect(() => {
     if (!autoFocus) return;
-    nameRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    nameRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     setTimeout(() => nameRef.current?.focus({ preventScroll: true }), 120);
   }, [autoFocus]);
   // qty is a dropdown now (no keyboard) — just fill the product and close the list
@@ -481,7 +482,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       <div className="flex items-center gap-2 mb-2.5">
         <span className="w-5 text-center text-xs font-medium text-muted shrink-0">{index + 1}</span>
         <div className="flex-1 relative min-w-0">
-          <input ref={nameRef} className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
+          <input ref={nameRef} className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium scroll-mt-20 focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
           {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
             {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
           </div>}
