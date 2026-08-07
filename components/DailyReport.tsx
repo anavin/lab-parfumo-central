@@ -137,7 +137,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
             <div className="space-y-1.5">
               <Line label="เงินสดหน้าร้านยกมา" value={`${nf(openingN)} บาท`} />
               <Line label="เงินสดหน้าร้าน" value={`${nf(cashOnHand)} บาท`} />
-              <Line label="🏦 เข้าธนาคาร" value={`${nf(depositN)} บาท`} />
+              <Line label="🏦 เข้าธนาคาร" value={`${nf(depositN)} บาท`} strong />
               <Line label="💵 เงินสดหน้าร้านคงเหลือ" value={`${nf(closing)} บาท`} strong />
             </div>
             <p className="text-[11px] text-muted mt-1.5 text-center">คงเหลือ {nf(closing)} → ยกไปเป็น &quot;เงินสดหน้าร้านยกมา&quot; ของวันพรุ่งนี้</p>
