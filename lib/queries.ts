@@ -485,67 +485,73 @@ export async function dailySalesByMonth(month: string, source: string) {
     group by d order by d`, [month, source]);
 }
 
-/** Non-rejected sale lines for one day (for the printable per-bill detail). */
-export async function dailySaleRows(date: string, source: string) {
-  return q<SubmissionRow>(`
-    select ${SUB_COLS}
-    from submissions s
-    join users u on u.id = s.created_by
-    left join users r on r.id = s.reviewed_by
-    where s.kind = 'sale' and s.status <> 'rejected' and s.entry_date = $1 and s.source = $2${await aliveAnd("s")}
-    order by s.sale_time nulls last, s.created_at, s.id`, [date, source]);
+export type DaySaleRow = {
+  id: number; src: string; receipt_no: string | null; item: string | null; size: string | null;
+  qty: number; unit_price: number; discount: number; total: number;
+  payment_channel: string | null; nation: string | null; sale_time: string | null;
+  author: string; created_by: number | null; entry_date: string;
+};
+
+/** One day's sale lines from the live `sales` table (approved + imported history) PLUS
+ *  still-pending submissions (not yet copied to sales) — no double-count. Feeds both the
+ *  daily report summary and the printable per-bill detail, so both include old data. */
+export async function dailySaleRows(date: string, source: string, userId: number | null = null): Promise<DaySaleRow[]> {
+  return q<DaySaleRow>(`
+    select id, 'sale'::text src, receipt_no, item, size,
+           qty::float qty, unit_price::float unit_price, coalesce(discount,0)::float discount, total::float total,
+           payment_channel, nation, sale_time::text sale_time,
+           coalesce(ba,'') author, created_by, sale_date::text entry_date
+    from sales
+    where sale_date = $1 and source = $2 and ($3::bigint is null or created_by = $3)
+    union all
+    select s.id, 'sub'::text src, s.receipt_no, s.item, s.size,
+           s.qty::float, s.unit_price::float, coalesce(s.discount,0)::float, s.total::float,
+           s.payment_channel, s.nation, s.sale_time::text,
+           coalesce(u.full_name,'') author, s.created_by, s.entry_date::text
+    from submissions s join users u on u.id = s.created_by
+    where s.kind = 'sale' and s.status = 'pending' and s.entry_date = $1 and s.source = $2
+      and ($3::bigint is null or s.created_by = $3)${await aliveAnd("s")}
+    order by sale_time nulls last, id`, [date, source, userId]);
 }
 
 export async function dailyReport(date: string, source: string, userId: number | null = null) {
-  const alive = await aliveAnd("");
-  // $3 = userId (null = whole branch; a value = only that salesperson's sales)
-  const [tot] = await q<{ orders: number; total: number }>(`
-    select count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int orders,
-           coalesce(sum(total),0)::float total
-    from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2${alive}
-      and ($3::bigint is null or created_by=$3)`, [date, source, userId]);
+  const rows = await dailySaleRows(date, source, userId);
+  const billKey = (r: DaySaleRow) => (r.receipt_no && r.receipt_no.trim() ? `r:${r.receipt_no}` : `i:${r.src}${r.id}`);
 
-  const nat = await q<{ nation: string; cnt: number; amt: number }>(`
-    select coalesce(nullif(nation,''),'ไม่ระบุ') nation,
-           count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int cnt,
-           coalesce(sum(total),0)::float amt
-    from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2${alive}
-      and ($3::bigint is null or created_by=$3)
-    group by 1`, [date, source, userId]);
+  const total = rows.reduce((s, r) => s + (r.total || 0), 0);
+  const orders = new Set(rows.map(billKey)).size;
 
-  const [cashLine] = await q<{ c: number }>(`
-    select coalesce(sum(total),0)::float c from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2 and payment_channel='Cash'${alive}
-      and ($3::bigint is null or created_by=$3)`,
-    [date, source, userId]);
-
+  // cash = single-channel Cash lines + the cash portion of split ("จ่าย 2 ทาง") bills
+  const cashLine = rows.filter((r) => r.payment_channel === "Cash").reduce((s, r) => s + (r.total || 0), 0);
+  const splitRefs = [...new Set(rows.filter((r) => r.payment_channel === SPLIT2 && r.receipt_no).map((r) => r.receipt_no as string))];
   let cashSplit = 0;
-  try {
-    const [r] = await q<{ c: number }>(`
-      select coalesce(sum(bp.amount),0)::float c from bill_payments bp
-      where bp.channel='Cash' and bp.entry_date=$1 and ($4::bigint is null or bp.created_by=$4)
-        and bp.bill_ref in (select distinct receipt_no from submissions
-                            where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2${alive}
-                              and payment_channel=$3 and coalesce(receipt_no,'')<>''
-                              and ($4::bigint is null or created_by=$4))`,
-      [date, source, SPLIT2, userId]);
-    cashSplit = r?.c ?? 0;
-  } catch (e) { if (!missingTable(e)) throw e; }
-
-  const total = tot?.total ?? 0;
-  const cash = (cashLine?.c ?? 0) + cashSplit;
+  if (splitRefs.length) {
+    try {
+      const [r] = await q<{ c: number }>(
+        `select coalesce(sum(amount),0)::float c from bill_payments where channel='Cash' and bill_ref = any($1)`, [splitRefs]);
+      cashSplit = r?.c ?? 0;
+    } catch (e) { if (!missingTable(e)) throw e; }
+  }
+  const cash = cashLine + cashSplit;
   const nonCash = Math.max(0, total - cash);
-  const pick = (n: string) => nat.find((x) => x.nation === n);
-  const thai = pick("Thai"), foreign = pick("Foreign");
-  const other = nat.filter((x) => x.nation !== "Thai" && x.nation !== "Foreign");
+
+  // nationality — distinct bills + amount per nation
+  const nat = new Map<string, { bills: Set<string>; amt: number }>();
+  for (const r of rows) {
+    const key = r.nation && r.nation.trim() ? r.nation : "ไม่ระบุ";
+    const e = nat.get(key) ?? { bills: new Set<string>(), amt: 0 };
+    e.bills.add(billKey(r)); e.amt += r.total || 0;
+    nat.set(key, e);
+  }
+  const thai = nat.get("Thai"), foreign = nat.get("Foreign");
+  let otherCount = 0, otherAmt = 0;
+  for (const [k, e] of nat) if (k !== "Thai" && k !== "Foreign") { otherCount += e.bills.size; otherAmt += e.amt; }
+
   return {
-    orders: tot?.orders ?? 0, total, cash, nonCash,
-    thaiCount: thai?.cnt ?? 0, thaiAmt: thai?.amt ?? 0,
-    foreignCount: foreign?.cnt ?? 0, foreignAmt: foreign?.amt ?? 0,
-    otherCount: other.reduce((s, x) => s + x.cnt, 0),
-    otherAmt: other.reduce((s, x) => s + x.amt, 0),
+    orders, total, cash, nonCash,
+    thaiCount: thai?.bills.size ?? 0, thaiAmt: thai?.amt ?? 0,
+    foreignCount: foreign?.bills.size ?? 0, foreignAmt: foreign?.amt ?? 0,
+    otherCount, otherAmt,
   };
 }
 export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;

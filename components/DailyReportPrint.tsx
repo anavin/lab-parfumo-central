@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Printer, FileText, ChevronDown } from "lucide-react";
 import { getDailyReport, getDailyBills } from "@/lib/actions/report";
 import { PAYMENTS } from "@/lib/payments";
-import type { DailyReport as ReportData, SubmissionRow } from "@/lib/queries";
+import type { DailyReport as ReportData, DaySaleRow } from "@/lib/queries";
 
 const SRC_LABEL: Record<string, string> = { CTW: "Central World (CTW)", EVENT_SCS: "Event" };
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
@@ -13,9 +13,9 @@ const thaiDate = (iso: string) =>
 const payLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v || "-";
 const natLabel = (n: string) => (n === "Foreign" ? "ต่างชาติ" : n === "Thai" ? "ไทย" : "-");
 
-type Bill = { key: string; no: number; time: string; author: string; nation: string; pay: string; rows: SubmissionRow[]; total: number };
-function groupBills(rows: SubmissionRow[]): Bill[] {
-  const map = new Map<string, SubmissionRow[]>();
+type Bill = { key: string; no: number; time: string; author: string; nation: string; pay: string; rows: DaySaleRow[]; total: number };
+function groupBills(rows: DaySaleRow[]): Bill[] {
+  const map = new Map<string, DaySaleRow[]>();
   const order: string[] = [];
   for (const r of rows) {
     const k = r.receipt_no || `id:${r.id}`;
