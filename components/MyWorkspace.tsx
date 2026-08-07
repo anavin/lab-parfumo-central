@@ -201,6 +201,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
+  const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
   const addItem = (patch: Partial<BillItem> = {}) => setState({ ...state, items: [...state.items, newItem(patch)] });
   // manual add: append an empty row and mark it so its card scrolls up + focuses the search box
@@ -262,6 +263,21 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     : [];
   const chLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label || (v === "?" ? "ยังไม่เลือก" : v);
 
+  // on a failed save, jump to the first unfilled field (top→bottom: items → สัญชาติ → payment)
+  const scrollToMissing = (m: string[]) => {
+    requestAnimationFrame(() => {
+      const root = rootRef.current;
+      if (!root) return;
+      if (m.includes("สินค้า") || m.includes("ชื่อสินค้าให้ครบ")) {
+        const empty = [...root.querySelectorAll<HTMLInputElement>('input[placeholder*="ค้นหากลิ่น"]')].find((i) => !i.value.trim());
+        if (empty) { empty.scrollIntoView({ block: "start", behavior: "smooth" }); setTimeout(() => empty.focus({ preventScroll: true }), 200); return; }
+        root.scrollIntoView({ block: "start", behavior: "smooth" }); return;
+      }
+      const field = m.includes("สัญชาติ") ? "สัญชาติ" : "ช่องทางชำระ";
+      root.querySelector<HTMLElement>(`[data-field="${field}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  };
+
   const submit = () => {
     const m: string[] = [];
     if (split) {
@@ -274,7 +290,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     if (state.items.length === 0) m.push("สินค้า");
     else if (state.items.some((it) => !String(it.item || "").trim())) m.push("ชื่อสินค้าให้ครบ");
     setMissing(m);
-    if (m.length > 0) return;
+    if (m.length > 0) { scrollToMissing(m); return; }
     const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel }));
     const outTenders = split ? tenders.map((t, i) => ({ channel: t.channel, amount: tenderAmount(i) })) : undefined;
     onSubmit(items, outTenders);
@@ -282,7 +298,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-danger border-danger" : "");
 
   return (
-    <div className="card p-4 sm:p-5 mb-4">
+    <div ref={rootRef} className="card p-4 sm:p-5 mb-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold text-ink">บิลใหม่ · ลูกค้า 1 คน</h3>
         <span className="text-xs text-muted">{fullName}</span>
@@ -301,7 +317,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       </div>
 
       {/* nationality — big toggle */}
-      <div className="mb-3">
+      <div className="mb-3" data-field="สัญชาติ">
         <div className="text-xs text-muted mb-1">สัญชาติลูกค้า *</div>
         <div className={"grid grid-cols-2 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-danger rounded-lg p-0.5" : "")}>
           {([["Thai", "🇹🇭 ไทย"], ["Foreign", "🌏 ต่างชาติ"]] as const).map(([v, l]) => (
@@ -337,7 +353,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       </div>
 
       {/* payment — last major step, once items + discount give a final net total */}
-      <div className="mb-4 border-t border-line/60 pt-3">
+      <div className="mb-4 border-t border-line/60 pt-3" data-field="ช่องทางชำระ">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-muted">ช่องทางชำระ *{state.splitPay ? " (ค่าเริ่มต้นทุกชิ้น)" : ""}</span>
           {!split && (
