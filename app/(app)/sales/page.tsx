@@ -3,7 +3,6 @@ import { baht, num } from "@/lib/format";
 import { AddSale, AddCustomerDay } from "@/components/EntryForms";
 import { ExportButton } from "@/components/ExportButton";
 import { MonthlyTable, RecentSalesTable } from "@/components/SalesTables";
-import { DailyReport } from "@/components/DailyReport";
 import { Receipt } from "lucide-react";
 import { q } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/require-user";
@@ -45,8 +44,6 @@ export default async function SalesPage() {
         <Stat label="เดือนที่มีข้อมูล" value={String(monthly.length)} />
         <Stat label="เฉลี่ย/เดือน" value={baht(monthly.length ? tot.revenue / monthly.length : 0)} />
       </div>
-
-      <div className="mb-6"><DailyReport revision={`${tot.revenue}|${recent.length}`} /></div>
 
       <Card title={`ส่วนลดรายเดือน · เฉลี่ยรวม ${avgRate.toFixed(1)}% ของราคาเต็ม`} bodyClass="p-0 overflow-x-auto" className="mb-6">
         <table className="w-full text-sm">
