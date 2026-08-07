@@ -37,16 +37,25 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
 
   const add = () => start(async () => {
     setMsg("");
-    try { await createUser(f); setF({ username: "", full_name: "", role: "staff", password: "" }); setOpen(false); router.refresh(); }
-    catch (e: any) { setMsg(e?.message ?? "เพิ่มไม่สำเร็จ"); }
+    try {
+      const r = await createUser(f);
+      if (r?.ok) { setF({ username: "", full_name: "", role: "staff", password: "" }); setOpen(false); router.refresh(); }
+      else setMsg(r?.error ?? "เพิ่มไม่สำเร็จ");
+    } catch { setMsg("เพิ่มไม่สำเร็จ ลองใหม่อีกครั้ง"); }
   });
   const toggle = (u: U) => start(async () => {
-    try { await setUserActive(u.id, !u.is_active); router.refresh(); } catch (e: any) { alert(e?.message ?? "ทำไม่สำเร็จ"); }
+    try { const r = await setUserActive(u.id, !u.is_active); if (r?.ok) router.refresh(); else alert(r?.error ?? "ทำไม่สำเร็จ"); }
+    catch { alert("ทำไม่สำเร็จ ลองใหม่อีกครั้ง"); }
   });
   const reset = (u: U) => {
     const pw = prompt(`ตั้งรหัสผ่านใหม่ให้ @${u.username} (อย่างน้อย 8 ตัว มีตัวอักษร+ตัวเลข)`);
     if (!pw) return;
-    start(async () => { try { await resetPassword(u.id, pw); alert("รีเซ็ตรหัสผ่านแล้ว · ผู้ใช้ต้องล็อกอินใหม่"); } catch (e: any) { alert(e?.message); } });
+    start(async () => {
+      try {
+        const r = await resetPassword(u.id, pw);
+        alert(r?.ok ? "รีเซ็ตรหัสผ่านแล้ว · ผู้ใช้ต้องล็อกอินใหม่" : (r?.error ?? "รีเซ็ตไม่สำเร็จ"));
+      } catch { alert("รีเซ็ตไม่สำเร็จ ลองใหม่อีกครั้ง"); }
+    });
   };
 
   return (
@@ -190,9 +199,9 @@ function AccessEditor({ u, onClose, onSaved }: { u: U; onClose: () => void; onSa
   const save = () => start(async () => {
     try {
       const custom = !isAdmin && !eq(perms, presetSet(role));
-      await updateUserAccess(u.id, role, custom ? [...perms] : null);
-      onSaved();
-    } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
+      const r = await updateUserAccess(u.id, role, custom ? [...perms] : null);
+      if (r?.ok) onSaved(); else alert(r?.error ?? "บันทึกไม่สำเร็จ");
+    } catch { alert("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); }
   });
 
   return (
