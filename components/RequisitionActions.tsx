@@ -2,23 +2,18 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setRequisitionStatus, deleteRequisition } from "@/lib/actions/requisitions";
+import { Select } from "@/components/ui/Select";
+
+const STATUS_OPTS = ["draft", "issued", "delivered", "closed"].map((s) => ({ value: s, label: s }));
 
 export function RequisitionActions({ id, status }: { id: number; status: string }) {
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
     <div className="no-print flex items-center gap-2">
-      <select
-        defaultValue={status}
-        onChange={(e) => start(async () => { await setRequisitionStatus(id, e.target.value); router.refresh(); })}
-        className="border border-line rounded-lg px-2.5 py-2 text-sm bg-surface"
-        disabled={pending}
-      >
-        <option value="draft">draft</option>
-        <option value="issued">issued</option>
-        <option value="delivered">delivered</option>
-        <option value="closed">closed</option>
-      </select>
+      <Select value={status}
+        onValueChange={(v) => start(async () => { await setRequisitionStatus(id, v); router.refresh(); })}
+        options={STATUS_OPTS} className="min-w-[130px]" />
       <a href={`/requisitions/${id}/edit`} className="px-3.5 py-2 rounded-lg border border-line text-sm font-medium hover:bg-canvas">✎ แก้ไข</a>
       <button
         onClick={() => { if (confirm("ลบใบเบิกนี้?")) start(() => deleteRequisition(id)); }}

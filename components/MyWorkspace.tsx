@@ -344,7 +344,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
             <div className="flex items-center justify-between gap-2">
               <button type="button" onClick={addTender} disabled={tenders.length >= 3}
                 className="text-xs text-brand-dark hover:underline disabled:opacity-40 disabled:no-underline inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> เพิ่มช่องทาง</button>
-              <span className={"text-xs font-medium " + (tenderMatches ? "text-green-600" : "text-danger")}>
+              <span className={"text-xs font-medium " + (tenderMatches ? "text-success" : "text-danger")}>
                 รวมชำระ {baht(tenderSum)}{tenderMatches ? " · ตรงกับยอดบิล" : (tenderSum < net ? ` · ขาด ${baht(net - tenderSum)}` : ` · เกิน ${baht(tenderSum - net)}`)}
               </span>
             </div>

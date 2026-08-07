@@ -29,7 +29,7 @@ export function SplitTenders({ value, onChange, net, onPick }: { value: Tender[]
                 className={"w-full border border-line rounded-lg pl-6 pr-2 py-2 text-sm text-right tabular-nums focus:outline-none focus:border-brand " + (last ? "bg-canvas text-muted" : "bg-surface")} />
             </div>
             {value.length > 2 && !last && (
-              <button type="button" onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="p-1 rounded text-muted hover:text-red-600 shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
+              <button type="button" onClick={() => onChange(value.filter((_, idx) => idx !== i))} className="p-1 rounded text-muted hover:text-danger shrink-0" aria-label="ลบช่องทาง"><Trash2 className="w-4 h-4" /></button>
             )}
           </div>
         );
@@ -37,7 +37,7 @@ export function SplitTenders({ value, onChange, net, onPick }: { value: Tender[]
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => onChange([...value, { channel: "", amount: "" }])} disabled={value.length >= 3}
           className="text-xs text-brand-dark hover:underline disabled:opacity-40 disabled:no-underline inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> เพิ่มช่องทาง</button>
-        <span className={"text-xs font-medium " + (matches ? "text-green-600" : "text-danger")}>
+        <span className={"text-xs font-medium " + (matches ? "text-success" : "text-danger")}>
           รวมชำระ {baht(sum)}{matches ? " · ตรงกับยอดบิล" : (sum < net ? ` · ขาด ${baht(net - sum)}` : ` · เกิน ${baht(sum - net)}`)}
         </span>
       </div>

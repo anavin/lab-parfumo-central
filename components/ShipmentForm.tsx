@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getPoItems } from "@/lib/actions/lookups";
 import { createShipment } from "@/lib/actions/logistics";
+import { Select } from "@/components/ui/Select";
 
 type PO = { po_number: string; order_date: string; branch_label: string; lines: number; qty: number };
 type Line = { barcode: string; scent: string; size: string; grade: string; qty: number; skus: string };
@@ -46,10 +47,8 @@ export function ShipmentForm({ pos }: { pos: PO[] }) {
     <div className="space-y-5">
       <div className="card p-5 grid md:grid-cols-2 gap-4">
         <label className="block"><span className="text-xs text-ink/50 mb-1 block">เลือก PO / ใบเบิก *</span>
-          <select className="inp" defaultValue="" onChange={(e) => onSelect(e.target.value)}>
-            <option value="" disabled>— เลือก —</option>
-            {pos.map((p) => <option key={p.po_number} value={p.po_number}>{p.po_number} · {p.branch_label} · {p.qty} ขวด</option>)}
-          </select>
+          <Select value={po?.po_number ?? ""} onValueChange={onSelect} placeholder="— เลือก —"
+            options={pos.map((p) => ({ value: p.po_number, label: `${p.po_number} · ${p.branch_label} · ${p.qty} ขวด` }))} />
         </label>
         <label className="block"><span className="text-xs text-ink/50 mb-1 block">วันที่ส่ง</span>
           <input type="date" className="inp" value={date} onChange={(e) => setDate(e.target.value)} /></label>

@@ -152,7 +152,7 @@ function ItemRow({ index, item, onChange, onRemove }: { index: number; item: Ite
       <input value={item.barcode} onChange={(e) => onChange({ barcode: e.target.value })} placeholder="Barcode" className="inp !w-40 font-mono text-xs" />
       <input value={item.size} onChange={(e) => onChange({ size: e.target.value })} placeholder="ขนาด" className="inp !w-24" />
       <input type="number" min={0} value={item.qty} onChange={(e) => onChange({ qty: Number(e.target.value) })} className="inp !w-20 text-right" />
-      <button onClick={onRemove} className="pt-2 text-ink/30 hover:text-red-500" title="ลบ">✕</button>
+      <button onClick={onRemove} className="pt-2 text-ink/30 hover:text-danger" title="ลบ">✕</button>
     </div>
   );
 }

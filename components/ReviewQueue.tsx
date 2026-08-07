@@ -105,7 +105,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   return (
     <div className="space-y-8">
       {rows.length === 0 ? (
-        <div className="card px-4 py-16 text-center text-muted"><CheckCheck className="w-8 h-8 mx-auto mb-2 text-green-500" /><div className="text-sm">ไม่มีรายการรอตรวจสอบ</div></div>
+        <div className="card px-4 py-16 text-center text-muted"><CheckCheck className="w-8 h-8 mx-auto mb-2 text-success" /><div className="text-sm">ไม่มีรายการรอตรวจสอบ</div></div>
       ) : (
       <div className="space-y-6">
       {days.map((day) => {
@@ -214,7 +214,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
         <div>
           <button onClick={() => setShowApproved((v) => !v)}
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
-            <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-success shrink-0" />
             <span className="text-sm font-semibold">อนุมัติแล้ว (ยกเลิกได้)</span>
             <span className="text-xs text-muted">· {approvedBillCount} บิล · 7 วันล่าสุด</span>
             <ChevronDown className={`w-4 h-4 text-muted ml-auto transition-transform ${showApproved ? "rotate-180" : ""}`} />

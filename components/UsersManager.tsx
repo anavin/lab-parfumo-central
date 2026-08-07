@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { UserPlus, KeyRound, Power, ShieldCheck, Check, ChevronDown, RotateCcw } from "lucide-react";
 import { createUser, setUserActive, resetPassword, updateUserAccess } from "@/lib/actions/auth";
 import { Badge } from "@/components/ui";
+import { Select } from "@/components/ui/Select";
 import {
   ROLES, ROLE_LABEL, ROLE_PRESETS, PERMISSIONS, ALL_PERM_KEYS,
   effectivePermissions, type PermKey, type RoleKey,
@@ -63,9 +64,8 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
           <label className="block"><span className="text-xs text-muted mb-1 block">ชื่อ-นามสกุล</span>
             <input className={inp} value={f.full_name} onChange={(e) => s("full_name", e.target.value)} /></label>
           <label className="block"><span className="text-xs text-muted mb-1 block">บทบาท</span>
-            <select className={inp} value={f.role} onChange={(e) => s("role", e.target.value)}>
-              {ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
-            </select></label>
+            <Select value={f.role} onValueChange={(v) => s("role", v)}
+              options={ROLES.map((r) => ({ value: r.key, label: r.label }))} className="py-2.5" /></label>
           <label className="block"><span className="text-xs text-muted mb-1 block">รหัสผ่าน</span>
             <input className={inp} type="text" value={f.password} onChange={(e) => s("password", e.target.value)} placeholder="8+ ตัว อักษร+เลข" /></label>
           <p className="md:col-span-4 text-[11px] text-muted-soft -mt-1">{ROLES.find((r) => r.key === f.role)?.desc}</p>

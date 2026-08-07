@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createReturn } from "@/lib/actions/logistics";
+import { Select } from "@/components/ui/Select";
 
 export function ReturnForm({ pos }: { pos: { po_number: string; branch_label: string }[] }) {
   const [po, setPo] = useState("");
@@ -28,10 +29,8 @@ export function ReturnForm({ pos }: { pos: { po_number: string; branch_label: st
     <div className="space-y-5">
       <div className="card p-5 grid md:grid-cols-2 gap-4">
         <label className="block"><span className="text-xs text-ink/50 mb-1 block">PO / ใบเบิก *</span>
-          <select className="inp" value={po} onChange={(e) => setPo(e.target.value)}>
-            <option value="" disabled>— เลือก —</option>
-            {pos.map((p) => <option key={p.po_number} value={p.po_number}>{p.po_number} · {p.branch_label}</option>)}
-          </select></label>
+          <Select value={po} onValueChange={setPo} placeholder="— เลือก —"
+            options={pos.map((p) => ({ value: p.po_number, label: `${p.po_number} · ${p.branch_label}` }))} /></label>
         <label className="block"><span className="text-xs text-ink/50 mb-1 block">วันที่คืน</span>
           <input type="date" className="inp" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className="block md:col-span-2"><span className="text-xs text-ink/50 mb-1 block">รหัสหน่วยที่คืน (SKU) — 1 รหัส/บรรทัด</span>
