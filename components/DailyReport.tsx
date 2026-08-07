@@ -26,8 +26,8 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
 
   const openingN = Number(opening) || 0;
   const depositN = Number(deposit) || 0;
-  // เงินสดหน้าร้าน (คงเหลือปลายวัน) = ยอดยกมา + เงินสดรับ − ฝากเข้าธนาคาร
-  const change = Math.max(0, openingN + (data?.cash ?? 0) - depositN);
+  const cashOnHand = openingN + (data?.cash ?? 0);   // เงินสดหน้าร้าน = ยกมา + เงินสดรับ (ก่อนฝาก)
+  const closing = Math.max(0, cashOnHand - depositN); // คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร → ยกไปวันถัดไป
 
   const text = useMemo(() => {
     if (!data) return "";
@@ -45,11 +45,12 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
       ...(data.otherCount > 0 ? [`อื่นๆ/ไม่ระบุ ${data.otherCount} ราย เป็นเงิน ${nf(data.otherAmt)} บาท`] : []),
       ``,
       `เงินสดหน้าร้านยกมา ${nf(openingN)} บาท`,
-      `💵 เงินสดหน้าร้าน ${nf(change)} บาท`,
+      `เงินสดหน้าร้าน ${nf(cashOnHand)} บาท`,
       `🏦 เข้าธนาคาร ${nf(depositN)} บาท`,
+      `💵 เงินสดหน้าร้านคงเหลือ ${nf(closing)} บาท`,
     ];
     return lines.join("\n");
-  }, [data, source, date, change, depositN, openingN]);
+  }, [data, source, date, cashOnHand, closing, depositN, openingN]);
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
@@ -135,14 +136,16 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
             <Rule />
             <div className="space-y-1.5">
               <Line label="เงินสดหน้าร้านยกมา" value={`${nf(openingN)} บาท`} />
-              <Line label="💵 เงินสดหน้าร้าน" value={`${nf(change)} บาท`} strong />
+              <Line label="เงินสดหน้าร้าน" value={`${nf(cashOnHand)} บาท`} />
               <Line label="🏦 เข้าธนาคาร" value={`${nf(depositN)} บาท`} />
+              <Line label="💵 เงินสดหน้าร้านคงเหลือ" value={`${nf(closing)} บาท`} strong />
             </div>
+            <p className="text-[11px] text-muted mt-1.5 text-center">คงเหลือ {nf(closing)} → ยกไปเป็น &quot;เงินสดหน้าร้านยกมา&quot; ของวันพรุ่งนี้</p>
           </>
         )}
       </div>
 
-      <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = เงินสดหน้าร้านยกมา + เงินสดรับ − ฝากเข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
+      <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = ยกมา + เงินสดรับ · คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
 
       <button onClick={copy} disabled={!ready}
         className="w-full mt-3 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
