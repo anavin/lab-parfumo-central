@@ -147,8 +147,10 @@ function ProfileEditor({ u, onClose, onSaved }: { u: U; onClose: () => void; onS
   const [err, setErr] = useState("");
   const save = () => start(async () => {
     setErr("");
-    try { await updateUserProfile(u.id, { full_name: fullName, username }); onSaved(); }
-    catch (e: any) { setErr(e?.message ?? "บันทึกไม่สำเร็จ"); }
+    try {
+      const r = await updateUserProfile(u.id, { full_name: fullName, username });
+      if (r?.ok) onSaved(); else setErr(r?.error ?? "บันทึกไม่สำเร็จ");
+    } catch { setErr("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); }
   });
   return (
     <div className="max-w-lg">
