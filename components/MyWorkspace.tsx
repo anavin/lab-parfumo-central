@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { SplitTenders } from "@/components/SplitTenders";
+import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 
@@ -84,6 +85,19 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // new sales are always recorded for TODAY (not the day being reviewed)
   const startScan = () => { setEdit(null); setAutoScan(true); setBill(blankBill(today, false)); };
   const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(today, true)); };
+
+  // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
+  // Once a bill is open, BillForm's own scanner listener adds subsequent items.
+  const scanToNewBill = (code: string) => start(async () => {
+    try {
+      const p = await findProductByBarcode(code);
+      const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
+                   : newItem({ barcode: code });
+      setEdit(null); setAutoScan(false); setBill({ ...blankBill(today, false), items: [it] });
+      try { navigator.vibrate?.(40); } catch {}
+    } catch (e: any) { onActionError(e); }
+  });
+  useBarcodeScanner(!bill && !edit, scanToNewBill);
 
   // scroll to the form whenever it opens (new bill or edit)
   useEffect(() => {
@@ -212,6 +226,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
+  const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
   const addItem = (patch: Partial<BillItem> = {}) => setState({ ...state, items: [...state.items, newItem(patch)] });
@@ -238,6 +253,15 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     addItem({ barcode: code });
     return { ok: false, label: `บาร์โค้ด ${code}`, sub: "" };
   };
+
+  // hardware (Bluetooth/USB) scanner: same pipeline as the camera, with a quick
+  // vibrate + on-screen confirmation of the last item scanned
+  useBarcodeScanner(true, (code) => {
+    onScanned(code).then((r) => {
+      try { navigator.vibrate?.(40); } catch {}
+      setLastScan(r); setTimeout(() => setLastScan((x) => (x === r ? null : x)), 2000);
+    });
+  });
 
   // effective payment channel for an item: its own override when split (falling
   // back to the bill default), else the bill default for everyone
@@ -335,9 +359,19 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       </div>
 
       {/* add item */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-2">
         <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
         <button onClick={addManual} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
+      </div>
+      {/* hardware scanner status / last-scan feedback */}
+      <div className="mb-4 min-h-[20px] text-xs">
+        {lastScan ? (
+          <span className={lastScan.ok ? "text-success font-medium" : "text-warn font-medium"}>
+            {lastScan.ok ? "✓ เพิ่ม " : "⚠ ไม่พบ "}{lastScan.label}{lastScan.sub ? ` · ${lastScan.sub}` : ""}
+          </span>
+        ) : (
+          <span className="text-muted inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-success inline-block" /> เครื่องสแกนพร้อม — ยิงบาร์โค้ดได้เลย</span>
+        )}
       </div>
 
       {/* nationality — big toggle */}
