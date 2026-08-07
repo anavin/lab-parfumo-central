@@ -185,7 +185,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
             </div>
 
             {/* bills of the day */}
-            <div className="grid gap-3 items-start">
+            <div className="grid gap-3 lg:grid-cols-2 items-start">
               {day.bills.map((bill, i) => {
                 const first = bill.rows[0];
                 const total = bill.rows.reduce((s, r) => s + (r.total ?? 0), 0);
@@ -290,7 +290,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                       <span className="text-sm font-semibold">{fmtThaiDay(day.date)}</span>
                       <span className="text-xs text-muted whitespace-nowrap">· {day.bills.length} บิล · {baht(dayTotal)}</span>
                     </div>
-                    <div className="grid gap-3 items-start">
+                    <div className="grid gap-3 lg:grid-cols-2 items-start">
                       {day.bills.map((bill, i) => {
                         const first = bill.rows[0];
                         const total = bill.rows.reduce((s, r) => s + (r.total ?? 0), 0);
