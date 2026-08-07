@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ClipboardCopy, Check, FileText } from "lucide-react";
-import { getDailyReport } from "@/lib/actions/report";
+import { getDailyReport, getMyCashFloat, saveMyCashFloat } from "@/lib/actions/report";
 import type { DailyReport as ReportData } from "@/lib/queries";
 
 const SRC_SHORT: Record<string, string> = { CTW: "CTW", EVENT_SCS: "Event" };
@@ -16,7 +16,9 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
   const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (opening float carried from the previous day)
   const [deposit, setDeposit] = useState("");
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);   // brief "จำแล้ว" flash on autosave (mine only)
   const [pending, start] = useTransition();
+  const loaded = useRef(false);
 
   // re-fetch on date change AND whenever `revision` changes (the page re-renders it
   // after a bill is saved/approved via router.refresh, so the report stays live)
@@ -24,10 +26,29 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
     start(async () => { try { setData(await getDailyReport(date, source, mine)); } catch { setData(null); } });
   }, [date, source, revision, mine]);
 
+  // on /my: load the saved opening/deposit for the day (opening carries forward)
+  useEffect(() => {
+    if (!mine) return;
+    loaded.current = false;
+    getMyCashFloat(date)
+      .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); })
+      .catch(() => {})
+      .finally(() => { loaded.current = true; });
+  }, [date, mine]);
+
   const openingN = Number(opening) || 0;
   const depositN = Number(deposit) || 0;
   const cashOnHand = openingN + (data?.cash ?? 0);   // เงินสดหน้าร้าน = ยกมา + เงินสดรับ (ก่อนฝาก)
   const closing = Math.max(0, cashOnHand - depositN); // คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร → ยกไปวันถัดไป
+
+  // on /my: autosave the drawer figures (debounced) so they persist + carry forward
+  useEffect(() => {
+    if (!mine || !loaded.current) return;
+    const t = setTimeout(() => {
+      saveMyCashFloat(date, openingN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [mine, date, openingN, depositN, closing]);
 
   const text = useMemo(() => {
     if (!data) return "";
@@ -77,7 +98,12 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
         <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน</h3>
-          <p className="text-xs text-muted">คัดลอกส่ง LINE ได้เลย</p>
+          <p className="text-xs text-muted">
+            คัดลอกส่ง LINE ได้เลย
+            {mine && (saved
+              ? <span className="text-success ml-1">· ✓ จำแล้ว</span>
+              : <span className="text-muted-soft ml-1">· จำค่าเงินสดให้อัตโนมัติ</span>)}
+          </p>
         </div>
       </div>
 

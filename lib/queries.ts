@@ -463,3 +463,30 @@ export async function dailyReport(date: string, source: string, userId: number |
   };
 }
 export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;
+
+// ---- daily cash drawer (opening float carries forward) --------------------
+const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_cash"? does not exist/i.test(String(e?.message || ""));
+
+/** Saved opening/deposit for a user's day; if none, opening carries from the latest
+ *  prior day's closing. Returns zeros gracefully if the table isn't there yet (prod). */
+export async function getDailyCash(date: string, userId: number) {
+  try {
+    const [row] = await q<{ opening: number; deposit: number }>(
+      `select opening::float, deposit::float from daily_cash where entry_date=$1 and created_by=$2`, [date, userId]);
+    if (row) return { opening: row.opening, deposit: row.deposit, saved: true };
+    const [prev] = await q<{ closing: number }>(
+      `select closing::float from daily_cash where created_by=$2 and entry_date<$1 order by entry_date desc limit 1`, [date, userId]);
+    return { opening: prev?.closing ?? 0, deposit: 0, saved: false };
+  } catch (e) { if (missingDailyCash(e)) return { opening: 0, deposit: 0, saved: false }; throw e; }
+}
+
+export async function saveDailyCash(date: string, userId: number, opening: number, deposit: number, closing: number) {
+  try {
+    await q(`insert into daily_cash (entry_date, created_by, opening, deposit, closing, updated_at)
+             values ($1,$2,$3,$4,$5, now())
+             on conflict (entry_date, created_by)
+             do update set opening=$3, deposit=$4, closing=$5, updated_at=now()`,
+      [date, userId, opening, deposit, closing]);
+    return { ok: true };
+  } catch (e) { if (missingDailyCash(e)) return { ok: false, missing: true }; throw e; }
+}
