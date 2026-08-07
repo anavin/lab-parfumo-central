@@ -1,12 +1,18 @@
 "use server";
 import { requireUser } from "@/lib/auth/require-user";
-import { dailyReport, getDailyCash, saveDailyCash } from "@/lib/queries";
+import { dailyReport, dailySaleRows, getDailyCash, saveDailyCash } from "@/lib/queries";
 
 /** Aggregate daily sales for the copy-ready report. `mine` = only the signed-in
  *  salesperson's own sales (for /my); otherwise the whole branch (for admin pages). */
 export async function getDailyReport(date: string, source: string, mine = false) {
   const user = await requireUser();
   return dailyReport(date, source, mine ? user.id : null);
+}
+
+/** Per-bill detail for one day (branch-wide) — for the printable daily report. */
+export async function getDailyBills(date: string, source: string) {
+  await requireUser();
+  return dailySaleRows(date, source);
 }
 
 /** Load the signed-in user's saved opening/deposit for a day (opening carries forward). */

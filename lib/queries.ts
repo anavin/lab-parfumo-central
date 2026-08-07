@@ -442,6 +442,17 @@ export function salesByPerson(f: Filter = ALL) {
  * cash = single-channel Cash lines + the cash portion of split ("จ่าย 2 ทาง") bills;
  * everything else is transfer/credit (total − cash).
  */
+/** Non-rejected sale lines for one day (for the printable per-bill detail). */
+export async function dailySaleRows(date: string, source: string) {
+  return q<SubmissionRow>(`
+    select ${SUB_COLS}
+    from submissions s
+    join users u on u.id = s.created_by
+    left join users r on r.id = s.reviewed_by
+    where s.kind = 'sale' and s.status <> 'rejected' and s.entry_date = $1 and s.source = $2${await aliveAnd("s")}
+    order by s.sale_time nulls last, s.created_at, s.id`, [date, source]);
+}
+
 export async function dailyReport(date: string, source: string, userId: number | null = null) {
   const alive = await aliveAnd("");
   // $3 = userId (null = whole branch; a value = only that salesperson's sales)

@@ -154,4 +154,11 @@ summary:focus-visible, [tabindex]:focus-visible {
   .print-area { box-shadow: none !important; border: none !important; }
   body { background: #fff; }
   @page { size: A4; margin: 12mm; }
+
+  /* daily report: fill the A4 page (let @page margins govern spacing) */
+  .daily-sheet { max-width: none !important; padding: 0 !important; border-radius: 0 !important; margin: 0 !important; }
+  /* keep a bill's rows together across page breaks */
+  .daily-sheet table { page-break-inside: auto; }
+  .daily-sheet tr { page-break-inside: avoid; }
+  .daily-sheet thead { display: table-header-group; }   /* repeat header each page */
 }
