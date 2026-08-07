@@ -75,7 +75,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <Stat label="เฉลี่ย/บิล" value={baht(kpi.aov)} />
       </div>
 
-      <div className="mb-5"><DailyReport revision={`${kpi.revenue}|${kpi.bills}|${kpi.qty}`} /></div>
+      <div className="mb-5"><DailyReport mine revision={`${kpi.revenue}|${kpi.bills}|${kpi.qty}`} /></div>
 
       <Card title="ยอดขายของฉัน 14 วันล่าสุด">
         {trend.every((t) => t.revenue === 0) ? (

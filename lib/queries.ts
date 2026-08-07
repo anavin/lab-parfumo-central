@@ -411,12 +411,14 @@ export function salesByPerson(f: Filter = ALL) {
  * cash = single-channel Cash lines + the cash portion of split ("จ่าย 2 ทาง") bills;
  * everything else is transfer/credit (total − cash).
  */
-export async function dailyReport(date: string, source: string) {
+export async function dailyReport(date: string, source: string, userId: number | null = null) {
+  // $3 = userId (null = whole branch; a value = only that salesperson's sales)
   const [tot] = await q<{ orders: number; total: number }>(`
     select count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int orders,
            coalesce(sum(total),0)::float total
     from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2`, [date, source]);
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
+      and ($3::bigint is null or created_by=$3)`, [date, source, userId]);
 
   const nat = await q<{ nation: string; cnt: number; amt: number }>(`
     select coalesce(nullif(nation,''),'ไม่ระบุ') nation,
@@ -424,22 +426,25 @@ export async function dailyReport(date: string, source: string) {
            coalesce(sum(total),0)::float amt
     from submissions
     where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
-    group by 1`, [date, source]);
+      and ($3::bigint is null or created_by=$3)
+    group by 1`, [date, source, userId]);
 
   const [cashLine] = await q<{ c: number }>(`
     select coalesce(sum(total),0)::float c from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2 and payment_channel='Cash'`,
-    [date, source]);
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2 and payment_channel='Cash'
+      and ($3::bigint is null or created_by=$3)`,
+    [date, source, userId]);
 
   let cashSplit = 0;
   try {
     const [r] = await q<{ c: number }>(`
       select coalesce(sum(bp.amount),0)::float c from bill_payments bp
-      where bp.channel='Cash' and bp.entry_date=$1
+      where bp.channel='Cash' and bp.entry_date=$1 and ($4::bigint is null or bp.created_by=$4)
         and bp.bill_ref in (select distinct receipt_no from submissions
                             where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
-                              and payment_channel=$3 and coalesce(receipt_no,'')<>'')`,
-      [date, source, SPLIT2]);
+                              and payment_channel=$3 and coalesce(receipt_no,'')<>''
+                              and ($4::bigint is null or created_by=$4))`,
+      [date, source, SPLIT2, userId]);
     cashSplit = r?.c ?? 0;
   } catch (e) { if (!missingTable(e)) throw e; }
 
