@@ -116,7 +116,7 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                     </div>
                   </td>
                   <td className="px-3 py-3">{u.is_active ? <Badge tone="success">ใช้งาน</Badge> : <Badge tone="danger">ปิด</Badge>}</td>
-                  <td className="px-3 py-3 text-muted text-xs hidden sm:table-cell">{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" }) : "-"}</td>
+                  <td className="px-3 py-3 text-muted text-xs hidden sm:table-cell">{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit", timeZone: "Asia/Bangkok" }) : "-"}</td>
                   <td className="px-5 py-3 text-right whitespace-nowrap">
                     <button onClick={() => { setProfileId((v) => (v === u.id ? null : u.id)); setEditId(null); }} disabled={pending} title="แก้ไขชื่อ / username"
                       className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-line-soft ${profileId === u.id ? "text-brand-dark bg-brand/10" : "text-muted hover:text-ink"}`}>
