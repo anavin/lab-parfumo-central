@@ -388,6 +388,67 @@ export async function unapproveMany(ids: number[]) {
 }
 
 // Reject a whole bill (all its rows) at once.
+// Move bills to the trash instead of bouncing them back. Trashed (soft-deleted)
+// bills drop out of the review queue and the salesperson's /my views, but can be
+// restored or purged on /trash. Returns { ok, error } so a pre-migration prod (no
+// `deleted_at` column yet) shows a clear message instead of a masked digest error.
+export async function trashMany(ids: number[]): Promise<{ ok: boolean; error?: string; count?: number }> {
+  await requirePermission("review");
+  if (!ids?.length) return { ok: true, count: 0 };
+  let ok = 0;
+  const refs = new Set<string>();
+  try {
+    for (const id of ids) {
+      const res = await q<{ id: number; receipt_no: string | null }>(
+        `update submissions set deleted_at = now(), updated_at = now()
+         where id = $1 and status <> 'approved' and deleted_at is null returning id, receipt_no`, [id]);
+      if (res.length) { ok++; if (res[0].receipt_no) refs.add(res[0].receipt_no); }
+    }
+  } catch (e: any) {
+    if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบถังขยะบิลบนเซิร์ฟเวอร์ (ต้องรัน SQL 0011 ก่อน)" };
+    console.error("[trashMany] failed", e);
+    return { ok: false, error: "ลบไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  // a trashed split bill's per-channel amounts must stop counting toward cash
+  try { for (const ref of refs) await q(`delete from bill_payments where bill_ref = $1`, [ref]); } catch {}
+  await logAudit("delete", "submission", null, `ลบบิลลงถังขยะ ${ok} รายการ`);
+  revalidatePath("/review"); revalidatePath("/my"); revalidatePath("/trash");
+  return { ok: true, count: ok };
+}
+
+// Restore a trashed bill back to the review queue (status is unchanged — a pending
+// bill returns as pending). Gated by the trash permission (the /trash page).
+export async function restoreSubmission(id: number): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("trash");
+  try {
+    await q(`update submissions set deleted_at = null, updated_at = now() where id = $1`, [id]);
+  } catch (e: any) {
+    if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบถังขยะบิล (ต้องรัน SQL 0011 ก่อน)" };
+    console.error("[restoreSubmission] failed", e);
+    return { ok: false, error: "กู้คืนไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+  await logAudit("restore", "submission", id, "กู้คืนบิลจากถังขยะ");
+  revalidatePath("/trash"); revalidatePath("/review"); revalidatePath("/my");
+  return { ok: true };
+}
+
+// Permanently delete a trashed bill (and its orphaned photos/split records).
+export async function purgeSubmission(id: number): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("trash");
+  const [ref] = await q<{ receipt_no: string | null }>(`select receipt_no from submissions where id = $1`, [id]);
+  await q(`delete from submissions where id = $1`, [id]);
+  if (ref?.receipt_no) {
+    const [left] = await q<{ n: number }>(`select count(*)::int n from submissions where receipt_no = $1`, [ref.receipt_no]);
+    if (!left?.n) {
+      await q(`delete from bill_attachments where bill_ref = $1`, [ref.receipt_no]);
+      try { await q(`delete from bill_payments where bill_ref = $1`, [ref.receipt_no]); } catch {}
+    }
+  }
+  await logAudit("purge", "submission", id, "ลบบิลถาวรจากถังขยะ");
+  revalidatePath("/trash");
+  return { ok: true };
+}
+
 export async function rejectMany(ids: number[], note?: string) {
   const admin = await requirePermission("review");
   let ok = 0;

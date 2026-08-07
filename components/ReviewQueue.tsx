@@ -1,8 +1,8 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck } from "lucide-react";
-import { approveMany, rejectMany, unapproveMany, updateSubmissionByAdmin } from "@/lib/actions/submissions";
+import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2 } from "lucide-react";
+import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -70,22 +70,42 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   const [showApproved, setShowApproved] = useState(false);
   const refresh = () => router.refresh();
 
-  const days = groupDays(rows);
-  const approvedDays = groupDays(approved);
+  // ---- filter by salesperson + free-text search ----
+  const [who, setWho] = useState("");        // selected salesperson ("" = all)
+  const [qtext, setQtext] = useState("");
+  const query = qtext.trim().toLowerCase();
+  const match = (r: SubmissionRow) =>
+    (!who || r.author === who) &&
+    (!query || [r.author, r.item, r.receipt_no, r.size, r.barcode].some((v) => (v || "").toLowerCase().includes(query)));
+
+  // salesperson chips — pending bill count per author (approved-only authors show 0)
+  const people = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of groupDays(rows)) for (const b of d.bills) m.set(b.author, (m.get(b.author) ?? 0) + 1);
+    for (const r of approved) if (r.author && !m.has(r.author)) m.set(r.author, 0);
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"));
+  }, [rows, approved]);
+  const totalPendingBills = people.reduce((s, [, c]) => s + c, 0);
+
+  const days = groupDays(rows.filter(match));
+  const approvedDays = groupDays(approved.filter(match));
   const approvedBillCount = approvedDays.reduce((s, d) => s + d.bills.length, 0);
+  const shownBills = days.reduce((s, d) => s + d.bills.length, 0);
+  const shownTotal = days.reduce((s, d) => s + d.bills.reduce((x, b) => x + b.rows.reduce((y, r) => y + (r.total ?? 0), 0), 0), 0);
 
   const approveBill = (bill: Bill) => start(async () => {
     setBusy(bill.key);
     try { await approveMany(bill.rows.map((r) => r.id)); refresh(); }
     catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } finally { setBusy(null); }
   });
-  const rejectBill = (bill: Bill) => {
-    const note = window.prompt("เหตุผลที่ตีกลับบิลนี้ (ไม่บังคับ):", "");
-    if (note === null) return;
+  const trashBill = (bill: Bill) => {
+    if (!confirm("ลบบิลนี้?\nบิลจะถูกย้ายไปถังขยะ — กู้คืนได้ที่หน้า ‘ถังขยะ’")) return;
     start(async () => {
       setBusy(bill.key);
-      try { await rejectMany(bill.rows.map((r) => r.id), note); refresh(); }
-      catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } finally { setBusy(null); }
+      try {
+        const r = await trashMany(bill.rows.map((x) => x.id));
+        if (r?.ok) refresh(); else alert(r?.error ?? "ลบไม่สำเร็จ");
+      } catch { alert("ลบไม่สำเร็จ ลองใหม่อีกครั้ง"); } finally { setBusy(null); }
     });
   };
   const approveDay = (day: Day) => {
@@ -103,11 +123,50 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* ---- filter toolbar: search + salesperson ---- */}
+      {(rows.length > 0 || approved.length > 0) && (
+        <div className="card p-3 sm:p-3.5 space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+            <input value={qtext} onChange={(e) => setQtext(e.target.value)}
+              placeholder="ค้นหา ชื่อพนักงาน / สินค้า / เลขใบเสร็จ"
+              className="w-full border border-line rounded-lg pl-9 pr-9 py-2.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
+            {qtext && (
+              <button onClick={() => setQtext("")} aria-label="ล้างคำค้นหา"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-ink hover:bg-canvas"><X className="w-4 h-4" /></button>
+            )}
+          </div>
+          {people.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs text-muted mr-0.5"><Users className="w-3.5 h-3.5" /> พนักงานขาย:</span>
+              <button onClick={() => setWho("")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors ${!who ? "bg-brand text-white border-brand" : "bg-surface text-ink border-line hover:bg-canvas"}`}>
+                ทั้งหมด <span className={`tabular-nums text-[11px] ${!who ? "opacity-90" : "text-muted"}`}>{totalPendingBills}</span>
+              </button>
+              {people.map(([name, cnt]) => (
+                <button key={name} onClick={() => setWho(who === name ? "" : name)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors ${who === name ? "bg-brand text-white border-brand" : "bg-surface text-ink border-line hover:bg-canvas"}`}>
+                  {name} <span className={`tabular-nums text-[11px] ${who === name ? "opacity-90" : "text-muted"}`}>{cnt}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="card px-4 py-16 text-center text-muted"><CheckCheck className="w-8 h-8 mx-auto mb-2 text-success" /><div className="text-sm">ไม่มีรายการรอตรวจสอบ</div></div>
+      ) : days.length === 0 ? (
+        <div className="card px-4 py-14 text-center text-muted"><Search className="w-7 h-7 mx-auto mb-2 opacity-50" /><div className="text-sm">ไม่พบบิลที่ตรงกับตัวกรอง</div>
+          <button onClick={() => { setWho(""); setQtext(""); }} className="mt-3 text-xs text-brand-dark font-medium hover:underline">ล้างตัวกรอง</button></div>
       ) : (
       <div className="space-y-6">
+      {/* summary of what's shown */}
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-muted">แสดง <b className="text-ink">{shownBills}</b> บิล{who ? ` ของ ${who}` : "รอตรวจสอบ"}</span>
+        <span className="font-semibold text-ink tabular-nums">รวม {baht(shownTotal)}</span>
+      </div>
       {days.map((day) => {
         const dayTotal = day.bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.total ?? 0), 0), 0);
         return (
@@ -189,9 +248,9 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
 
                       {/* per-bill actions */}
                       <div className="flex gap-2 justify-end mt-3 pt-2.5 border-t border-line">
-                        <button onClick={() => rejectBill(bill)} disabled={pending}
+                        <button onClick={() => trashBill(bill)} disabled={pending}
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-danger text-sm font-medium hover:bg-danger-soft disabled:opacity-50">
-                          <X className="w-4 h-4" /> ตีกลับ
+                          <Trash2 className="w-4 h-4" /> ลบ
                         </button>
                         <button onClick={() => approveBill(bill)} disabled={pending}
                           className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
@@ -210,7 +269,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
       )}
 
       {/* -------- approved bills (undo an approval) -------- */}
-      {approved.length > 0 && (
+      {approvedDays.length > 0 && (
         <div>
           <button onClick={() => setShowApproved((v) => !v)}
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">

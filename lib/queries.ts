@@ -266,42 +266,72 @@ const SUB_COLS = `
   s.payment_channel, s.nation, s.customers, s.thai::float thai, s.foreign_cnt::float foreign_cnt,
   s.sell_amount::float sell_amount, s.review_note, r.full_name reviewer, s.reviewed_at, s.created_at`;
 
+// submissions soft-delete ("ถังขยะ"): prod adds `deleted_at` via manual SQL. Until it
+// runs the column is absent, so probe once and treat every row as alive — the review
+// and /my queries must keep working before the migration is applied.
+let _subTrash: boolean | null = null;
+async function subTrashReady(): Promise<boolean> {
+  if (_subTrash !== null) return _subTrash;
+  try {
+    const r = await q(`select 1 from information_schema.columns where table_name = 'submissions' and column_name = 'deleted_at'`);
+    _subTrash = r.length > 0;
+  } catch { _subTrash = false; }
+  return _subTrash;
+}
+/** " and <alias>.deleted_at is null" once the column exists; "" before the migration. */
+async function aliveAnd(alias = "s"): Promise<string> {
+  if (!(await subTrashReady())) return "";
+  return ` and ${alias ? alias + "." : ""}deleted_at is null`;
+}
+
 /** Pending queue for the admin review page (oldest first = FIFO). */
-export function pendingSubmissions() {
+export async function pendingSubmissions() {
   return q<SubmissionRow>(`
     select ${SUB_COLS}
     from submissions s
     join users u on u.id = s.created_by
     left join users r on r.id = s.reviewed_by
-    where s.status = 'pending'
+    where s.status = 'pending'${await aliveAnd("s")}
     order by s.created_by, s.entry_date, s.created_at`);
 }
 
 /** Recently approved submissions (last 7 days) so an admin can undo a wrong approval. */
-export function recentlyApprovedSubmissions() {
+export async function recentlyApprovedSubmissions() {
   return q<SubmissionRow>(`
     select ${SUB_COLS}
     from submissions s
     join users u on u.id = s.created_by
     left join users r on r.id = s.reviewed_by
-    where s.status = 'approved' and s.reviewed_at >= now() - interval '7 days'
+    where s.status = 'approved' and s.reviewed_at >= now() - interval '7 days'${await aliveAnd("s")}
     order by s.entry_date desc, s.created_at`);
 }
 
 /** Count of pending items — drives the sidebar badge. */
-export function pendingCount() {
-  return q<{ n: number }>(`select count(*)::int n from submissions where status='pending'`).then((r) => r[0].n);
+export async function pendingCount() {
+  return q<{ n: number }>(`select count(*)::int n from submissions where status='pending'${await aliveAnd("")}`).then((r) => r[0].n);
 }
 
 /** One staff member's submissions for a given day (all statuses). */
-export function mySubmissions(userId: number, date: string) {
+export async function mySubmissions(userId: number, date: string) {
   return q<SubmissionRow>(`
     select ${SUB_COLS}
     from submissions s
     join users u on u.id = s.created_by
     left join users r on r.id = s.reviewed_by
-    where s.created_by = $1 and s.entry_date = $2
+    where s.created_by = $1 and s.entry_date = $2${await aliveAnd("s")}
     order by s.created_at desc`, [userId, date]);
+}
+
+/** Bills a reviewer sent to the trash — restore or purge them on /trash. */
+export async function trashedSubmissions() {
+  if (!(await subTrashReady())) return [] as (SubmissionRow & { deleted_at: string })[];
+  return q<SubmissionRow & { deleted_at: string }>(`
+    select ${SUB_COLS}, s.deleted_at::text deleted_at
+    from submissions s
+    join users u on u.id = s.created_by
+    left join users r on r.id = s.reviewed_by
+    where s.deleted_at is not null
+    order by s.deleted_at desc, s.entry_date desc`);
 }
 
 export type BillAttachment = { id: number; bill_ref: string; data: string; created_by: number };
@@ -339,13 +369,14 @@ export async function attachmentsForRefs(refs: string[]): Promise<Record<string,
  * everything they entered that has not been rejected), so their view reflects
  * their own work regardless of review state. */
 export async function myDayKpis(userId: number, date: string) {
+  const alive = await aliveAnd("");
   const [sale] = await q<{ revenue: number; qty: number; bills: number; pending: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float qty,
            -- one bill per shared receipt/bill-ref; legacy rows with none count individually
            count(distinct coalesce(nullif(receipt_no,''), 'i'||id))::int bills,
            count(*) filter (where status='pending')::int pending
-    from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2`,
+    from submissions where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2${alive}`,
     [userId, date]);
 
   // Per-channel breakdown for the daily summary: single-channel lines grouped by
@@ -353,7 +384,7 @@ export async function myDayKpis(userId: number, date: string) {
   const lineCh = await q<{ channel: string; revenue: number }>(`
     select coalesce(nullif(payment_channel,''),'ไม่ระบุ') channel, sum(total)::float revenue
     from submissions
-    where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2
+    where kind='sale' and status<>'rejected' and created_by=$1 and entry_date=$2${alive}
       and coalesce(payment_channel,'') <> $3
     group by 1`, [userId, date, SPLIT2]);
   let tenderCh: { channel: string; revenue: number }[] = [];
@@ -375,21 +406,21 @@ export async function myDayKpis(userId: number, date: string) {
 }
 
 /** Last `days` days of a staff member's own revenue (for the mini trend). */
-export function myTrend(userId: number, days = 14) {
+export async function myTrend(userId: number, days = 14) {
   return q<{ d: string; revenue: number }>(`
     select entry_date::text as d, coalesce(sum(total),0)::float revenue
     from submissions
-    where kind='sale' and status<>'rejected' and created_by=$1
+    where kind='sale' and status<>'rejected' and created_by=$1${await aliveAnd("")}
       and entry_date >= (current_date - ($2::int - 1))
     group by entry_date order by entry_date`, [userId, days]);
 }
 
 /** Days a staff member has any submission — for the day switcher. */
-export function myEntryDays(userId: number, limit = 30) {
+export async function myEntryDays(userId: number, limit = 30) {
   return q<{ d: string; n: number; pending: number }>(`
     select entry_date::text as d, count(*)::int n,
            count(*) filter (where status='pending')::int pending
-    from submissions where created_by=$1
+    from submissions where created_by=$1${await aliveAnd("")}
     group by entry_date order by entry_date desc limit $2`, [userId, limit]);
 }
 
@@ -412,12 +443,13 @@ export function salesByPerson(f: Filter = ALL) {
  * everything else is transfer/credit (total − cash).
  */
 export async function dailyReport(date: string, source: string, userId: number | null = null) {
+  const alive = await aliveAnd("");
   // $3 = userId (null = whole branch; a value = only that salesperson's sales)
   const [tot] = await q<{ orders: number; total: number }>(`
     select count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int orders,
            coalesce(sum(total),0)::float total
     from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2${alive}
       and ($3::bigint is null or created_by=$3)`, [date, source, userId]);
 
   const nat = await q<{ nation: string; cnt: number; amt: number }>(`
@@ -425,13 +457,13 @@ export async function dailyReport(date: string, source: string, userId: number |
            count(distinct coalesce(nullif(receipt_no,''),'i'||id))::int cnt,
            coalesce(sum(total),0)::float amt
     from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2${alive}
       and ($3::bigint is null or created_by=$3)
     group by 1`, [date, source, userId]);
 
   const [cashLine] = await q<{ c: number }>(`
     select coalesce(sum(total),0)::float c from submissions
-    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2 and payment_channel='Cash'
+    where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2 and payment_channel='Cash'${alive}
       and ($3::bigint is null or created_by=$3)`,
     [date, source, userId]);
 
@@ -441,7 +473,7 @@ export async function dailyReport(date: string, source: string, userId: number |
       select coalesce(sum(bp.amount),0)::float c from bill_payments bp
       where bp.channel='Cash' and bp.entry_date=$1 and ($4::bigint is null or bp.created_by=$4)
         and bp.bill_ref in (select distinct receipt_no from submissions
-                            where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2
+                            where kind='sale' and status<>'rejected' and entry_date=$1 and source=$2${alive}
                               and payment_channel=$3 and coalesce(receipt_no,'')<>''
                               and ($4::bigint is null or created_by=$4))`,
       [date, source, SPLIT2, userId]);
