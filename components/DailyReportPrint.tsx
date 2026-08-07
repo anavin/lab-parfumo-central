@@ -55,6 +55,15 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
     return [...m.entries()].map(([author, v]) => ({ author, ...v })).sort((a, b) => b.total - a.total);
   }, [bills]);
   const totalQty = useMemo(() => bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.qty ?? 0), 0), 0), [bills]);
+  // price roll-up: full (before discount) − discount = net selling price
+  const price = useMemo(() => {
+    let gross = 0, disc = 0;
+    for (const b of bills) for (const r of b.rows) {
+      gross += (r.qty ?? 0) * (r.unit_price ?? 0);
+      disc += r.discount ?? 0;
+    }
+    return { gross, disc };
+  }, [bills]);
 
   const ready = !!data && data.orders > 0;
   const srcLabel = SRC_LABEL[defaultSource] ?? defaultSource;
@@ -134,6 +143,15 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
               <Kpi label="เฉลี่ย/บิล" value={`฿${nf(aov)}`} />
             </div>
 
+            {/* price breakdown: full − discount = net */}
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border border-neutral-400 rounded-lg px-4 py-2.5 mb-6 text-[13px]">
+              <span className="flex items-baseline gap-1.5"><span className="text-neutral-500">ราคาเต็ม</span><span className="font-semibold tabular-nums">฿{nf(price.gross)}</span></span>
+              <span className="text-neutral-400">−</span>
+              <span className="flex items-baseline gap-1.5"><span className="text-neutral-500">ส่วนลด</span><span className="font-semibold tabular-nums">฿{nf(price.disc)}</span></span>
+              <span className="text-neutral-400">=</span>
+              <span className="flex items-baseline gap-1.5 ml-auto"><span className="text-neutral-500">ราคาขายสุทธิ</span><span className="font-bold text-[15px] tabular-nums">฿{nf(data!.total)}</span></span>
+            </div>
+
             {/* breakdowns — payment + nationality side by side */}
             <div className="grid grid-cols-2 gap-x-10 mb-6">
               <div>
@@ -197,9 +215,16 @@ export function DailyReportPrint({ defaultSource = "CTW", revision }: { defaultS
                         <td className="py-2 pr-2 tabular-nums">{b.time || "-"}</td>
                         <td className="py-2 pr-2">
                           <ul className="text-[11px] text-neutral-700 space-y-0.5">
-                            {b.rows.map((r) => (
-                              <li key={r.id}>{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""} — ฿{nf(r.total ?? 0)}</li>
-                            ))}
+                            {b.rows.map((r) => {
+                              const g = (r.qty ?? 0) * (r.unit_price ?? 0);
+                              return (
+                                <li key={r.id}>
+                                  <span className="text-black">{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</span>
+                                  <span className="text-neutral-500"> · เต็ม ฿{nf(g)} · ลด ฿{nf(r.discount ?? 0)} · ขาย </span>
+                                  <span className="font-semibold text-black">฿{nf(r.total ?? 0)}</span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         </td>
                         <td className="py-2 pr-2">{payLabel(b.pay)}</td>
