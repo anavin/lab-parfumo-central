@@ -66,9 +66,11 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const [autoScan, setAutoScan] = useState(false);
   const [edit, setEdit] = useState<SaleState | null>(null);
   const [del, setDel] = useState<SubmissionRow | null>(null);
+  const [toast, setToast] = useState<string | null>(null);   // brief "saved" confirmation
   const formRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
+  const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast((t) => (t === msg ? null : t)), 2600); };
   // In production a server action's error is a generic "Server Components render"
   // message with a digest — usually a transient revalidation/render blip AFTER
   // the write already succeeded. Recover quietly (close + refresh) instead of a
@@ -90,7 +92,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
     wasOpen.current = open;
   });
 
-  const submitTheBill = (items: BillItemPayload[], tenders?: { channel: string; amount: number }[]) => start(async () => {
+  const submitTheBill = (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => start(async () => {
     if (!bill) return;
     try {
       await submitBill({
@@ -99,6 +101,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         items, attachments: bill.attachments, tenders,
       });
       setBill(null);
+      flash(`บันทึกบิลแล้ว · ${baht(net ?? 0)}`);
       // the sale is recorded for today — jump to today's view so it's visible
       if (viewingPast) router.push("/my"); else refresh();
     } catch (e: any) { onActionError(e, () => setBill(null)); }
@@ -137,6 +140,13 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
 
   return (
     <div className="mb-6">
+      {/* brief save confirmation — POS-style toast pinned above the bottom bar */}
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-6 z-[80] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ink text-surface text-sm font-medium shadow-pop"
+          style={{ marginBottom: "env(safe-area-inset-bottom)" }} role="status">
+          <Check className="w-4 h-4 text-success shrink-0" /> {toast}
+        </div>
+      )}
       <div ref={formRef} className="scroll-mt-16" />
 
       {!busy && (
@@ -164,7 +174,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
             const lineTotal = (Number(edit.qty) || 0) * (Number(edit.unit_price) || 0) - (Number(edit.discount) || 0);
             const tenders = isSplit(edit.payment_channel) ? resolveTenders(edit.tenders, lineTotal) : undefined;
             await updateMySale(edit.id, { ...edit, qty: Number(edit.qty), unit_price: Number(edit.unit_price), discount: Number(edit.discount), tenders });
-            setEdit(null); refresh();
+            setEdit(null); flash(`บันทึกการแก้ไขแล้ว · ${baht(lineTotal)}`); refresh();
           } catch (e: any) { onActionError(e, () => setEdit(null)); }
         })} />}
 
@@ -193,7 +203,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
 
 // ---------------------------------------------------------------- bill builder
 function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[]) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
+  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
 }) {
   const [scanning, setScanning] = useState(!!autoScan);
   const [missing, setMissing] = useState<string[]>([]);
@@ -201,6 +211,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
+  const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
   const addItem = (patch: Partial<BillItem> = {}) => setState({ ...state, items: [...state.items, newItem(patch)] });
@@ -212,6 +223,14 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const onScanned = async (code: string): Promise<ScanResult> => {
     const p = await findProductByBarcode(code);
     if (p) {
+      // POS convention: scanning the same product again bumps its quantity
+      // instead of adding a duplicate line.
+      const existing = state.items.find((it) => it.barcode === p.barcode && String(it.item || "").trim());
+      if (existing) {
+        const qty = (Number(existing.qty) || 0) + 1;
+        updateItem(existing.key, { qty });
+        return { ok: true, label: p.scent, sub: `จำนวน ${qty} ชิ้น` };
+      }
       addItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 });
       const sub = [p.size, p.price ? `฿${Number(p.price).toLocaleString()}` : ""].filter(Boolean).join(" · ");
       return { ok: true, label: p.scent, sub };
@@ -293,9 +312,14 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     if (m.length > 0) { scrollToMissing(m); return; }
     const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel }));
     const outTenders = split ? tenders.map((t, i) => ({ channel: t.channel, amount: tenderAmount(i) })) : undefined;
-    onSubmit(items, outTenders);
+    onSubmit(items, outTenders, net);
   };
   const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-danger border-danger" : "");
+
+  const named = state.items.filter((it) => String(it.item || "").trim());
+  const itemCount = named.reduce((s, it) => s + (Number(it.qty) || 0), 0);   // total pieces so far
+  const hasData = named.length > 0 || state.items.some((it) => Number(it.unit_price) > 0) || state.attachments.length > 0;
+  const tryCancel = () => (hasData ? setConfirmCancel(true) : onCancel());
 
   return (
     <div ref={rootRef} className="card p-4 sm:p-5 mb-4">
@@ -442,14 +466,17 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-5 mt-3 px-4 sm:px-5 pt-3 bg-surface/95 backdrop-blur border-t border-line flex items-center justify-between gap-3 shadow-[0_-4px_14px_rgba(0,0,0,0.05)]"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         <div className="min-w-0 leading-tight">
-          <div className="text-[11px] text-muted">รวมสุทธิ</div>
+          <div className="text-[11px] text-muted">รวมสุทธิ{itemCount > 0 ? ` · ${itemCount} ชิ้น` : ""}</div>
           <div className="text-brand-dark text-xl font-bold tabular-nums truncate">{baht(net)}</div>
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={onCancel} className="px-4 min-h-[48px] rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
+          <button onClick={tryCancel} className="px-4 min-h-[48px] rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
           <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-6 min-h-[48px] rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
         </div>
       </div>
+
+      <ConfirmDialog open={confirmCancel} title="ยกเลิกบิลนี้?" message="ข้อมูลที่กรอกไว้จะหายทั้งหมด" danger confirmLabel="ทิ้งบิล"
+        onCancel={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); onCancel(); }} />
 
       {scanning && <BarcodeScanner continuous onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
