@@ -196,7 +196,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                     {/* bill header */}
                     <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0">#{day.bills.length - i}</span>
+                        <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0">#{i + 1}</span>
                         <div className="min-w-0">
                           <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                           <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
@@ -300,7 +300,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                           <div key={bill.key} className="rounded-xl border border-green-200 bg-surface shadow-sm overflow-hidden">
                             <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-success-soft/60 border-b border-success/20">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0">#{day.bills.length - i}</span>
+                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0">#{i + 1}</span>
                                 <div className="min-w-0">
                                   <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                                   <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
