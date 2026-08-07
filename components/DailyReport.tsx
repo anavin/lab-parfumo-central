@@ -1,11 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ClipboardCopy, Check, FileText } from "lucide-react";
-import { Select } from "@/components/ui/Select";
 import { getDailyReport } from "@/lib/actions/report";
 import type { DailyReport as ReportData } from "@/lib/queries";
 
-const SOURCES = [{ value: "CTW", label: "Central World (CTW)" }, { value: "EVENT_SCS", label: "Event (SCS)" }];
 const SRC_SHORT: Record<string, string> = { CTW: "CTW", EVENT_SCS: "Event" };
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
@@ -13,7 +11,7 @@ const ddmmyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}
 
 export function DailyReport({ defaultSource = "CTW" }: { defaultSource?: string }) {
   const [date, setDate] = useState(bkkToday());
-  const [source, setSource] = useState(defaultSource);
+  const source = defaultSource;   // single location (CTW) — no branch picker
   const [data, setData] = useState<ReportData | null>(null);
   const [deposit, setDeposit] = useState("");
   const [copied, setCopied] = useState(false);
@@ -63,7 +61,6 @@ export function DailyReport({ defaultSource = "CTW" }: { defaultSource?: string 
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} max={bkkToday()} className={inp} />
-        <div className="min-w-[190px]"><Select value={source} onValueChange={setSource} options={SOURCES} /></div>
         <label className="flex items-center gap-1.5 text-sm text-muted ml-auto">
           <span className="whitespace-nowrap">ฝากเข้าธนาคาร</span>
           <input inputMode="numeric" value={deposit} onFocus={(e) => e.target.select()}
