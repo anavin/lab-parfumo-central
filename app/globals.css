@@ -161,8 +161,9 @@ summary:focus-visible, [tabindex]:focus-visible {
 
 @media print {
   .no-print { display: none !important; }
-  .print-area { box-shadow: none !important; border: none !important; }
-  body { background: #fff; }
+  /* never clip the printable area — overflow:hidden here makes the PDF come out blank */
+  .print-area { box-shadow: none !important; border: none !important; overflow: visible !important; border-radius: 0 !important; }
+  html, body { background: #fff !important; }
   @page { size: A4; margin: 12mm; }
 
   /* daily report: fill the A4 page (let @page margins govern spacing) */
