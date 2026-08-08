@@ -114,7 +114,8 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="text-center mt-4 pt-3 border-t border-dashed border-neutral-400">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/lab-parfumo-qr.png" alt="Lab Parfumo QR" className="mx-auto w-[110px] h-[110px] object-contain" />
-        <div className="text-[11px] text-neutral-600 mt-1">สแกนติดตามเรา · รีวิว &amp; โปรโมชั่น</div>
+        <div className="text-[11px] text-neutral-700 font-medium mt-1">สแกนเลย · ทุกช่องทางออนไลน์</div>
+        <div className="text-[10px] text-neutral-500">ช้อปออนไลน์ · โปรโมชั่น · ติดต่อเรา</div>
       </div>
     </div>
   );
