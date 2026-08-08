@@ -95,7 +95,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);      // bill key being processed
   const [editId, setEditId] = useState<number | null>(null);
-  const [showApproved, setShowApproved] = useState(false);
+  const [showApproved, setShowApproved] = useState(true);   // approved section open by default
   const refresh = () => router.refresh();
 
   // ---- filter by salesperson + free-text search ----
