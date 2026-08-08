@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Printer, FileText, ChevronDown } from "lucide-react";
+import { Printer, FileText, ChevronDown, Download } from "lucide-react";
 import { getDailyReport, getDailyBills } from "@/lib/actions/report";
 import { PAYMENTS } from "@/lib/payments";
 import type { DailyReport as ReportData, DaySaleRow } from "@/lib/queries";
@@ -81,16 +81,10 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
   const sellers = byPerson.map((p) => p.author);   // usually one salesperson per day
   const generatedAt = new Date().toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Bangkok" });
 
-  // Print / Save-as-PDF with a tidy filename, e.g. "CTW-Daily-Report-2026-08-07" —
-  // browsers use document.title as the default PDF name, so set it just for the print.
-  const printReport = () => {
-    const prev = document.title;
-    document.title = `${defaultSource}-Daily-Report-${date}`;
-    const restore = () => { document.title = prev; window.removeEventListener("afterprint", restore); };
-    window.addEventListener("afterprint", restore);
-    window.print();
-    setTimeout(restore, 1000);   // fallback if afterprint doesn't fire
-  };
+  // Server-generated PDF (same reliable path as the receipt) — Safari's own print
+  // renders this report blank, so download / print the server PDF instead.
+  const pdfUrl = (disp: "inline" | "download") =>
+    `/api/daily-report/pdf?date=${date}&source=${defaultSource}${disp === "inline" ? "&disp=inline" : ""}`;
 
   const Kpi = ({ label, value, primary = false }: { label: string; value: string; primary?: boolean }) => (
     <div className={`border rounded-lg px-3 py-2.5 ${primary ? "border-black border-2" : "border-neutral-400"}`}>
@@ -113,7 +107,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
       <button onClick={() => setOpen(!open)}
         className="no-print w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
         <FileText className="w-4 h-4 text-brand-dark shrink-0" />
-        <span className="text-sm font-semibold">รายงานประจำวัน (สำหรับปริ้น)</span>
+        <span className="text-sm font-semibold">รายงานประจำวัน</span>
         <span className="text-xs text-muted">· คลิกเพื่อดู / ปริ้น</span>
         <ChevronDown className={`w-4 h-4 text-muted ml-auto transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -131,10 +125,16 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
           <input type="date" value={date} max={bkkToday()} onChange={(e) => setDate(e.target.value)}
             className="border border-line rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
         </label>
-        <button onClick={printReport} disabled={!ready}
-          className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90 disabled:opacity-50 whitespace-nowrap">
-          <Printer className="w-4 h-4" /> ปริ้น / บันทึก PDF
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <a href={pdfUrl("download")} aria-disabled={!ready}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-line bg-surface text-ink text-sm font-semibold hover:bg-canvas whitespace-nowrap ${ready ? "" : "pointer-events-none opacity-50"}`}>
+            <Download className="w-4 h-4" /> ดาวน์โหลด PDF
+          </a>
+          <a href={pdfUrl("inline")} target="_blank" rel="noopener" aria-disabled={!ready}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-line bg-surface text-ink text-sm font-semibold hover:bg-canvas whitespace-nowrap ${ready ? "" : "pointer-events-none opacity-50"}`}>
+            <Printer className="w-4 h-4" /> พิมพ์
+          </a>
+        </div>
       </div>
 
       {/* printable A4 sheet — always white so it prints cleanly in any theme */}
