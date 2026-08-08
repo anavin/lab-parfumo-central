@@ -18,7 +18,10 @@ export type ReceiptItem = { name: string; size: string; qty: number; unitPrice: 
 export function Receipt({ receiptNo, date, time, salesperson, items }: {
   receiptNo: string; date: string; time?: string; salesperson: string; items: ReceiptItem[];
 }) {
-  const gross = items.reduce((s, it) => s + it.qty * it.unitPrice, 0);   // ก่อนหักส่วนลด
+  // full (before discount) = net + discount, so it always reconciles (gross − discount = net)
+  // even for legacy rows where qty×unit_price drifts from the stored total.
+  const lineFull = (it: ReceiptItem) => it.total + it.discount;
+  const gross = items.reduce((s, it) => s + lineFull(it), 0);   // ก่อนหักส่วนลด
   const discount = items.reduce((s, it) => s + it.discount, 0);
   const net = items.reduce((s, it) => s + it.total, 0);                  // หลังหักส่วนลด = รวมทั้งสิ้น
   const exVat = net / (1 + VAT_RATE);
@@ -57,10 +60,19 @@ export function Receipt({ receiptNo, date, time, salesperson, items }: {
       {/* items: qty · name · amount (gross per line) */}
       <div className="space-y-2">
         {items.map((it, i) => (
-          <div key={i} className="flex gap-2 text-[12px]">
-            <span className="w-7 shrink-0 tabular-nums">{Math.round(it.qty)}</span>
-            <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}</span>
-            <span className="tabular-nums text-right">{nf(it.qty * it.unitPrice)}</span>
+          <div key={i} className="text-[12px]">
+            <div className="flex gap-2">
+              <span className="w-7 shrink-0 tabular-nums">{Math.round(it.qty)}</span>
+              <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}</span>
+              <span className="tabular-nums text-right">{nf(lineFull(it))}</span>
+            </div>
+            {it.discount > 0 && (
+              <div className="flex gap-2 text-neutral-500">
+                <span className="w-7 shrink-0" />
+                <span className="flex-1 min-w-0 pl-2">ส่วนลด</span>
+                <span className="tabular-nums text-right">-{nf(it.discount)}</span>
+              </div>
+            )}
           </div>
         ))}
       </div>
