@@ -524,6 +524,25 @@ export async function dailySaleRows(date: string, source: string, userId: number
     order by sale_time nulls last, id`, [date, source, userId]);
 }
 
+/** One bill's lines by receipt number (approved from sales, else pending submission) —
+ *  for the printable tax receipt. Salesperson uses the current name. */
+export async function billByReceipt(ref: string) {
+  const alive = await aliveAnd("s");
+  return q<{ id: number; receipt_no: string; item: string; size: string; qty: number; unit_price: number; discount: number; total: number; sale_time: string; author: string; entry_date: string; source: string; payment_channel: string }>(`
+    select s.id, s.receipt_no, s.item, s.size, s.qty::float qty, s.unit_price::float unit_price,
+           coalesce(s.discount,0)::float discount, s.total::float total, s.sale_time::text sale_time,
+           coalesce(u.full_name, nullif(s.ba,''), '') author, s.sale_date::text entry_date, s.source, s.payment_channel
+    from sales s left join users u on u.id = s.created_by
+    where s.receipt_no = $1
+    union all
+    select s.id, s.receipt_no, s.item, s.size, s.qty::float, s.unit_price::float,
+           coalesce(s.discount,0)::float, s.total::float, s.sale_time::text,
+           coalesce(u.full_name, '') author, s.entry_date::text, s.source, s.payment_channel
+    from submissions s join users u on u.id = s.created_by
+    where s.receipt_no = $1 and s.kind = 'sale' and s.status = 'pending'${alive}
+    order by id`, [ref]);
+}
+
 export async function dailyReport(date: string, source: string, userId: number | null = null) {
   const rows = await dailySaleRows(date, source, userId);
   const billKey = (r: DaySaleRow) => (r.receipt_no && r.receipt_no.trim() ? `r:${r.receipt_no}` : `i:${r.src}${r.id}`);

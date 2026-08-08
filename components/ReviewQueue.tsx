@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2 } from "lucide-react";
+import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Receipt as ReceiptIcon } from "lucide-react";
 import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
@@ -275,7 +275,13 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
 
                       {/* per-bill actions */}
-                      <div className="flex gap-2 justify-end mt-3 pt-2.5 border-t border-line">
+                      <div className="flex gap-2 items-center justify-end mt-3 pt-2.5 border-t border-line">
+                        {bill.ref && (
+                          <a href={`/receipt/${encodeURIComponent(bill.ref)}`} target="_blank" rel="noopener"
+                            className="mr-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-muted text-sm font-medium hover:bg-canvas hover:text-ink">
+                            <ReceiptIcon className="w-4 h-4" /> ใบเสร็จ
+                          </a>
+                        )}
                         <button onClick={() => trashBill(bill)} disabled={pending}
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-danger text-sm font-medium hover:bg-danger-soft disabled:opacity-50">
                           <Trash2 className="w-4 h-4" /> ลบ
@@ -361,7 +367,13 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                               </ul>
                               <SplitBreakdown tenders={payments[bill.ref]} />
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
-                              <div className="flex justify-end mt-3 pt-2.5 border-t border-line">
+                              <div className="flex items-center justify-end mt-3 pt-2.5 border-t border-line">
+                                {bill.ref && (
+                                  <a href={`/receipt/${encodeURIComponent(bill.ref)}`} target="_blank" rel="noopener"
+                                    className="mr-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-muted text-sm font-medium hover:bg-canvas hover:text-ink">
+                                    <ReceiptIcon className="w-4 h-4" /> ใบเสร็จ
+                                  </a>
+                                )}
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
                                   className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-danger/40 text-danger text-sm font-semibold hover:bg-danger-soft disabled:opacity-50">
                                   {busy === bill.key ? <Clock className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} ยกเลิกการอนุมัติ
