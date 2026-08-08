@@ -17,7 +17,9 @@ export type ReceiptLang = "th" | "en";
 const T = {
   th: {
     company: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
-    address: "288/31 หมู่ที่ 12 ตําบลราชาเทวะ อําเภอบางพลี จังหวัดสมุทรปราการ 10540",
+    // word-joiner (⁠) keeps "จังหวัดสมุทรปราการ" from splitting mid-word so it wraps
+    // together onto the next line instead of stranding "จังหวัด" at the end of a line.
+    address: "288/31 หมู่ที่ 12 ตําบลราชาเทวะ อําเภอบางพลี จังหวัด⁠สมุทรปราการ 10540",
     headOffice: "(สำนักงานใหญ่)", taxId: "เลขประจำตัวผู้เสียภาษี", tel: "โทร.",
     doc: "ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน",
     salesperson: "พนักงานขาย", date: "วันที่", payment: "ประเภทการชำระเงิน",

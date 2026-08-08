@@ -18,30 +18,33 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
 
   const Tab = ({ v, children }: { v: ReceiptLang; children: React.ReactNode }) => (
     <button onClick={() => setLang(v)}
-      className={`px-3 py-2 text-sm font-medium transition-colors ${lang === v ? "bg-ink text-surface" : "text-muted hover:bg-canvas"}`}>
+      className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors ${lang === v ? "bg-ink text-surface shadow-sm" : "text-muted hover:text-ink"}`}>
       {children}
     </button>
   );
 
   return (
     <>
-      <div className="no-print flex items-center justify-between gap-2 mb-4">
-        <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm text-muted hover:bg-canvas">
-          <ArrowLeft className="w-4 h-4" /> กลับ
-        </button>
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-line overflow-hidden" role="group" aria-label="ภาษา">
+      <div className="no-print mb-4 space-y-2.5">
+        {/* row 1: back · language */}
+        <div className="flex items-center justify-between gap-2">
+          <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-muted hover:bg-canvas hover:text-ink transition-colors">
+            <ArrowLeft className="w-4 h-4" /> กลับ
+          </button>
+          <div className="inline-flex rounded-lg bg-canvas p-0.5 border border-line" role="group" aria-label="ภาษา">
             <Tab v="th">ไทย</Tab>
             <Tab v="en">EN</Tab>
           </div>
-          {/* both use the server PDF (always 1 clean page, works in Safari) */}
+        </div>
+        {/* row 2: actions — both use the server PDF (always 1 clean page, works in Safari) */}
+        <div className="flex items-stretch gap-2">
           <a href={pdfUrl("download")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90">
-            <Download className="w-4 h-4" /> ดาวน์โหลด PDF
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-ink text-surface text-sm font-semibold whitespace-nowrap shadow-sm hover:opacity-90 active:scale-[.99] transition">
+            <Download className="w-4 h-4 shrink-0" /> ดาวน์โหลด PDF
           </a>
           <a href={pdfUrl("inline")} target="_blank" rel="noopener" title="เปิด PDF เพื่อสั่งพิมพ์"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm font-medium text-muted hover:bg-canvas">
-            <Printer className="w-4 h-4" /> พิมพ์
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium text-ink whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
+            <Printer className="w-4 h-4 shrink-0" /> พิมพ์
           </a>
         </div>
       </div>
