@@ -4,11 +4,13 @@ import { PAYMENTS, SPLIT2 } from "@/lib/payments";
 // style. Prices are VAT-inclusive 7%. Shop details are the real legal entity.
 const SHOP = {
   name: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
+  taxBranch: "สำนักงานใหญ่",   // เปลี่ยนเป็น "สาขาที่ 00001" ถ้าจดทะเบียนเป็นสาขา
   branch: "LAB PARFUMO @ Central World",
   address: "288/31 หมู่ 12 ราชาเทวะ บางพลี สมุทรปราการ 10540",
   taxId: "0115564002651",
   tel: "081-234-1438",
   web: "www.labparfumo.com",
+  ig: "@labparfumo",
 };
 const VAT_RATE = 0.07;
 
@@ -49,7 +51,8 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/lab-parfumo-logo.png" alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
         <div className="text-[13px] font-bold mt-2 leading-snug">{SHOP.name}</div>
-        <div className="text-[12px] leading-snug">({SHOP.branch})</div>
+        <div className="text-[12px] leading-snug">({SHOP.taxBranch})</div>
+        <div className="text-[12px] leading-snug">{SHOP.branch}</div>
         <div className="text-[11px] text-neutral-700 mt-1 leading-snug">{SHOP.address}</div>
         <div className="text-[12px] font-semibold mt-2">เลขผู้เสียภาษี {SHOP.taxId}</div>
         <div className="text-[12px] font-semibold">โทร. {SHOP.tel}</div>
@@ -100,9 +103,12 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="border-t border-black mt-3 pt-2">
         <Row label="รวมทั้งสิ้น" value={nf(net)} strong />
       </div>
-      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[12px] font-semibold tracking-wide">VAT INCLUDED</div>
+      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[12px] font-semibold">ราคารวมภาษีมูลค่าเพิ่มแล้ว (VAT INCLUDED)</div>
 
-      <div className="text-center text-[10px] text-neutral-500 mt-4">{SHOP.web}</div>
+      <div className="text-center mt-4">
+        <div className="text-[12px] text-neutral-700 font-medium">ขอบคุณที่อุดหนุน 🙏 Thank you</div>
+        <div className="text-[10px] text-neutral-500 mt-1 leading-relaxed">โทร. {SHOP.tel} · {SHOP.web}<br />IG {SHOP.ig}</div>
+      </div>
     </div>
   );
 }

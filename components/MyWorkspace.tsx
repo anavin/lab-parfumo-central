@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X } from "lucide-react";
 import { searchProducts, findProductByBarcode, productBarcodes } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -80,6 +80,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const [edit, setEdit] = useState<SaleState | null>(null);
   const [del, setDel] = useState<SubmissionRow | null>(null);
   const [toast, setToast] = useState<string | null>(null);   // brief "saved" confirmation
+  const [lastReceipt, setLastReceipt] = useState<{ ref: string; net: number } | null>(null);   // print-receipt shortcut for the bill just saved
   const formRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
@@ -95,8 +96,8 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   };
 
   // new sales are always recorded for TODAY (not the day being reviewed)
-  const startScan = () => { setEdit(null); setAutoScan(true); setBill(blankBill(today, false)); };
-  const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(today, true)); };
+  const startScan = () => { setLastReceipt(null); setEdit(null); setAutoScan(true); setBill(blankBill(today, false)); };
+  const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(today, true)); };
 
   // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
   // Once a bill is open, BillForm's own scanner listener adds subsequent items.
@@ -121,12 +122,13 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const submitTheBill = (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => start(async () => {
     if (!bill) return;
     try {
-      await submitBill({
+      const res = await submitBill({
         sale_date: bill.sale_date, sale_time: bill.sale_time, source: bill.source,
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
         items, attachments: bill.attachments, tenders,
       });
       setBill(null);
+      if (res?.ref) setLastReceipt({ ref: res.ref, net: net ?? 0 });
       flash(`บันทึกบิลแล้ว · ${baht(net ?? 0)}`);
       // the sale is recorded for today — jump to today's view so it's visible
       if (viewingPast) router.push("/my"); else refresh();
@@ -182,6 +184,24 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
           </button>
           <button onClick={startManual} className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas active:scale-[.99] transition">
             <Plus className="w-4 h-4" /> เพิ่มเอง
+          </button>
+        </div>
+      )}
+
+      {/* receipt shortcut for the bill just saved — tap to open the printable ใบเสร็จ */}
+      {!busy && lastReceipt && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-success/40 bg-success/5 px-3 py-2.5">
+          <Check className="w-4 h-4 text-success shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">บันทึกแล้ว · {baht(lastReceipt.net)}</div>
+            <div className="text-xs text-muted truncate">{lastReceipt.ref}</div>
+          </div>
+          <a href={`/receipt/${encodeURIComponent(lastReceipt.ref)}`} target="_blank" rel="noopener"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-surface text-sm font-semibold shrink-0">
+            <ReceiptIcon className="w-4 h-4" /> ใบเสร็จ
+          </a>
+          <button onClick={() => setLastReceipt(null)} aria-label="ปิด" className="p-1.5 text-muted hover:text-ink shrink-0">
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -690,6 +710,14 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
         </div>
       )}
       {note && <div className="text-xs text-danger mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
+      {ref && (
+        <div className="mt-2 pt-2 border-t border-line/60 flex justify-end">
+          <a href={`/receipt/${encodeURIComponent(ref)}`} target="_blank" rel="noopener"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-xs font-medium text-muted hover:bg-canvas hover:text-ink">
+            <ReceiptIcon className="w-3.5 h-3.5" /> ใบเสร็จ
+          </a>
+        </div>
+      )}
       </div>
     </div>
   );

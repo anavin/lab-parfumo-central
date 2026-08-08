@@ -100,6 +100,7 @@ export async function submitBill(input: unknown) {
   }
   await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}${d.attachments?.length ? ` · แนบ ${d.attachments.length} รูป` : ""}`);
   revalidatePath("/my"); revalidatePath("/review");
+  return { ref };   // so the UI can offer a "print receipt" link for the bill just saved
 }
 
 // Add / remove photo evidence on a bill you own that is still pending.
