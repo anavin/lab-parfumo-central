@@ -1,4 +1,5 @@
 import { PAYMENTS, SPLIT2 } from "@/lib/payments";
+import { LOGO_DATA_URI, QR_DATA_URI } from "@/lib/receipt-assets";
 
 // Abbreviated tax invoice / receipt (ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน) — thermal-slip
 // style. Prices are VAT-inclusive 7%. Shop details are the real legal entity.
@@ -85,7 +86,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       {/* header */}
       <div className="text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/lab-parfumo-logo.png" alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
+        <img src={LOGO_DATA_URI} alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
         <div className="text-[13px] font-bold mt-2 leading-snug">{SHOP.name}</div>
         <div className="text-[12px] leading-snug">{t.headOffice}</div>
         <div className="text-[12px] leading-snug">{SHOP.branch}</div>
@@ -149,7 +150,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       {/* follow / review QR (Linktree) */}
       <div className="text-center mt-4 pt-3 border-t border-dashed border-neutral-400">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/lab-parfumo-qr.png" alt="Lab Parfumo QR" className="mx-auto w-[110px] h-[110px] object-contain" />
+        <img src={QR_DATA_URI} alt="Lab Parfumo QR" className="mx-auto w-[110px] h-[110px] object-contain" />
         <div className="text-[11px] text-neutral-700 font-medium mt-1">{t.qrTitle}</div>
         <div className="text-[10px] text-neutral-500">{t.qrSub}</div>
       </div>
