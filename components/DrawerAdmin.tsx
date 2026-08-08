@@ -53,7 +53,7 @@ function DrawerRow({ r }: { r: Row }) {
       {viewDate && (
         <tr className="border-b border-line-soft bg-canvas/40">
           <td colSpan={5} className="px-4 py-3">
-            <div className="max-w-md">
+            <div className="max-w-md mx-auto">
               <DailyReport date={viewDate} onDateChange={setViewDate} readOnly />
             </div>
           </td>
