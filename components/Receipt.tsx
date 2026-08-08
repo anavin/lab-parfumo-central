@@ -32,9 +32,9 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
   const exVat = net / (1 + VAT_RATE);
   const vat = net - exVat;
   const totalQty = items.reduce((s, it) => s + it.qty, 0);
-  const payLines = tenders && tenders.length >= 2
-    ? tenders.map((t) => ({ label: payLabel(t.channel), amount: t.amount }))
-    : [{ label: payLabel(paymentChannel), amount: net }];
+  const payMethod = tenders && tenders.length >= 2
+    ? tenders.map((t) => payLabel(t.channel)).join(", ")
+    : payLabel(paymentChannel);
 
   const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
     <div className={`flex justify-between gap-3 ${strong ? "font-bold text-[13px]" : "text-[12px]"}`}>
@@ -47,7 +47,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       {/* header */}
       <div className="text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/lab-parfumo-logo.jpg" alt="LAB PARFUMO" className="mx-auto h-14 w-auto object-contain" />
+        <img src="/lab-parfumo-logo.png" alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
         <div className="text-[13px] font-bold mt-2 leading-snug">{SHOP.name}</div>
         <div className="text-[12px] leading-snug">({SHOP.branch})</div>
         <div className="text-[11px] text-neutral-700 mt-1 leading-snug">{SHOP.address}</div>
@@ -63,6 +63,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="text-[12px] space-y-0.5">
         <div className="flex gap-3"><span className="w-20 font-semibold">พนักงานขาย</span><span>{salesperson || "-"}</span></div>
         <div className="flex gap-3"><span className="w-20 font-semibold">วันที่</span><span className="tabular-nums">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">ประเภทการชำระเงิน</span><span>{payMethod}</span></div>
       </div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
@@ -99,14 +100,6 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="border-t border-black mt-3 pt-2">
         <Row label="รวมทั้งสิ้น" value={nf(net)} strong />
       </div>
-      {/* payment method(s) */}
-      <div className="border-t border-dashed border-neutral-400 mt-3 pt-2 text-[12px]">
-        <div className="font-semibold mb-1">ประเภทการชำระเงิน</div>
-        {payLines.map((p, i) => (
-          <div key={i} className="flex justify-between gap-3"><span className="text-neutral-600">{p.label}</span><span className="tabular-nums">{nf(p.amount)}</span></div>
-        ))}
-      </div>
-
       <div className="border-t border-double border-black mt-3 pt-3 text-center text-[12px] font-semibold tracking-wide">VAT INCLUDED</div>
 
       <div className="text-center text-[10px] text-neutral-500 mt-4">{SHOP.web}</div>
