@@ -21,14 +21,14 @@ export async function getDailyBills(date: string, source: string) {
   return dailySaleRows(date, source);
 }
 
-/** Load the signed-in user's saved opening/deposit for a day (opening carries forward). */
+/** Load the shared shop drawer for a day (same for every user; opening carries forward). */
 export async function getMyCashFloat(date: string) {
-  const user = await requireUser();
-  return getDailyCash(date, user.id);
+  await requireUser();
+  return getDailyCash(date);
 }
 
-/** Autosave the signed-in user's cash-drawer figures for a day. */
+/** Autosave the shared shop drawer for a day (records who last edited). */
 export async function saveMyCashFloat(date: string, opening: number, deposit: number, closing: number) {
   const user = await requireUser();
-  return saveDailyCash(date, user.id, opening, deposit, closing);
+  return saveDailyCash(date, opening, deposit, closing, user.id);
 }

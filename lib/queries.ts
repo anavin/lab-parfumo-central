@@ -569,26 +569,35 @@ export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;
 // ---- daily cash drawer (opening float carries forward) --------------------
 const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_cash"? does not exist/i.test(String(e?.message || ""));
 
-/** Saved opening/deposit for a user's day; if none, opening carries from the latest
- *  prior day's closing. Returns zeros gracefully if the table isn't there yet (prod). */
-export async function getDailyCash(date: string, userId: number) {
+/** Shared shop drawer for a day (same figures for every user). Opening carries from the
+ *  latest prior day's closing when not yet saved. Zeros gracefully if the table is absent. */
+export async function getDailyCash(date: string) {
   try {
     const [row] = await q<{ opening: number; deposit: number }>(
-      `select opening::float, deposit::float from daily_cash where entry_date=$1 and created_by=$2`, [date, userId]);
+      `select opening::float, deposit::float from daily_cash where entry_date=$1`, [date]);
     if (row) return { opening: row.opening, deposit: row.deposit, saved: true };
     const [prev] = await q<{ closing: number }>(
-      `select closing::float from daily_cash where created_by=$2 and entry_date<$1 order by entry_date desc limit 1`, [date, userId]);
+      `select closing::float from daily_cash where entry_date<$1 order by entry_date desc limit 1`, [date]);
     return { opening: prev?.closing ?? 0, deposit: 0, saved: false };
   } catch (e) { if (missingDailyCash(e)) return { opening: 0, deposit: 0, saved: false }; throw e; }
 }
 
-export async function saveDailyCash(date: string, userId: number, opening: number, deposit: number, closing: number) {
+export async function saveDailyCash(date: string, opening: number, deposit: number, closing: number, updatedBy: number | null = null) {
   try {
-    await q(`insert into daily_cash (entry_date, created_by, opening, deposit, closing, updated_at)
+    await q(`insert into daily_cash (entry_date, opening, deposit, closing, updated_by, updated_at)
              values ($1,$2,$3,$4,$5, now())
-             on conflict (entry_date, created_by)
-             do update set opening=$3, deposit=$4, closing=$5, updated_at=now()`,
-      [date, userId, opening, deposit, closing]);
+             on conflict (entry_date)
+             do update set opening=$2, deposit=$3, closing=$4, updated_by=$5, updated_at=now()`,
+      [date, opening, deposit, closing, updatedBy]);
     return { ok: true };
   } catch (e) { if (missingDailyCash(e)) return { ok: false, missing: true }; throw e; }
+}
+
+/** Per-day shop drawer figures for the admin cash page (read-only summary). */
+export async function dailyCashLog(limit = 90) {
+  try {
+    return await q<{ entry_date: string; opening: number; deposit: number; closing: number }>(
+      `select entry_date::text entry_date, opening::float, deposit::float, closing::float
+       from daily_cash order by entry_date desc limit $1`, [limit]);
+  } catch (e) { if (missingDailyCash(e)) return []; throw e; }
 }
