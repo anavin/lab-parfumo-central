@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Lock, FileText } from "lucide-react";
 import { confirmDrawer } from "@/lib/actions/cash";
-import { DailyReportPrint } from "@/components/DailyReportPrint";
+import { DailyReport } from "@/components/DailyReport";
 import { baht } from "@/lib/format";
 
 type Row = { entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
@@ -53,7 +53,9 @@ function DrawerRow({ r }: { r: Row }) {
       {viewDate && (
         <tr className="border-b border-line-soft bg-canvas/40">
           <td colSpan={5} className="px-4 py-3">
-            <DailyReportPrint date={viewDate} onDateChange={setViewDate} open onOpenChange={(o) => { if (!o) setViewDate(null); }} />
+            <div className="max-w-md">
+              <DailyReport date={viewDate} onDateChange={setViewDate} readOnly />
+            </div>
           </td>
         </tr>
       )}

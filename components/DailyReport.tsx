@@ -9,8 +9,13 @@ const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 const ddmmyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y.slice(2)}`; };
 
-export function DailyReport({ defaultSource = "CTW", revision, mine = false }: { defaultSource?: string; revision?: string | number; mine?: boolean }) {
-  const [date, setDate] = useState(bkkToday());
+export function DailyReport({ defaultSource = "CTW", revision, mine = false, date: dateProp, onDateChange, readOnly = false }: {
+  defaultSource?: string; revision?: string | number; mine?: boolean;
+  date?: string; onDateChange?: (d: string) => void; readOnly?: boolean;   // readOnly = verify view (no autosave)
+}) {
+  const [dateI, setDateI] = useState(bkkToday());
+  const date = dateProp ?? dateI;
+  const setDate = onDateChange ?? setDateI;
   const source = defaultSource;   // single location (CTW) — no branch picker
   const [data, setData] = useState<ReportData | null>(null);
   const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (opening float carried from the previous day)
@@ -26,9 +31,9 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
     start(async () => { try { setData(await getDailyReport(date, source, mine)); } catch { setData(null); } });
   }, [date, source, revision, mine]);
 
-  // on /my: load the saved opening/deposit for the day (opening carries forward)
+  // load the shared shop-drawer opening/deposit for the day (carries forward). Loaded for
+  // every viewer now that the drawer is shared; only /my autosaves changes back.
   useEffect(() => {
-    if (!mine) return;
     loaded.current = false;
     getMyCashFloat(date)
       .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); })
@@ -43,7 +48,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
 
   // on /my: autosave the drawer figures (debounced) so they persist + carry forward
   useEffect(() => {
-    if (!mine || !loaded.current) return;
+    if (!mine || readOnly || !loaded.current) return;
     const t = setTimeout(() => {
       saveMyCashFloat(date, openingN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
     }, 800);
@@ -100,9 +105,10 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
           <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน</h3>
           <p className="text-xs text-muted">
             คัดลอกส่ง LINE ได้เลย
-            {mine && (saved
+            {mine && !readOnly && (saved
               ? <span className="text-success ml-1">· ✓ จำแล้ว</span>
               : <span className="text-muted-soft ml-1">· จำค่าเงินสดให้อัตโนมัติ</span>)}
+            {readOnly && <span className="text-muted-soft ml-1">· อ่านอย่างเดียว (ตรวจสอบ)</span>}
           </p>
         </div>
       </div>
@@ -117,18 +123,18 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false }: {
           <span className="text-xs text-muted mb-1 block">เงินสดหน้าร้านยกมา</span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
-            <input inputMode="numeric" value={opening} onFocus={(e) => e.target.select()}
+            <input inputMode="numeric" value={opening} onFocus={(e) => e.target.select()} readOnly={readOnly}
               onChange={(e) => setOpening(e.target.value.replace(/[^\d]/g, ""))} placeholder="0"
-              className={inp + " pl-7 text-right tabular-nums font-medium"} />
+              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
           </div>
         </label>
         <label className="block">
           <span className="text-xs text-muted mb-1 block">ฝากเข้าธนาคาร</span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
-            <input inputMode="numeric" value={deposit} onFocus={(e) => e.target.select()}
+            <input inputMode="numeric" value={deposit} onFocus={(e) => e.target.select()} readOnly={readOnly}
               onChange={(e) => setDeposit(e.target.value.replace(/[^\d]/g, ""))} placeholder="0"
-              className={inp + " pl-7 text-right tabular-nums font-medium"} />
+              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
           </div>
         </label>
       </div>
