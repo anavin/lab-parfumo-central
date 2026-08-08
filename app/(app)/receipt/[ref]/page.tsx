@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/require-user";
-import { billByReceipt } from "@/lib/queries";
+import { billByReceipt, paymentsForRefs } from "@/lib/queries";
 import { Receipt, type ReceiptItem } from "@/components/Receipt";
 import { ReceiptPrintBar } from "@/components/ReceiptPrintBar";
 
@@ -24,12 +24,14 @@ export default async function ReceiptPage({ params }: { params: Promise<{ ref: s
   const items: ReceiptItem[] = rows.map((r) => ({
     name: r.item || "-", size: r.size || "", qty: r.qty || 0, unitPrice: r.unit_price || 0, discount: r.discount || 0, total: r.total || 0,
   }));
+  const tenders = (await paymentsForRefs([decoded]))[decoded] || [];   // per-channel split amounts (if any)
 
   return (
     <div className="p-4 sm:p-6 max-w-md mx-auto">
       <ReceiptPrintBar filename={`Receipt-${decoded}`} />
       <div className="print-area rounded-xl border border-line shadow-sm overflow-hidden">
-        <Receipt receiptNo={decoded} date={first.entry_date} time={(first.sale_time || "").slice(0, 5)} salesperson={first.author} items={items} />
+        <Receipt receiptNo={decoded} date={first.entry_date} time={(first.sale_time || "").slice(0, 5)} salesperson={first.author}
+          items={items} paymentChannel={first.payment_channel} tenders={tenders} />
       </div>
     </div>
   );

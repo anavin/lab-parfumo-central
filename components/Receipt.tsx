@@ -1,3 +1,5 @@
+import { PAYMENTS, SPLIT2 } from "@/lib/payments";
+
 // Abbreviated tax invoice / receipt (ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน) — thermal-slip
 // style. Prices are VAT-inclusive 7%. Shop details are the real legal entity.
 const SHOP = {
@@ -12,11 +14,14 @@ const VAT_RATE = 0.07;
 
 const nf = (n: number) => (Math.round((n || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ddmmyyyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+const payLabel = (v?: string | null) => !v ? "เงินสด" : v === SPLIT2 ? "จ่าย 2 ช่องทาง" : (PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v);
 
 export type ReceiptItem = { name: string; size: string; qty: number; unitPrice: number; discount: number; total: number };
+export type ReceiptTender = { channel: string; amount: number };
 
-export function Receipt({ receiptNo, date, time, salesperson, items }: {
+export function Receipt({ receiptNo, date, time, salesperson, items, paymentChannel, tenders }: {
   receiptNo: string; date: string; time?: string; salesperson: string; items: ReceiptItem[];
+  paymentChannel?: string; tenders?: ReceiptTender[];
 }) {
   // full (before discount) = net + discount, so it always reconciles (gross − discount = net)
   // even for legacy rows where qty×unit_price drifts from the stored total.
@@ -27,6 +32,9 @@ export function Receipt({ receiptNo, date, time, salesperson, items }: {
   const exVat = net / (1 + VAT_RATE);
   const vat = net - exVat;
   const totalQty = items.reduce((s, it) => s + it.qty, 0);
+  const payLines = tenders && tenders.length >= 2
+    ? tenders.map((t) => ({ label: payLabel(t.channel), amount: t.amount }))
+    : [{ label: payLabel(paymentChannel), amount: net }];
 
   const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
     <div className={`flex justify-between gap-3 ${strong ? "font-bold text-[13px]" : "text-[12px]"}`}>
@@ -38,7 +46,8 @@ export function Receipt({ receiptNo, date, time, salesperson, items }: {
     <div className="receipt mx-auto w-[302px] bg-white text-black px-5 py-6 font-sans">
       {/* header */}
       <div className="text-center">
-        <div className="text-[15px] font-extrabold tracking-tight">LAB PARFUMO</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/lab-parfumo-logo.jpg" alt="LAB PARFUMO" className="mx-auto h-14 w-auto object-contain" />
         <div className="text-[13px] font-bold mt-2 leading-snug">{SHOP.name}</div>
         <div className="text-[12px] leading-snug">({SHOP.branch})</div>
         <div className="text-[11px] text-neutral-700 mt-1 leading-snug">{SHOP.address}</div>
@@ -90,7 +99,15 @@ export function Receipt({ receiptNo, date, time, salesperson, items }: {
       <div className="border-t border-black mt-3 pt-2">
         <Row label="รวมทั้งสิ้น" value={nf(net)} strong />
       </div>
-      <div className="border-t border-double border-black mt-1 pt-3 text-center text-[12px] font-semibold tracking-wide">VAT INCLUDED</div>
+      {/* payment method(s) */}
+      <div className="border-t border-dashed border-neutral-400 mt-3 pt-2 text-[12px]">
+        <div className="font-semibold mb-1">ประเภทการชำระเงิน</div>
+        {payLines.map((p, i) => (
+          <div key={i} className="flex justify-between gap-3"><span className="text-neutral-600">{p.label}</span><span className="tabular-nums">{nf(p.amount)}</span></div>
+        ))}
+      </div>
+
+      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[12px] font-semibold tracking-wide">VAT INCLUDED</div>
 
       <div className="text-center text-[10px] text-neutral-500 mt-4">{SHOP.web}</div>
     </div>
