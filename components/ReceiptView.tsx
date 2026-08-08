@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Printer, ArrowLeft } from "lucide-react";
+import { Printer, ArrowLeft, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Receipt, type ReceiptItem, type ReceiptTender, type ReceiptLang } from "./Receipt";
 
@@ -39,8 +39,14 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
             <Tab v="th">ไทย</Tab>
             <Tab v="en">EN</Tab>
           </div>
-          <button onClick={print} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90">
-            <Printer className="w-4 h-4" /> พิมพ์ / บันทึก PDF
+          {/* server-generated PDF — identical in every browser (bypasses Safari's blank Save-as-PDF) */}
+          <a href={`/api/receipt/${encodeURIComponent(receiptNo)}/pdf?lang=${lang}`}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-ink text-surface hover:opacity-90">
+            <Download className="w-4 h-4" /> ดาวน์โหลด PDF
+          </a>
+          <button onClick={print} title="พิมพ์ผ่านเบราว์เซอร์"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm font-medium text-muted hover:bg-canvas">
+            <Printer className="w-4 h-4" /> พิมพ์
           </button>
         </div>
       </div>
