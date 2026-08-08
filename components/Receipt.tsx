@@ -109,6 +109,13 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
         <div className="text-[12px] text-neutral-700 font-medium">ขอบคุณที่อุดหนุน 🙏 Thank you</div>
         <div className="text-[10px] text-neutral-500 mt-1 leading-relaxed">โทร. {SHOP.tel} · {SHOP.web}<br />IG {SHOP.ig}</div>
       </div>
+
+      {/* follow / review QR (Linktree) */}
+      <div className="text-center mt-4 pt-3 border-t border-dashed border-neutral-400">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/lab-parfumo-qr.png" alt="Lab Parfumo QR" className="mx-auto w-[110px] h-[110px] object-contain" />
+        <div className="text-[11px] text-neutral-600 mt-1">สแกนติดตามเรา · รีวิว &amp; โปรโมชั่น</div>
+      </div>
     </div>
   );
 }
