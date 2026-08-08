@@ -57,14 +57,12 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
     relaxUpcEanChecksum();
     const video = videoRef.current!;
     let stream: MediaStream | null = null;
-    let zxingControls: { stop: () => void } | null = null;
     let raf = 0;
     let stopped = false;
 
     const stopAll = () => {
       stopped = true;
       if (raf) cancelAnimationFrame(raf);
-      try { zxingControls?.stop(); } catch {}
       stream?.getTracks().forEach((t) => t.stop());
     };
 
@@ -139,35 +137,47 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         const track = stream.getVideoTracks()[0];
         try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }); } catch {}
 
-        // BASE decoder on EVERY device: ZXing, patched to accept the shop's
-        // non-standard EAN-13 check digits. Native/standard scanners REJECT those
-        // labels, so this must always run — it's the only thing that reads them.
+        // Decode ONLY the guide-frame region: capture the CENTRE of the video into a canvas
+        // each tick and read from that — barcodes outside the box are ignored, so it won't
+        // grab a neighbouring product's code. Both ZXing (reads the shop's non-standard
+        // EAN-13 labels) and the OS detector (fast on valid codes) run on the same crop.
         const hints = new Map();
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
           BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
         ]);
-        hints.set(DecodeHintType.TRY_HARDER, true);   // work harder to lock onto a barcode
-        const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
-        zxingControls = await reader.decodeFromStream(stream, video, (res) => { if (res) onCode(res.getText()); });
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        const reader = new BrowserMultiFormatReader(hints);
 
-        // BONUS parallel fast-path: the OS detector (Android/Chrome) locks onto
-        // VALID codes (e.g. the CODE-128 labels we print) almost instantly. Runs
-        // alongside ZXing on the same video; onCode() de-dupes whichever fires first.
         const NativeBD: any = (window as any).BarcodeDetector;
+        let detector: any = null;
         if (NativeBD) {
-          let detector: any;
           try { detector = new NativeBD({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] }); }
           catch { detector = new NativeBD(); }
-          const tick = async () => {
-            if (stopped) return;
-            try {
-              const codes = await detector.detect(video);
-              if (codes && codes.length && codes[0].rawValue) { onCode(codes[0].rawValue); }
-            } catch {}
-            if (!stopped) raf = requestAnimationFrame(tick);
-          };
-          raf = requestAnimationFrame(tick);
         }
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+        const ROI_W = 0.82, ROI_H = 0.42;   // centre band matching the on-screen guide box
+
+        const tick = async () => {
+          if (stopped) return;
+          const vw = video.videoWidth, vh = video.videoHeight;
+          if (vw && vh && ctx) {
+            const cw = Math.max(2, Math.round(vw * ROI_W)), ch = Math.max(2, Math.round(vh * ROI_H));
+            const sx = Math.round((vw - cw) / 2), sy = Math.round((vh - ch) / 2);
+            if (canvas.width !== cw) canvas.width = cw;
+            if (canvas.height !== ch) canvas.height = ch;
+            ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
+            if (detector) {
+              try { const codes = await detector.detect(canvas); if (codes?.length && codes[0].rawValue) onCode(codes[0].rawValue); } catch {}
+            }
+            if (!stopped) {
+              try { const res = reader.decodeFromCanvas(canvas); if (res) onCode(res.getText()); } catch {}
+            }
+          }
+          if (!stopped) setTimeout(() => { raf = requestAnimationFrame(tick); }, 120);
+        };
+        raf = requestAnimationFrame(tick);
       } catch (e: any) {
         setError(
           e?.name === "NotAllowedError"
