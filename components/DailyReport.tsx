@@ -98,22 +98,24 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
 
   return (
     <div className="card p-4 sm:p-5">
-      {/* header */}
+      {/* header — hidden in the verify view (slip only) */}
+      {!readOnly && (
       <div className="flex items-center gap-3 mb-4">
         <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน</h3>
           <p className="text-xs text-muted">
             คัดลอกส่ง LINE ได้เลย
-            {mine && !readOnly && (saved
+            {mine && (saved
               ? <span className="text-success ml-1">· ✓ จำแล้ว</span>
               : <span className="text-muted-soft ml-1">· จำค่าเงินสดให้อัตโนมัติ</span>)}
-            {readOnly && <span className="text-muted-soft ml-1">· อ่านอย่างเดียว (ตรวจสอบ)</span>}
           </p>
         </div>
       </div>
+      )}
 
-      {/* controls */}
+      {/* controls — hidden in the verify view */}
+      {!readOnly && (
       <div className="grid grid-cols-2 gap-3 mb-4">
         <label className="block col-span-2">
           <span className="text-xs text-muted mb-1 block">วันที่</span>
@@ -138,6 +140,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
           </div>
         </label>
       </div>
+      )}
 
       {/* receipt-style preview */}
       <div className="rounded-xl border border-line bg-canvas px-4 py-4">
@@ -177,12 +180,16 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
         )}
       </div>
 
-      <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = ยกมา + เงินสดรับ · คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
+      {!readOnly && (
+        <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = ยกมา + เงินสดรับ · คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
+      )}
 
-      <button onClick={copy} disabled={!ready}
-        className="w-full mt-3 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
-        {copied ? <><Check className="w-4 h-4" /> คัดลอกแล้ว</> : <><ClipboardCopy className="w-4 h-4" /> คัดลอกรายงาน</>}
-      </button>
+      {!readOnly && (
+        <button onClick={copy} disabled={!ready}
+          className="w-full mt-3 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
+          {copied ? <><Check className="w-4 h-4" /> คัดลอกแล้ว</> : <><ClipboardCopy className="w-4 h-4" /> คัดลอกรายงาน</>}
+        </button>
+      )}
     </div>
   );
 }
