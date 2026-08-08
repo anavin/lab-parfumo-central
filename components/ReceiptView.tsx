@@ -36,14 +36,14 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
             <Tab v="en">EN</Tab>
           </div>
         </div>
-        {/* row 2: actions — both use the server PDF (always 1 clean page, works in Safari) */}
-        <div className="flex items-stretch gap-2">
+        {/* row 2: actions — equal-weight buttons; both use the server PDF (1 clean page, works in Safari) */}
+        <div className="grid grid-cols-2 gap-2">
           <a href={pdfUrl("download")}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-ink text-surface text-sm font-semibold whitespace-nowrap shadow-sm hover:opacity-90 active:scale-[.99] transition">
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-line bg-surface text-ink text-sm font-semibold whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
             <Download className="w-4 h-4 shrink-0" /> ดาวน์โหลด PDF
           </a>
           <a href={pdfUrl("inline")} target="_blank" rel="noopener" title="เปิด PDF เพื่อสั่งพิมพ์"
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium text-ink whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-line bg-surface text-ink text-sm font-semibold whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
             <Printer className="w-4 h-4 shrink-0" /> พิมพ์
           </a>
         </div>
