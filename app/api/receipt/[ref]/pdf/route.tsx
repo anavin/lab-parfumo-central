@@ -11,7 +11,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
 
   const { ref } = await params;
   const decoded = decodeURIComponent(ref);
-  const lang: ReceiptLang = new URL(req.url).searchParams.get("lang") === "en" ? "en" : "th";
+  const sp = new URL(req.url).searchParams;
+  const lang: ReceiptLang = sp.get("lang") === "en" ? "en" : "th";
+  // disp=inline → view in the browser's PDF viewer (for printing); default = download
+  const disposition = sp.get("disp") === "inline" ? "inline" : "attachment";
 
   const rows = await billByReceipt(decoded);
   if (!rows.length) return new Response("Not found", { status: 404 });
@@ -29,7 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Receipt-${decoded}-${lang.toUpperCase()}.pdf"`,
+      "Content-Disposition": `${disposition}; filename="Receipt-${decoded}-${lang.toUpperCase()}.pdf"`,
       "Cache-Control": "no-store",
     },
   });
