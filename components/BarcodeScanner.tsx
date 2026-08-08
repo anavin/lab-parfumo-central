@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { DecodeHintType, BarcodeFormat, EAN13Reader } from "@zxing/library";
-import { X, Camera, Check, AlertTriangle, ScanLine } from "lucide-react";
+import { X, Camera, Check, AlertTriangle, ScanLine, Flashlight, FlashlightOff, Keyboard, ZoomIn } from "lucide-react";
 
 // The shop's EAN-13 labels were generated with non-standard check digits, so
 // ZXing's strict checksum rejects most of them. Relax EAN/UPC checksum
@@ -52,6 +52,14 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
   const knownRef = useRef(knownCodes);            // latest known set without restarting the camera
   useEffect(() => { knownRef.current = knownCodes; });
   const voteRef = useRef<{ last: string; n: number }>({ last: "", n: 0 });   // consensus for unknown codes
+  const trackRef = useRef<MediaStreamTrack | null>(null);                    // camera track for torch/zoom/focus
+  const commitRef = useRef<(code: string) => void>(() => {});                // manual entry funnels here
+  const [caps, setCaps] = useState<{ torch: boolean; zoom: { min: number; max: number; step: number } | null }>({ torch: false, zoom: null });
+  const [torch, setTorch] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [manual, setManual] = useState(false);
+  const [manualVal, setManualVal] = useState("");
+  const [focusPing, setFocusPing] = useState<{ x: number; y: number; k: number } | null>(null);
 
   useEffect(() => {
     relaxUpcEanChecksum();
@@ -95,6 +103,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         cbRef.current(code);
       }
     };
+    commitRef.current = commit;   // manual number entry uses the same accept path
 
     // Shared handler for a decoded code (both native + ZXing paths funnel here).
     const onCode = (raw: string) => {
@@ -135,7 +144,14 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
 
         // Continuous autofocus — the single biggest fix for blurry, unreadable frames.
         const track = stream.getVideoTracks()[0];
+        trackRef.current = track;
         try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }); } catch {}
+        // expose torch/zoom controls only if the device supports them
+        try {
+          const cp: any = track.getCapabilities?.() || {};
+          setCaps({ torch: !!cp.torch, zoom: cp.zoom ? { min: cp.zoom.min ?? 1, max: cp.zoom.max ?? 1, step: cp.zoom.step || 0.1 } : null });
+          if (cp.zoom) setZoom((track.getSettings?.() as any)?.zoom ?? cp.zoom.min ?? 1);
+        } catch {}
 
         // Decode ONLY the guide-frame region: capture the CENTRE of the video into a canvas
         // each tick and read from that — barcodes outside the box are ignored, so it won't
@@ -201,6 +217,30 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
   const scanNext = () => { setResult(null); voteRef.current = { last: "", n: 0 }; cooldownRef.current = Date.now() + 1000; pausedRef.current = false; };
   const paused = checking || result !== null;
 
+  const applyTrack = (adv: any) => { trackRef.current?.applyConstraints({ advanced: [adv] }).catch(() => {}); };
+  const toggleTorch = () => { const on = !torch; setTorch(on); applyTrack({ torch: on }); };
+  const changeZoom = (z: number) => { setZoom(z); applyTrack({ zoom: z }); };
+
+  // tap the camera to (re)focus — nudges autofocus (broadly supported); sets the point if the device allows
+  const refocus = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (error || paused || manual) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const k = Date.now();
+    setFocusPing({ x: e.clientX - rect.left, y: e.clientY - rect.top, k });
+    setTimeout(() => setFocusPing((p) => (p?.k === k ? null : p)), 650);
+    const t = trackRef.current; if (!t) return;
+    const cp: any = t.getCapabilities?.() || {};
+    const adv: any = {};
+    if (Array.isArray(cp.focusMode) && cp.focusMode.includes("single-shot")) adv.focusMode = "single-shot";
+    else if (Array.isArray(cp.focusMode) && cp.focusMode.includes("continuous")) adv.focusMode = "continuous";
+    if (cp.pointsOfInterest) adv.pointsOfInterest = [{ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height }];
+    if (!Object.keys(adv).length) return;
+    t.applyConstraints({ advanced: [adv] }).catch(() => {});
+    if (adv.focusMode === "single-shot") setTimeout(() => t.applyConstraints({ advanced: [{ focusMode: "continuous" }] as any }).catch(() => {}), 1600);
+  };
+
+  const submitManual = () => { const code = manualVal.trim(); if (!code) return; setManual(false); setManualVal(""); commitRef.current(code); };
+
   return (
     <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-ink rounded-2xl overflow-hidden w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -209,8 +249,29 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10" aria-label="ปิด"><X className="w-5 h-5" /></button>
         </div>
 
-        <div className="relative bg-black aspect-[3/4]">
+        <div className="relative bg-black aspect-[3/4]" onClick={refocus}>
           <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+
+          {/* torch */}
+          {caps.torch && !paused && !error && !manual && (
+            <button onClick={(e) => { e.stopPropagation(); toggleTorch(); }} aria-label="ไฟฉาย"
+              className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur border border-white/20 text-white flex items-center justify-center">
+              {torch ? <Flashlight className="w-5 h-5 text-brand" /> : <FlashlightOff className="w-5 h-5" />}
+            </button>
+          )}
+          {/* zoom */}
+          {caps.zoom && !paused && !error && !manual && (
+            <div onClick={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/50 backdrop-blur rounded-full px-3 py-1.5 border border-white/20">
+              <ZoomIn className="w-4 h-4 text-white/80" />
+              <input type="range" min={caps.zoom.min} max={caps.zoom.max} step={caps.zoom.step} value={zoom}
+                onChange={(e) => changeZoom(Number(e.target.value))} className="w-32 accent-brand" />
+            </div>
+          )}
+          {/* tap-to-focus ping */}
+          {focusPing && (
+            <span key={focusPing.k} className="pointer-events-none absolute z-10 w-14 h-14 -ml-7 -mt-7 rounded-full border-2 border-brand animate-ping"
+              style={{ left: focusPing.x, top: focusPing.y }} />
+          )}
           {!error && !paused && (
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-5">
               <div className="relative w-[74%] h-[34%] rounded-xl overflow-hidden" style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }}>
@@ -260,19 +321,39 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
               <button onClick={onClose} className="mt-2 text-white/60 text-sm py-2 hover:text-white">เสร็จสิ้น</button>
             </div>
           )}
+
+          {/* manual barcode entry — type the digits under the barcode when it won't scan */}
+          {manual && (
+            <div className="absolute inset-0 z-20 bg-black/95 flex flex-col items-center justify-center px-6" onClick={(e) => e.stopPropagation()}>
+              <div className="text-white/90 text-sm mb-3 text-center">พิมพ์เลขบาร์โค้ด (ตัวเลขใต้แถบบาร์โค้ด)</div>
+              <input autoFocus inputMode="numeric" value={manualVal}
+                onChange={(e) => setManualVal(e.target.value.replace(/[^\dA-Za-z]/g, ""))}
+                onKeyDown={(e) => { if (e.key === "Enter") submitManual(); }}
+                className="w-full max-w-xs text-center text-lg tracking-wider rounded-xl px-4 py-3 bg-white text-black outline-none" placeholder="เช่น 8857128012026" />
+              <div className="flex gap-2 mt-4 w-full max-w-xs">
+                <button onClick={() => { setManual(false); setManualVal(""); }} className="flex-1 py-3 rounded-xl border border-white/30 text-white/80">ยกเลิก</button>
+                <button onClick={submitManual} disabled={!manualVal.trim()} className="flex-1 py-3 rounded-xl bg-brand text-white font-semibold disabled:opacity-50">ตกลง</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* footer (only when not showing a result) */}
-        {!result && !checking && (continuous ? (
-          <div className="p-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-white/80">{count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b> รายการ · สแกนต่อ</> : "สแกนที่บาร์โค้ด"}</span>
-            <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">
-              <Check className="w-4 h-4" /> เสร็จ
+        {!result && !checking && (
+          <div className="p-3 flex items-center justify-between gap-2">
+            <button onClick={() => setManual(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/25 text-white/90 text-sm hover:bg-white/10 whitespace-nowrap">
+              <Keyboard className="w-4 h-4" /> พิมพ์เลข
             </button>
+            <span className="text-xs text-white/70 flex-1 text-center truncate">
+              {continuous && count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b></> : "จ่อบาร์โค้ดในกรอบ"}
+            </span>
+            {continuous ? (
+              <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark whitespace-nowrap">
+                <Check className="w-4 h-4" /> เสร็จ
+              </button>
+            ) : <span className="w-[64px]" />}
           </div>
-        ) : (
-          <div className="px-4 py-3 text-center text-[12px] text-white/60">สแกนไปที่บาร์โค้ดสินค้า</div>
-        ))}
+        )}
       </div>
     </div>
   );
