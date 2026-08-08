@@ -43,6 +43,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
   const [count, setCount] = useState(0);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [hint, setHint] = useState(false);   // "can't scan?" tips after a few seconds with no lock
   const doneRef = useRef(false);    // single mode guard
   const pausedRef = useRef(false);  // continuous: waiting for confirm
   const cooldownRef = useRef(0);    // ignore reads until this time (ms) after resuming
@@ -179,6 +180,14 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
     return () => { stopAll(); };
   }, [continuous]);
 
+  // show scanning tips if nothing locks within a few seconds of actively scanning
+  useEffect(() => {
+    if (error || checking || result) { setHint(false); return; }
+    setHint(false);
+    const t = setTimeout(() => setHint(true), 7000);
+    return () => clearTimeout(t);
+  }, [error, checking, result]);
+
   const scanNext = () => { setResult(null); voteRef.current = { last: "", n: 0 }; cooldownRef.current = Date.now() + 1000; pausedRef.current = false; };
   const paused = checking || result !== null;
 
@@ -193,8 +202,25 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         <div className="relative bg-black aspect-[3/4]">
           <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
           {!error && !paused && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="w-[72%] h-[32%] border-2 border-white/85 rounded-xl" style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }} />
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-5">
+              <div className="relative w-[74%] h-[34%] rounded-xl overflow-hidden" style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }}>
+                <div className="absolute inset-0 border border-white/30 rounded-xl" />
+                {/* corner brackets (pulse) */}
+                <span className="lp-corner absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-brand rounded-tl-xl" />
+                <span className="lp-corner absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-brand rounded-tr-xl" />
+                <span className="lp-corner absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-brand rounded-bl-xl" />
+                <span className="lp-corner absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-brand rounded-br-xl" />
+                {/* sweeping scan line */}
+                <div className="lp-scanline absolute left-3 right-3 h-[3px] bg-brand rounded" style={{ boxShadow: "0 0 10px 2px rgba(161,124,72,0.85)" }} />
+              </div>
+              <div className="flex items-center gap-2 text-white/90 text-sm font-medium">
+                <ScanLine className="w-4 h-4 animate-pulse text-brand" /> กำลังสแกน…
+              </div>
+              {hint && (
+                <div className="mx-6 max-w-[85%] rounded-lg bg-black/60 px-3 py-2 text-center text-[12px] leading-relaxed text-white/90">
+                  สแกนไม่ติด? ลอง <b className="text-brand">ถอยเข้า–ออก</b> ให้ภาพชัด · จัดบาร์โค้ดให้อยู่กลางกรอบ · เพิ่มแสง/เลี่ยงแสงสะท้อน
+                </div>
+              )}
             </div>
           )}
           {error && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/90">{error}</div>}

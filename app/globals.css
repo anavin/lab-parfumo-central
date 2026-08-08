@@ -149,6 +149,16 @@ summary:focus-visible, [tabindex]:focus-visible {
 *::-webkit-scrollbar-thumb { background: rgb(var(--muted-soft)); border-radius: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
+/* camera scanner: a sweeping line + pulsing corners so it's obvious it's actively scanning */
+@keyframes lp-scanline { 0% { top: 6%; opacity: .45; } 50% { top: 90%; opacity: 1; } 100% { top: 6%; opacity: .45; } }
+.lp-scanline { animation: lp-scanline 1.6s ease-in-out infinite; }
+@keyframes lp-corner { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+.lp-corner { animation: lp-corner 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-scanline { animation: none; top: 50%; }
+  .lp-corner { animation: none; opacity: .9; }
+}
+
 @media print {
   .no-print { display: none !important; }
   .print-area { box-shadow: none !important; border: none !important; }
