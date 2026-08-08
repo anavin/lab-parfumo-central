@@ -32,6 +32,7 @@ const Fld = ({ label, children }: { label: string; children: React.ReactNode }) 
 
 const fmtThaiDay = (d: string) =>
   new Date(d + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
 type Bill = { key: string; ref: string; author: string; rows: SubmissionRow[] };
 type Day = { date: string; bills: Bill[] };
@@ -117,7 +118,13 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
 
   const days = groupDays(rows.filter(match));
   const approvedDays = groupDays(approved.filter(match));
-  const approvedBillCount = approvedDays.reduce((s, d) => s + d.bills.length, 0);
+  // show one day at a time (today by default); other days are picked from the dropdown
+  const [approvedDate, setApprovedDate] = useState("");
+  const activeApprovedDate = approvedDate && approvedDays.some((d) => d.date === approvedDate)
+    ? approvedDate
+    : (approvedDays.find((d) => d.date === bkkToday())?.date ?? approvedDays[0]?.date ?? "");
+  const shownApprovedDays = approvedDays.filter((d) => d.date === activeApprovedDate);
+  const activeDayBillCount = shownApprovedDays.reduce((s, d) => s + d.bills.length, 0);
   const shownBills = days.reduce((s, d) => s + d.bills.length, 0);
   const shownTotal = days.reduce((s, d) => s + d.bills.reduce((x, b) => x + b.rows.reduce((y, r) => y + (r.total ?? 0), 0), 0), 0);
 
@@ -309,13 +316,25 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
             <ShieldCheck className="w-4 h-4 text-success shrink-0" />
             <span className="text-sm font-semibold">อนุมัติแล้ว</span>
-            <span className="text-xs text-muted">· {approvedBillCount} บิล · 7 วันล่าสุด</span>
+            <span className="text-xs text-muted">· {activeDayBillCount} บิล</span>
             <ChevronDown className={`w-4 h-4 text-muted ml-auto transition-transform ${showApproved ? "rotate-180" : ""}`} />
           </button>
 
           {showApproved && (
             <div className="space-y-6 mt-3">
-              {approvedDays.map((day) => {
+              {/* pick which day to view (defaults to today) */}
+              {approvedDays.length > 1 && (
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-muted">เลือกวัน</span>
+                  <select value={activeApprovedDate} onChange={(e) => setApprovedDate(e.target.value)}
+                    className="border border-line rounded-lg px-3 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand">
+                    {approvedDays.map((d) => (
+                      <option key={d.date} value={d.date}>{fmtThaiDay(d.date)} · {d.bills.length} บิล</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {shownApprovedDays.map((day) => {
                 const dayTotal = day.bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.total ?? 0), 0), 0);
                 return (
                   <div key={day.date}>
