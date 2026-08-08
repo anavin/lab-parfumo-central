@@ -166,12 +166,13 @@ summary:focus-visible, [tabindex]:focus-visible {
   html, body { background: #fff !important; }
   @page { size: A4; margin: 12mm; }
 
-  /* receipt: isolate the slip so the PDF is never blank/clipped — hide everything
-     on the receipt page, then show only the printable area, lifted to the page top. */
-  body:has(.receipt-page) * { visibility: hidden !important; }
-  body:has(.receipt-page) .print-area,
-  body:has(.receipt-page) .print-area * { visibility: visible !important; }
-  body:has(.receipt-page) .print-area { position: absolute !important; left: 0; top: 0; width: 100%; }
+  /* receipt: isolate the slip so the PDF is never blank/clipped. The print button
+     adds .printing-receipt to <body> first (no :has() — works in every browser):
+     hide everything, then show only the printable area lifted to the page top. */
+  body.printing-receipt * { visibility: hidden !important; }
+  body.printing-receipt .print-area,
+  body.printing-receipt .print-area * { visibility: visible !important; }
+  body.printing-receipt .print-area { position: absolute !important; left: 0; top: 0; width: 100%; }
 
   /* daily report: fill the A4 page (let @page margins govern spacing) */
   .daily-sheet { max-width: none !important; padding: 0 !important; border-radius: 0 !important; margin: 0 !important; }
