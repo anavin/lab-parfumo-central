@@ -107,7 +107,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
 
       <div className="text-center mt-4">
         <div className="text-[12px] text-neutral-700 font-medium">ขอบคุณที่อุดหนุน 🙏 Thank you</div>
-        <div className="text-[10px] text-neutral-500 mt-1 leading-relaxed">โทร. {SHOP.tel} · {SHOP.web}<br />IG {SHOP.ig}</div>
+        <div className="text-[10px] text-neutral-500 mt-1 leading-relaxed">โทร. {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
       </div>
 
       {/* follow / review QR (Linktree) */}
