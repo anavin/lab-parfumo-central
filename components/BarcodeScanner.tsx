@@ -28,10 +28,15 @@ export type ScanResult = { ok: boolean; label: string; sub?: string };
 // - continuous mode: after each scan it PAUSES and shows what was found; the
 //   user taps "ตกลง" to scan the next one. onDetected may return a ScanResult
 //   (what to show); otherwise a generic success is shown.
-export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
+// Reads needed before ACCEPTING a code that isn't a known product barcode — guards
+// against a blurry frame decoding to a wrong number (a misread rarely repeats identically).
+const UNKNOWN_CONFIRM = 3;
+
+export function BarcodeScanner({ onDetected, onClose, continuous = false, knownCodes }: {
   onDetected: (code: string) => void | Promise<ScanResult | void>;
   onClose: () => void;
   continuous?: boolean;
+  knownCodes?: Set<string> | null;   // all product barcodes — decoded value is checked against these first
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +48,9 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
   const cooldownRef = useRef(0);    // ignore reads until this time (ms) after resuming
   const cbRef = useRef(onDetected); // keep latest callback without restarting the camera
   useEffect(() => { cbRef.current = onDetected; });
+  const knownRef = useRef(knownCodes);            // latest known set without restarting the camera
+  useEffect(() => { knownRef.current = knownCodes; });
+  const voteRef = useRef<{ last: string; n: number }>({ last: "", n: 0 });   // consensus for unknown codes
 
   useEffect(() => {
     relaxUpcEanChecksum();
@@ -59,11 +67,20 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
       stream?.getTracks().forEach((t) => t.stop());
     };
 
-    // Shared handler for a decoded code (both native + ZXing paths funnel here).
-    const onCode = (code: string) => {
-      if (!code) return;
+    // Is this decoded value an actual product barcode? (exact, or ignoring leading zeros
+    // that some readers add/drop between UPC-A / EAN-13.)
+    const isKnown = (code: string) => {
+      const k = knownRef.current;
+      if (!k || !k.size) return false;
+      if (k.has(code)) return true;
+      const bare = code.replace(/^0+/, "");
+      return k.has(bare) || k.has("0" + code) || k.has("00" + code);
+    };
+
+    // Commit a code downstream (fires onDetected). Continuous pauses for confirm; single closes.
+    const commit = (code: string) => {
+      voteRef.current = { last: "", n: 0 };
       if (continuous) {
-        if (pausedRef.current || Date.now() < cooldownRef.current) return; // ignore until confirmed / off cooldown
         pausedRef.current = true;
         try { navigator.vibrate?.(45); } catch {}
         setChecking(true);
@@ -78,6 +95,20 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
         stopAll();
         cbRef.current(code);
       }
+    };
+
+    // Shared handler for a decoded code (both native + ZXing paths funnel here).
+    const onCode = (raw: string) => {
+      const code = (raw || "").trim();
+      if (!code) return;
+      if (continuous ? (pausedRef.current || Date.now() < cooldownRef.current) : doneRef.current) return;
+
+      // matches a real product → trust it immediately; otherwise require several
+      // identical reads so a one-off misread never gets accepted.
+      if (isKnown(code)) { commit(code); return; }
+      const v = voteRef.current;
+      if (v.last === code) v.n += 1; else { v.last = code; v.n = 1; }
+      if (v.n >= UNKNOWN_CONFIRM) commit(code);
     };
 
     // Grab the rear camera at the highest resolution the device will give — more
@@ -148,7 +179,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false }: {
     return () => { stopAll(); };
   }, [continuous]);
 
-  const scanNext = () => { setResult(null); cooldownRef.current = Date.now() + 1000; pausedRef.current = false; };
+  const scanNext = () => { setResult(null); voteRef.current = { last: "", n: 0 }; cooldownRef.current = Date.now() + 1000; pausedRef.current = false; };
   const paused = checking || result !== null;
 
   return (

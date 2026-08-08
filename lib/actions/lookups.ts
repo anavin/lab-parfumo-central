@@ -20,6 +20,13 @@ export async function findProductByBarcode(barcode: string) {
   return p ?? null;
 }
 
+/** All product barcodes — the scanner cross-checks a decoded value against this so a
+ *  real product is accepted instantly and a misread (that matches nothing) is caught. */
+export async function productBarcodes() {
+  const rows = await q<{ barcode: string }>(`select barcode from products where barcode is not null`);
+  return rows.map((r) => r.barcode);
+}
+
 export async function listPOs() {
   return q<{ po_number: string; order_date: string; branch_label: string; lines: number; qty: number }>(`
     select po.po_number, po.order_date, po.branch_label,

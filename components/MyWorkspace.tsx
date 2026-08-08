@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus } from "lucide-react";
-import { searchProducts, findProductByBarcode } from "@/lib/actions/lookups";
+import { searchProducts, findProductByBarcode, productBarcodes } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -14,6 +14,18 @@ import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/paymen
 import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
+
+// All product barcodes, loaded once and cached, so the camera scanner can trust exact
+// matches instantly and reject misreads. Shared across every scanner on the page.
+let _barcodeCache: Set<string> | null = null;
+function useKnownBarcodes() {
+  const [codes, setCodes] = useState<Set<string> | null>(_barcodeCache);
+  useEffect(() => {
+    if (_barcodeCache) return;
+    productBarcodes().then((list) => { _barcodeCache = new Set(list); setCodes(_barcodeCache); }).catch(() => {});
+  }, []);
+  return codes;
+}
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 
 const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-brand";
@@ -220,6 +232,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
 }) {
   const [scanning, setScanning] = useState(!!autoScan);
+  const knownCodes = useKnownBarcodes();
   const [missing, setMissing] = useState<string[]>([]);
   const [qrKey, setQrKey] = useState(0);   // bump to re-pop the K Shop QR (even on same-value pick)
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
@@ -512,7 +525,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       <ConfirmDialog open={confirmCancel} title="ยกเลิกบิลนี้?" message="ข้อมูลที่กรอกไว้จะหายทั้งหมด" danger confirmLabel="ทิ้งบิล"
         onCancel={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); onCancel(); }} />
 
-      {scanning && <BarcodeScanner continuous onDetected={onScanned} onClose={() => setScanning(false)} />}
+      {scanning && <BarcodeScanner continuous knownCodes={knownCodes} onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
   );
 }
@@ -715,6 +728,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const knownCodes = useKnownBarcodes();
   const [missing, setMissing] = useState<string[]>([]);
   const [qrKey, setQrKey] = useState(0);
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
@@ -806,7 +820,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
           <button onClick={handleSave} disabled={pending || !state.item || (split && !tendersOk)} className="px-6 min-h-[48px] rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
         </div>
       </div>
-      {scanning && <BarcodeScanner onDetected={onScanned} onClose={() => setScanning(false)} />}
+      {scanning && <BarcodeScanner knownCodes={knownCodes} onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
   );
 }
