@@ -4,6 +4,7 @@ import { pendingSubmissions, recentlyApprovedSubmissions, attachmentsForRefs, pa
 import { PageHeader } from "@/components/ui";
 import { ReviewQueue } from "@/components/ReviewQueue";
 import { ReviewInsights } from "@/components/ReviewInsights";
+import { MonthlyExcelButton } from "@/components/MonthlyExcelButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function ReviewPage() {
       <div className="no-print">
         <PageHeader icon={ClipboardCheck} title="ตรวจสอบยอดขาย"
           subtitle={rows.length ? `${rows.length} รายการรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
+        <div className="mb-6"><MonthlyExcelButton /></div>
       </div>
       <ReviewInsights revision={`${rows.length}|${approved.length}`}>
         <div className="no-print">
