@@ -60,10 +60,10 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="text-[12px] text-neutral-700">{receiptNo}</div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
-      <div className="text-[12px] space-y-0.5">
-        <div className="flex gap-3"><span className="w-20 font-semibold">พนักงานขาย</span><span>{salesperson || "-"}</span></div>
-        <div className="flex gap-3"><span className="w-20 font-semibold">วันที่</span><span className="tabular-nums">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
-        <div className="flex justify-between gap-3"><span className="font-semibold">ประเภทการชำระเงิน</span><span>{payMethod}</span></div>
+      <div className="text-[12px] space-y-1">
+        <div className="flex justify-between gap-3"><span className="font-semibold">พนักงานขาย</span><span className="text-right">{salesperson || "-"}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">วันที่</span><span className="tabular-nums text-right">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">ประเภทการชำระเงิน</span><span className="text-right">{payMethod}</span></div>
       </div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
