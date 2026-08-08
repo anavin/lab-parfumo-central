@@ -26,7 +26,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ ref: s
   const tenders = (await paymentsForRefs([decoded]))[decoded] || [];   // per-channel split amounts (if any)
 
   return (
-    <div className="p-4 sm:p-6 max-w-md mx-auto">
+    <div className="receipt-page p-4 sm:p-6 max-w-md mx-auto">
       <ReceiptView filename={`Receipt-${decoded}`} receiptNo={decoded} date={first.entry_date}
         time={(first.sale_time || "").slice(0, 5)} salesperson={first.author}
         items={items} paymentChannel={first.payment_channel} tenders={tenders} />

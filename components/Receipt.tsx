@@ -17,7 +17,7 @@ const VAT_RATE = 0.07;
 export type ReceiptLang = "th" | "en";
 const T = {
   th: {
-    headOffice: "(สำนักงานใหญ่)", taxId: "เลขผู้เสียภาษี", tel: "โทร.",
+    headOffice: "(สำนักงานใหญ่)", taxId: "เลขประจำตัวผู้เสียภาษี", tel: "โทร.",
     doc: "ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน",
     salesperson: "พนักงานขาย", date: "วันที่", payment: "ประเภทการชำระเงิน",
     lineDiscount: "ส่วนลด", totalQty: "จำนวนรวม",

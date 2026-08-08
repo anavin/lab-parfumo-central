@@ -308,7 +308,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
           <button onClick={() => setShowApproved((v) => !v)}
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
             <ShieldCheck className="w-4 h-4 text-success shrink-0" />
-            <span className="text-sm font-semibold">อนุมัติแล้ว (ยกเลิกได้)</span>
+            <span className="text-sm font-semibold">อนุมัติแล้ว</span>
             <span className="text-xs text-muted">· {approvedBillCount} บิล · 7 วันล่าสุด</span>
             <ChevronDown className={`w-4 h-4 text-muted ml-auto transition-transform ${showApproved ? "rotate-180" : ""}`} />
           </button>

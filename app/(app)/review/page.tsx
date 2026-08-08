@@ -34,21 +34,23 @@ export default async function ReviewPage() {
         <PageHeader icon={ClipboardCheck} title="ตรวจสอบยอดขาย"
           subtitle={rows.length ? `${rows.length} รายการรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
         <div className="mb-6"><MonthlyExcelButton /></div>
-        <div className="grid gap-6 lg:grid-cols-2 mb-6">
-          <div className="card p-5 flex flex-col">
-            <h3 className="text-[14px] font-semibold text-ink">เปรียบเทียบยอดขายรายเดือน</h3>
-            <p className="text-[12px] text-muted mt-0.5 mb-3">รายได้รวมของแต่ละเดือน (ล่าสุด {monthChart.length} เดือน)</p>
-            {monthChart.length ? <Columns data={monthChart} highlight={highlight} />
-              : <div className="flex-1 grid place-items-center text-sm text-muted py-10">ยังไม่มีข้อมูล</div>}
-          </div>
-          <TopScentsCard data={topScentsData} />
-        </div>
       </div>
       <ReviewInsights revision={`${rows.length}|${approved.length}`}>
         <div className="no-print">
           <ReviewQueue rows={rows} approved={approved} attachments={attachments} payments={payments} />
         </div>
       </ReviewInsights>
+
+      {/* month-vs-month + best sellers — kept at the very bottom */}
+      <div className="no-print grid gap-6 lg:grid-cols-2 mt-8">
+        <div className="card p-5 flex flex-col">
+          <h3 className="text-[14px] font-semibold text-ink">เปรียบเทียบยอดขายรายเดือน</h3>
+          <p className="text-[12px] text-muted mt-0.5 mb-3">รายได้รวมของแต่ละเดือน (ล่าสุด {monthChart.length} เดือน)</p>
+          {monthChart.length ? <Columns data={monthChart} highlight={highlight} />
+            : <div className="flex-1 grid place-items-center text-sm text-muted py-10">ยังไม่มีข้อมูล</div>}
+        </div>
+        <TopScentsCard data={topScentsData} />
+      </div>
     </div>
   );
 }
