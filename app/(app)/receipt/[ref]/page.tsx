@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth/require-user";
 import { billByReceipt, paymentsForRefs } from "@/lib/queries";
-import { Receipt, type ReceiptItem } from "@/components/Receipt";
-import { ReceiptPrintBar } from "@/components/ReceiptPrintBar";
+import { type ReceiptItem } from "@/components/Receipt";
+import { ReceiptView } from "@/components/ReceiptView";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,6 @@ export default async function ReceiptPage({ params }: { params: Promise<{ ref: s
   if (!rows.length) {
     return (
       <div className="p-6 max-w-md mx-auto">
-        <ReceiptPrintBar filename={decoded} />
         <div className="card p-8 text-center text-muted text-sm">ไม่พบใบเสร็จเลขที่ {decoded}</div>
       </div>
     );
@@ -28,11 +27,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ ref: s
 
   return (
     <div className="p-4 sm:p-6 max-w-md mx-auto">
-      <ReceiptPrintBar filename={`Receipt-${decoded}`} />
-      <div className="print-area rounded-xl border border-line shadow-sm overflow-hidden">
-        <Receipt receiptNo={decoded} date={first.entry_date} time={(first.sale_time || "").slice(0, 5)} salesperson={first.author}
-          items={items} paymentChannel={first.payment_channel} tenders={tenders} />
-      </div>
+      <ReceiptView filename={`Receipt-${decoded}`} receiptNo={decoded} date={first.entry_date}
+        time={(first.sale_time || "").slice(0, 5)} salesperson={first.author}
+        items={items} paymentChannel={first.payment_channel} tenders={tenders} />
     </div>
   );
 }

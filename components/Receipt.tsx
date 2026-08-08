@@ -2,9 +2,9 @@ import { PAYMENTS, SPLIT2 } from "@/lib/payments";
 
 // Abbreviated tax invoice / receipt (ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน) — thermal-slip
 // style. Prices are VAT-inclusive 7%. Shop details are the real legal entity.
+// Bilingual (TH/EN) — labels switch by `lang`; legal identifiers stay as registered.
 const SHOP = {
   name: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
-  taxBranch: "สำนักงานใหญ่",   // เปลี่ยนเป็น "สาขาที่ 00001" ถ้าจดทะเบียนเป็นสาขา
   branch: "LAB PARFUMO @ Central World",
   address: "288/31 หมู่ 12 ราชาเทวะ บางพลี สมุทรปราการ 10540",
   taxId: "0115564002651",
@@ -14,17 +14,53 @@ const SHOP = {
 };
 const VAT_RATE = 0.07;
 
+export type ReceiptLang = "th" | "en";
+const T = {
+  th: {
+    headOffice: "(สำนักงานใหญ่)", taxId: "เลขผู้เสียภาษี", tel: "โทร.",
+    doc: "ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน",
+    salesperson: "พนักงานขาย", date: "วันที่", payment: "ประเภทการชำระเงิน",
+    lineDiscount: "ส่วนลด", totalQty: "จำนวนรวม",
+    subtotal: "รวมเป็นเงิน", discount: "ส่วนลด", afterDiscount: "จำนวนเงินหลังหักส่วนลด",
+    beforeVat: "ราคาไม่รวมภาษีมูลค่าเพิ่ม", vat: "ภาษีมูลค่าเพิ่ม 7%", grandTotal: "รวมทั้งสิ้น",
+    vatIncluded: "ราคารวมภาษีมูลค่าเพิ่มแล้ว (VAT INCLUDED)",
+    thanks: "ขอบคุณที่อุดหนุน 🙏 Thank you",
+    qrTitle: "สแกนเลย · ทุกช่องทางออนไลน์", qrSub: "ช้อปออนไลน์ · โปรโมชั่น · ติดต่อเรา",
+  },
+  en: {
+    headOffice: "(Head Office)", taxId: "Tax ID", tel: "Tel.",
+    doc: "Abbreviated Tax Invoice / Receipt",
+    salesperson: "Salesperson", date: "Date", payment: "Payment",
+    lineDiscount: "Discount", totalQty: "Total Qty",
+    subtotal: "Subtotal", discount: "Discount", afterDiscount: "After discount",
+    beforeVat: "Amount before VAT", vat: "VAT 7%", grandTotal: "Grand Total",
+    vatIncluded: "PRICES INCLUDE VAT",
+    thanks: "Thank you 🙏 ขอบคุณที่อุดหนุน",
+    qrTitle: "Scan · all our channels", qrSub: "Shop online · Promotions · Contact",
+  },
+} as const;
+
+// English display names for the payment channels (values stay Thai in the DB).
+const PAY_EN: Record<string, string> = {
+  Cash: "Cash", "K Shop": "QR (K Shop)", "K Shop Credit Card": "Credit Card (QR)",
+  "EDC Credit Card": "Credit Card", "EDC Alipay/WeChat": "Alipay / WeChat",
+};
+
 const nf = (n: number) => (Math.round((n || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ddmmyyyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
-const payLabel = (v?: string | null) => !v ? "เงินสด" : v === SPLIT2 ? "จ่าย 2 ช่องทาง" : (PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v);
+const payLabel = (v: string | null | undefined, lang: ReceiptLang) => {
+  if (lang === "en") return !v ? "Cash" : v === SPLIT2 ? "Split payment" : (PAY_EN[v] || v);
+  return !v ? "เงินสด" : v === SPLIT2 ? "จ่าย 2 ช่องทาง" : (PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v);
+};
 
 export type ReceiptItem = { name: string; size: string; qty: number; unitPrice: number; discount: number; total: number };
 export type ReceiptTender = { channel: string; amount: number };
 
-export function Receipt({ receiptNo, date, time, salesperson, items, paymentChannel, tenders }: {
+export function Receipt({ receiptNo, date, time, salesperson, items, paymentChannel, tenders, lang = "th" }: {
   receiptNo: string; date: string; time?: string; salesperson: string; items: ReceiptItem[];
-  paymentChannel?: string; tenders?: ReceiptTender[];
+  paymentChannel?: string; tenders?: ReceiptTender[]; lang?: ReceiptLang;
 }) {
+  const t = T[lang];
   // full (before discount) = net + discount, so it always reconciles (gross − discount = net)
   // even for legacy rows where qty×unit_price drifts from the stored total.
   const lineFull = (it: ReceiptItem) => it.total + it.discount;
@@ -35,8 +71,8 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
   const vat = net - exVat;
   const totalQty = items.reduce((s, it) => s + it.qty, 0);
   const payMethod = tenders && tenders.length >= 2
-    ? tenders.map((t) => payLabel(t.channel)).join(", ")
-    : payLabel(paymentChannel);
+    ? tenders.map((tn) => payLabel(tn.channel, lang)).join(", ")
+    : payLabel(paymentChannel, lang);
 
   const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
     <div className={`flex justify-between gap-3 ${strong ? "font-bold text-[13px]" : "text-[12px]"}`}>
@@ -51,22 +87,22 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/lab-parfumo-logo.png" alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
         <div className="text-[13px] font-bold mt-2 leading-snug">{SHOP.name}</div>
-        <div className="text-[12px] leading-snug">({SHOP.taxBranch})</div>
+        <div className="text-[12px] leading-snug">{t.headOffice}</div>
         <div className="text-[12px] leading-snug">{SHOP.branch}</div>
         <div className="text-[11px] text-neutral-700 mt-1 leading-snug">{SHOP.address}</div>
-        <div className="text-[12px] font-semibold mt-2">เลขผู้เสียภาษี {SHOP.taxId}</div>
-        <div className="text-[12px] font-semibold">โทร. {SHOP.tel}</div>
+        <div className="text-[12px] font-semibold mt-2">{t.taxId} {SHOP.taxId}</div>
+        <div className="text-[12px] font-semibold">{t.tel} {SHOP.tel}</div>
       </div>
 
       <div className="border-t border-black my-3" />
-      <div className="text-[13px] font-bold">ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน</div>
+      <div className="text-[13px] font-bold">{t.doc}</div>
       <div className="text-[12px] text-neutral-700">{receiptNo}</div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
       <div className="text-[12px] space-y-1">
-        <div className="flex justify-between gap-3"><span className="font-semibold">พนักงานขาย</span><span className="text-right">{salesperson || "-"}</span></div>
-        <div className="flex justify-between gap-3"><span className="font-semibold">วันที่</span><span className="tabular-nums text-right">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
-        <div className="flex justify-between gap-3"><span className="font-semibold">ประเภทการชำระเงิน</span><span className="text-right">{payMethod}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">{t.salesperson}</span><span className="text-right">{salesperson || "-"}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">{t.date}</span><span className="tabular-nums text-right">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">{t.payment}</span><span className="text-right">{payMethod}</span></div>
       </div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
@@ -82,7 +118,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
             {it.discount > 0 && (
               <div className="flex gap-2 text-neutral-500">
                 <span className="w-7 shrink-0" />
-                <span className="flex-1 min-w-0 pl-2">ส่วนลด</span>
+                <span className="flex-1 min-w-0 pl-2">{t.lineDiscount}</span>
                 <span className="tabular-nums text-right">-{nf(it.discount)}</span>
               </div>
             )}
@@ -91,31 +127,31 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       </div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
-      <div className="text-[12px] font-semibold mb-2">จำนวนรวม {Math.round(totalQty)}</div>
+      <div className="text-[12px] font-semibold mb-2">{t.totalQty} {Math.round(totalQty)}</div>
       <div className="space-y-1">
-        <Row label="รวมเป็นเงิน" value={nf(gross)} />
-        <Row label="ส่วนลด" value={nf(discount)} />
-        <Row label="จำนวนเงินหลังหักส่วนลด" value={nf(net)} />
-        <Row label="ราคาไม่รวมภาษีมูลค่าเพิ่ม" value={nf(exVat)} />
-        <Row label="ภาษีมูลค่าเพิ่ม 7%" value={nf(vat)} />
+        <Row label={t.subtotal} value={nf(gross)} />
+        <Row label={t.discount} value={nf(discount)} />
+        <Row label={t.afterDiscount} value={nf(net)} />
+        <Row label={t.beforeVat} value={nf(exVat)} />
+        <Row label={t.vat} value={nf(vat)} />
       </div>
 
       <div className="border-t border-black mt-3 pt-2">
-        <Row label="รวมทั้งสิ้น" value={nf(net)} strong />
+        <Row label={t.grandTotal} value={nf(net)} strong />
       </div>
-      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[12px] font-semibold">ราคารวมภาษีมูลค่าเพิ่มแล้ว (VAT INCLUDED)</div>
+      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[12px] font-semibold">{t.vatIncluded}</div>
 
       <div className="text-center mt-4">
-        <div className="text-[12px] text-neutral-700 font-medium">ขอบคุณที่อุดหนุน 🙏 Thank you</div>
-        <div className="text-[10px] text-neutral-500 mt-1 leading-relaxed">โทร. {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
+        <div className="text-[12px] text-neutral-700 font-medium">{t.thanks}</div>
+        <div className="text-[10px] text-neutral-500 mt-1 leading-relaxed">{t.tel} {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
       </div>
 
       {/* follow / review QR (Linktree) */}
       <div className="text-center mt-4 pt-3 border-t border-dashed border-neutral-400">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/lab-parfumo-qr.png" alt="Lab Parfumo QR" className="mx-auto w-[110px] h-[110px] object-contain" />
-        <div className="text-[11px] text-neutral-700 font-medium mt-1">สแกนเลย · ทุกช่องทางออนไลน์</div>
-        <div className="text-[10px] text-neutral-500">ช้อปออนไลน์ · โปรโมชั่น · ติดต่อเรา</div>
+        <div className="text-[11px] text-neutral-700 font-medium mt-1">{t.qrTitle}</div>
+        <div className="text-[10px] text-neutral-500">{t.qrSub}</div>
       </div>
     </div>
   );
