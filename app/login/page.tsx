@@ -11,7 +11,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   if (await getCurrentUser()) redirect(safeNext);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-nav p-4">
+    <div className="min-h-screen min-h-dvh flex flex-col items-center justify-start sm:justify-center bg-nav px-4 py-10 sm:py-4 overflow-y-auto">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-3">
