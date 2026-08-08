@@ -5,9 +5,7 @@ import { LOGO_DATA_URI, QR_DATA_URI } from "@/lib/receipt-assets";
 // style. Prices are VAT-inclusive 7%. Shop details are the real legal entity.
 // Bilingual (TH/EN) — labels switch by `lang`; legal identifiers stay as registered.
 const SHOP = {
-  name: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
   branch: "LAB PARFUMO @ Central World",
-  address: "288/31 หมู่ 12 ราชาเทวะ บางพลี สมุทรปราการ 10540",
   taxId: "0115564002651",
   tel: "081-234-1438",
   web: "www.labparfumo.com",
@@ -18,6 +16,8 @@ const VAT_RATE = 0.07;
 export type ReceiptLang = "th" | "en";
 const T = {
   th: {
+    company: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
+    address: "288/31 หมู่ที่ 12 ตําบลราชาเทวะ อําเภอบางพลี จังหวัดสมุทรปราการ 10540",
     headOffice: "(สำนักงานใหญ่)", taxId: "เลขประจำตัวผู้เสียภาษี", tel: "โทร.",
     doc: "ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน",
     salesperson: "พนักงานขาย", date: "วันที่", payment: "ประเภทการชำระเงิน",
@@ -29,6 +29,8 @@ const T = {
     qrTitle: "สแกนเลย · ทุกช่องทางออนไลน์", qrSub: "ช้อปออนไลน์ · โปรโมชั่น · ติดต่อเรา",
   },
   en: {
+    company: "TOUCH DIVERGENCE CO., LTD",
+    address: "288/31 Moo 12, Racha Thewa Sub District, Bang Phli District, Samut Prakan 10540",
     headOffice: "(Head Office)", taxId: "Tax ID", tel: "Tel.",
     doc: "Abbreviated Tax Invoice / Receipt",
     salesperson: "Salesperson", date: "Date", payment: "Payment",
@@ -36,7 +38,7 @@ const T = {
     subtotal: "Subtotal", discount: "Discount", afterDiscount: "After discount",
     beforeVat: "Amount before VAT", vat: "VAT 7%", grandTotal: "Grand Total",
     vatIncluded: "PRICES INCLUDE VAT",
-    thanks: "Thank you 🙏 ขอบคุณที่อุดหนุน",
+    thanks: "Thank you 🙏",
     qrTitle: "Scan · all our channels", qrSub: "Shop online · Promotions · Contact",
   },
 } as const;
@@ -87,10 +89,10 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={LOGO_DATA_URI} alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
-        <div className="text-[13px] font-bold mt-2 leading-snug">{SHOP.name}</div>
+        <div className="text-[13px] font-bold mt-2 leading-snug">{t.company}</div>
         <div className="text-[12px] leading-snug">{t.headOffice}</div>
         <div className="text-[12px] leading-snug">{SHOP.branch}</div>
-        <div className="text-[11px] text-neutral-700 mt-1 leading-snug">{SHOP.address}</div>
+        <div className="text-[11px] text-neutral-700 mt-1 leading-snug">{t.address}</div>
         <div className="text-[12px] font-semibold mt-2">{t.taxId} {SHOP.taxId}</div>
         <div className="text-[12px] font-semibold">{t.tel} {SHOP.tel}</div>
       </div>

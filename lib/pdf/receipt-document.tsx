@@ -28,15 +28,15 @@ export type PdfReceiptItem = { name: string; size: string; qty: number; discount
 export type PdfReceiptTender = { channel: string; amount: number };
 
 const SHOP = {
-  name: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
   branch: "LAB PARFUMO @ Central World",
-  address: "288/31 หมู่ 12 ราชาเทวะ บางพลี สมุทรปราการ 10540",
   taxId: "0115564002651", tel: "081-234-1438", web: "www.labparfumo.com", ig: "@labparfumo",
 };
 const VAT_RATE = 0.07;
 
 const T = {
   th: {
+    company: "บริษัท ทัช ไดเวอร์เจนซ์ จำกัด",
+    address: "288/31 หมู่ที่ 12 ตําบลราชาเทวะ อําเภอบางพลี จังหวัดสมุทรปราการ 10540",
     headOffice: "(สำนักงานใหญ่)", taxId: "เลขประจำตัวผู้เสียภาษี", tel: "โทร.",
     doc: "ใบกำกับภาษีอย่างย่อ/ใบเสร็จรับเงิน",
     salesperson: "พนักงานขาย", date: "วันที่", payment: "ประเภทการชำระเงิน",
@@ -49,6 +49,8 @@ const T = {
     thanks: "ขอบคุณที่อุดหนุน Thank you", qrTitle: "สแกนเลย ทุกช่องทางออนไลน์", qrSub: "ช้อปออนไลน์ · โปรโมชั่น · ติดต่อเรา",
   },
   en: {
+    company: "TOUCH DIVERGENCE CO., LTD",
+    address: "288/31 Moo 12, Racha Thewa Sub District, Bang Phli District, Samut Prakan 10540",
     headOffice: "(Head Office)", taxId: "Tax ID", tel: "Tel.",
     doc: "Abbreviated Tax Invoice / Receipt",
     salesperson: "Salesperson", date: "Date", payment: "Payment",
@@ -123,10 +125,10 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
         <View style={s.slip}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image style={s.logo} src={path.join(PUBLIC, "lab-parfumo-logo.png")} />
-          <Text style={s.company}>{SHOP.name}</Text>
+          <Text style={s.company}>{t.company}</Text>
           <Text style={s.small}>{t.headOffice}</Text>
           <Text style={s.small}>{SHOP.branch}</Text>
-          <Text style={s.addr}>{SHOP.address}</Text>
+          <Text style={s.addr}>{t.address}</Text>
           <Text style={[s.small, s.bold, { marginTop: 4 }]}>{t.taxId} {SHOP.taxId}</Text>
           <Text style={[s.small, s.bold]}>{t.tel} {SHOP.tel}</Text>
 
