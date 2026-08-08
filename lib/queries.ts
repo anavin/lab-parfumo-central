@@ -495,6 +495,19 @@ export async function dailySalesByMonth(month: string, source: string) {
     group by d order by d`, [month, source]);
 }
 
+/** Total sales per calendar month (from the live `sales` table), newest first.
+ *  Feeds the month-vs-month comparison chart on /review. */
+export async function monthlySalesTotals(source: string | null = null, limit = 12) {
+  return q<{ ym: string; revenue: number; qty: number; bills: number }>(`
+    select to_char(sale_date,'YYYY-MM') as ym,
+           coalesce(sum(total),0)::float revenue,
+           coalesce(sum(qty),0)::float qty,
+           count(distinct coalesce(nullif(receipt_no,''),'s'||id::text))::int bills
+    from sales
+    where sale_date is not null and ($1::text is null or source = $1)
+    group by 1 order by 1 desc limit $2`, [source, limit]);
+}
+
 export type DaySaleRow = {
   id: number; src: string; receipt_no: string | null; item: string | null; size: string | null;
   qty: number; unit_price: number; discount: number; total: number;
