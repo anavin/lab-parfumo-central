@@ -15,15 +15,10 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
   const print = () => {
     const prev = document.title;
     document.title = `${filename}-${lang.toUpperCase()}`;
-    document.body.classList.add("printing-receipt");   // isolate the slip for print (see globals.css)
-    const restore = () => {
-      document.title = prev;
-      document.body.classList.remove("printing-receipt");
-      window.removeEventListener("afterprint", restore);
-    };
+    const restore = () => { document.title = prev; window.removeEventListener("afterprint", restore); };
     window.addEventListener("afterprint", restore);
     window.print();
-    setTimeout(restore, 1000);
+    setTimeout(restore, 4000);   // keep the title through a slow Save-as-PDF dialog
   };
 
   const Tab = ({ v, children }: { v: ReceiptLang; children: React.ReactNode }) => (
@@ -49,7 +44,7 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
           </button>
         </div>
       </div>
-      <div className="print-area rounded-xl border border-line shadow-sm overflow-hidden bg-white text-black">
+      <div className="print-area receipt-sheet rounded-xl border border-line shadow-sm bg-white text-black">
         <Receipt lang={lang} receiptNo={receiptNo} date={date} time={time} salesperson={salesperson}
           items={items} paymentChannel={paymentChannel} tenders={tenders} />
       </div>

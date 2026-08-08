@@ -161,18 +161,19 @@ summary:focus-visible, [tabindex]:focus-visible {
 
 @media print {
   .no-print { display: none !important; }
-  /* never clip the printable area — overflow:hidden here makes the PDF come out blank */
-  .print-area { box-shadow: none !important; border: none !important; overflow: visible !important; border-radius: 0 !important; }
   html, body { background: #fff !important; }
   @page { size: A4; margin: 12mm; }
 
-  /* receipt: isolate the slip so the PDF is never blank/clipped. The print button
-     adds .printing-receipt to <body> first (no :has() — works in every browser):
-     hide everything, then show only the printable area lifted to the page top. */
-  body.printing-receipt * { visibility: hidden !important; }
-  body.printing-receipt .print-area,
-  body.printing-receipt .print-area * { visibility: visible !important; }
-  body.printing-receipt .print-area { position: absolute !important; left: 0; top: 0; width: 100%; }
+  /* Safari/WebKit prints a BLANK page when the content sits inside a flex box with
+     min-height:100vh (our app shell) — force plain top-down block flow for print so
+     the receipt/report starts at the top of page 1. */
+  .app-shell { display: block !important; min-height: 0 !important; }
+  .app-main { display: block !important; padding-top: 0 !important; }
+
+  /* never clip the printable area — overflow:hidden here makes the PDF come out blank */
+  .print-area { box-shadow: none !important; border: none !important; overflow: visible !important; border-radius: 0 !important; }
+  /* receipt slip: start at the page top, centered, no card chrome */
+  .receipt-sheet { margin: 0 auto !important; border-radius: 0 !important; }
 
   /* daily report: fill the A4 page (let @page margins govern spacing) */
   .daily-sheet { max-width: none !important; padding: 0 !important; border-radius: 0 !important; margin: 0 !important; }

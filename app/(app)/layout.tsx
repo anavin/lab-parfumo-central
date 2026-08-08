@@ -15,10 +15,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (perm && !can(user, perm)) redirect(landingFor(user));
   const pending = can(user, "review") ? await pendingCount() : 0;
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="app-shell flex min-h-screen bg-canvas">
       <IdleLogout />
       <Sidebar user={user} pending={pending} />
-      <main className="flex-1 min-w-0 pt-14 lg:pt-0">{children}</main>
+      <main className="app-main flex-1 min-w-0 pt-14 lg:pt-0">{children}</main>
     </div>
   );
 }
