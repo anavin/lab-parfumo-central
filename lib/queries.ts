@@ -593,11 +593,12 @@ export async function saveDailyCash(date: string, opening: number, deposit: numb
   } catch (e) { if (missingDailyCash(e)) return { ok: false, missing: true }; throw e; }
 }
 
-/** Per-day shop drawer figures for the admin cash page (read-only summary). */
+/** Per-day shop drawer figures for the admin cash page (review + confirm + post). */
 export async function dailyCashLog(limit = 90) {
   try {
-    return await q<{ entry_date: string; opening: number; deposit: number; closing: number }>(
-      `select entry_date::text entry_date, opening::float, deposit::float, closing::float
+    return await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
+      `select entry_date::text entry_date, opening::float, deposit::float, closing::float,
+              confirmed, (posted_cash_id is not null) posted
        from daily_cash order by entry_date desc limit $1`, [limit]);
-  } catch (e) { if (missingDailyCash(e)) return []; throw e; }
+  } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
 }

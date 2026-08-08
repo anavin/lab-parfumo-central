@@ -4,12 +4,11 @@ import { AddCash } from "@/components/EntryForms";
 import { Wallet } from "lucide-react";
 import { ExportButton } from "@/components/ExportButton";
 import { CashTable } from "@/components/CashTable";
+import { DrawerAdmin } from "@/components/DrawerAdmin";
 import { q } from "@/lib/db";
 import { dailyCashLog } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
-
-const fmtDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "2-digit" });
 
 export default async function CashPage() {
   const drawer = await dailyCashLog(90);
@@ -32,26 +31,8 @@ export default async function CashPage() {
         {byType.slice(0, 2).map((t) => <Stat key={t.type} label={t.type} value={baht(t.total)} />)}
       </div>
       {drawer.length > 0 && (
-        <Card title="เงินสดหน้าร้าน (รายวัน) · จากที่พนักงานบันทึกในสรุปรายวัน" bodyClass="p-0 overflow-x-auto" className="mb-6">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas"><tr className="th border-b border-line-soft">
-              <th className="px-5 py-2.5 text-left">วันที่</th>
-              <th className="px-3 py-2.5 text-right">ยกมา</th>
-              <th className="px-3 py-2.5 text-right">🏦 เข้าธนาคาร</th>
-              <th className="px-5 py-2.5 text-right">คงเหลือหน้าร้าน</th>
-            </tr></thead>
-            <tbody>
-              {drawer.map((d) => (
-                <tr key={d.entry_date} className="border-b border-line-soft last:border-0 hover:bg-canvas">
-                  <td className="px-5 py-2.5 font-medium text-ink whitespace-nowrap">{fmtDay(d.entry_date)}</td>
-                  <td className="px-3 py-2.5 text-right text-muted tabular-nums">{baht(d.opening)}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-brand-dark tabular-nums">{baht(d.deposit)}</td>
-                  <td className="px-5 py-2.5 text-right font-semibold text-ink tabular-nums">{baht(d.closing)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="text-[11px] text-muted px-5 py-2">อ่านอย่างเดียว · แก้ไขได้ที่สรุปรายวันในหน้าพนักงานขาย · ไม่รวมในยอด “เงินสดสะสม” ด้านบน</p>
+        <Card title="เงินสดหน้าร้าน (รายวัน) · ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto" className="mb-6">
+          <DrawerAdmin rows={drawer} />
         </Card>
       )}
 
