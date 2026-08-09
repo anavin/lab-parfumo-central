@@ -1,8 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ClipboardCopy, Check, FileText } from "lucide-react";
+import { ClipboardCopy, Check, FileText, Paperclip, Loader2 } from "lucide-react";
 import { getDailyReport, getMyCashFloat, saveMyCashFloat } from "@/lib/actions/report";
-import type { DailyReport as ReportData } from "@/lib/queries";
+import { getCashSlips, addCashAttachments, deleteCashAttachment } from "@/lib/actions/cash";
+import { PhotoStrip } from "@/components/BillPhotos";
+import { compressImage } from "@/lib/img";
+import type { DailyReport as ReportData, CashAttachment } from "@/lib/queries";
 
 const SRC_SHORT: Record<string, string> = { CTW: "CTW", EVENT_SCS: "Event" };
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
@@ -24,6 +27,10 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const [saved, setSaved] = useState(false);   // brief "จำแล้ว" flash on autosave (mine only)
   const [pending, start] = useTransition();
   const loaded = useRef(false);
+  const [slips, setSlips] = useState<CashAttachment[]>([]);   // bank-deposit slips for the day
+  const slipRef = useRef<HTMLInputElement>(null);
+  const [slipBusy, setSlipBusy] = useState(false);
+  const [slipErr, setSlipErr] = useState<string | null>(null);
 
   // re-fetch on date change AND whenever `revision` changes (the page re-renders it
   // after a bill is saved/approved via router.refresh, so the report stays live)
@@ -40,6 +47,28 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       .catch(() => {})
       .finally(() => { loaded.current = true; });
   }, [date, mine]);
+
+  // bank-deposit slips for the day (shared; loaded for every viewer)
+  useEffect(() => {
+    getCashSlips(date).then(setSlips).catch(() => setSlips([]));
+  }, [date, revision]);
+
+  const addSlips = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setSlipBusy(true); setSlipErr(null);
+    try {
+      const room = Math.max(0, 6 - slips.length);
+      const out: string[] = [];
+      for (const f of Array.from(files).slice(0, room)) { try { out.push(await compressImage(f)); } catch { /* skip bad image */ } }
+      if (!out.length) { setSlipErr("แนบไม่สำเร็จ — รองรับ JPG/PNG"); return; }
+      const res = await addCashAttachments(date, out);
+      if (res?.ok) setSlips(await getCashSlips(date)); else setSlipErr(res?.error ?? "แนบไม่สำเร็จ");
+    } finally { setSlipBusy(false); if (slipRef.current) slipRef.current.value = ""; }
+  };
+  const removeSlip = (id: number) => {
+    setSlips((s) => s.filter((x) => x.id !== id));   // optimistic
+    deleteCashAttachment(id).catch(() => getCashSlips(date).then(setSlips));
+  };
 
   const openingN = Number(opening) || 0;
   const depositN = Number(deposit) || 0;
@@ -139,6 +168,22 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
               className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
           </div>
         </label>
+        {/* bank-deposit slip photos — attached right under ฝากเข้าธนาคาร */}
+        <div className="col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-muted">สลิปฝากธนาคาร</span>
+            <span className="text-[11px] text-muted-soft">{slips.length}/6</span>
+          </div>
+          <PhotoStrip photos={slips} size={56} onDelete={removeSlip} />
+          {slips.length < 6 && (
+            <button type="button" onClick={() => slipRef.current?.click()} disabled={slipBusy}
+              className="mt-1.5 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-dashed border-line text-xs text-muted hover:bg-canvas disabled:opacity-50">
+              {slipBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} แนบสลิป
+            </button>
+          )}
+          <input ref={slipRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addSlips(e.target.files)} />
+          {slipErr && <div className="mt-1 text-[11px] text-danger leading-snug">{slipErr}</div>}
+        </div>
       </div>
       )}
 

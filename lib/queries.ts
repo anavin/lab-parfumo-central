@@ -667,3 +667,10 @@ export async function cashAttachmentsByDate(): Promise<Record<string, CashAttach
     return map;
   } catch (e) { if ((e as any)?.code === "42P01") return {}; throw e; }
 }
+
+/** Bank-deposit slip photos for one day (for the salesperson's /my daily report). */
+export async function cashAttachmentsForDate(date: string): Promise<CashAttachment[]> {
+  try {
+    return await q<CashAttachment>(`select id, entry_date::text entry_date, data from cash_attachments where entry_date=$1 order by id`, [date]);
+  } catch (e) { if ((e as any)?.code === "42P01") return []; throw e; }
+}

@@ -1,8 +1,8 @@
 "use server";
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth/require-user";
-import { dailyReport } from "@/lib/queries";
+import { requirePermission, requireUser } from "@/lib/auth/require-user";
+import { dailyReport, cashAttachmentsForDate, type CashAttachment } from "@/lib/queries";
 import { logAudit } from "@/lib/audit";
 
 /** Admin: save the day's opening/deposit, recompute closing from that day's cash sales,
@@ -37,15 +37,22 @@ export async function confirmDrawer(date: string, opening: number, deposit: numb
   }
 }
 
-/** Attach bank-deposit slip photos to a day's shop-cash record. */
+/** Slips a salesperson attached for a day (for the /my daily report). */
+export async function getCashSlips(date: string): Promise<CashAttachment[]> {
+  await requireUser();
+  return cashAttachmentsForDate(date);
+}
+
+/** Attach bank-deposit slip photos to a day (salesperson does this on /my when
+ *  entering ฝากเข้าธนาคาร; admin just reviews them on /cash). */
 export async function addCashAttachments(date: string, images: string[]): Promise<{ ok: boolean; error?: string }> {
-  const me = await requirePermission("cash");
+  const me = await requireUser();
   const imgs = (images || []).filter((s) => typeof s === "string" && s.startsWith("data:image/") && s.length <= 3_000_000).slice(0, 6);
   if (!imgs.length) return { ok: false, error: "ไม่มีรูปที่ถูกต้อง" };
   try {
     for (const a of imgs) await q(`insert into cash_attachments (entry_date, created_by, data) values ($1,$2,$3)`, [date, me.id, a]);
     await logAudit("update", "cash", date, `แนบสลิปเงินสด ${date} · ${imgs.length} รูป`);
-    revalidatePath("/cash");
+    revalidatePath("/cash"); revalidatePath("/my");
     return { ok: true };
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตารางแนบไฟล์ (รัน SQL 0015 ก่อน)" };
@@ -56,10 +63,10 @@ export async function addCashAttachments(date: string, images: string[]): Promis
 
 /** Remove a bank-deposit slip photo. */
 export async function deleteCashAttachment(id: number): Promise<{ ok: boolean; error?: string }> {
-  await requirePermission("cash");
+  await requireUser();
   try {
     await q(`delete from cash_attachments where id = $1`, [id]);
-    revalidatePath("/cash");
+    revalidatePath("/cash"); revalidatePath("/my");
     return { ok: true };
   } catch (e) { console.error("[deleteCashAttachment] failed", e); return { ok: false, error: "ลบไม่สำเร็จ" }; }
 }
