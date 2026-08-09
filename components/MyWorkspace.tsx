@@ -441,7 +441,6 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
             <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
           </div>
         </div>
-        <div className="text-[11px] text-muted mt-1.5">ราคาต่อชิ้นลดมาแล้ว — ช่องนี้ไว้ลดเพิ่มตอนต่อรอง (กรอกเองได้ในช่อง %)</div>
       </div>
 
       {/* payment — last major step, once items + discount give a final net total */}
