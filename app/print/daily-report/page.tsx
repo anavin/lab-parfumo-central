@@ -10,6 +10,14 @@ export const dynamic = "force-dynamic";
 
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
+// the <title> becomes the default PDF filename in the browser's Save-as-PDF
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ date?: string; source?: string }> }) {
+  const sp = await searchParams;
+  const date = (sp.date || "").match(/^\d{4}-\d{2}-\d{2}$/)?.[0] || bkkToday();
+  const source = sp.source || "CTW";
+  return { title: `${source}-Daily-Report-${date}` };
+}
+
 export default async function DailyReportPrintPage({ searchParams }: { searchParams: Promise<{ date?: string; source?: string; detail?: string }> }) {
   await requirePermission("review");
   const sp = await searchParams;

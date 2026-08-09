@@ -175,8 +175,8 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* receipt slip: start at the page top, centered, no card chrome */
   .receipt-sheet { margin: 0 auto !important; border-radius: 0 !important; }
 
-  /* daily report: fill the A4 page (let @page margins govern spacing) */
-  .daily-sheet { max-width: none !important; padding: 0 !important; border-radius: 0 !important; margin: 0 !important; }
+  /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
+  .daily-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
   /* keep a bill's rows together across page breaks */
   .daily-sheet table { page-break-inside: auto; }
   .daily-sheet tr { page-break-inside: avoid; }
