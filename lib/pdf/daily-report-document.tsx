@@ -42,33 +42,36 @@ function groupBills(rows: DaySaleRow[]): Bill[] {
   });
 }
 
-const C = { ink: "#1a1614", muted: "#6b645d", faint: "#9a938c", border: "#d8d3cc", soft: "#f4f2ee" };
+// Neutral black-on-white palette + minimal borders, to match the on-screen
+// preview (DailyReportPrint): row dividers only, no cell grid, no shaded header.
+const C = { ink: "#171717", muted: "#737373", faint: "#a3a3a3", line: "#e5e5e5", dash: "#d4d4d4", black: "#000000" };
 const s = StyleSheet.create({
   page: { fontFamily: "NotoSansThai", fontSize: 9, color: C.ink, padding: 32, lineHeight: 1.4 },
-  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderBottomWidth: 2, borderBottomColor: C.ink, paddingBottom: 10, marginBottom: 14 },
-  brand: { fontSize: 20, fontWeight: "bold", letterSpacing: -0.3 },
+  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderBottomWidth: 2, borderBottomColor: C.black, paddingBottom: 10, marginBottom: 14 },
+  brand: { fontSize: 22, fontWeight: "bold", color: C.black, letterSpacing: -0.3 },
   sub: { fontSize: 9, color: C.muted, marginTop: 3 },
   seller: { fontSize: 9, color: C.ink, marginTop: 2 },
-  dateBig: { fontSize: 12, fontWeight: "bold", textAlign: "right" },
+  dateBig: { fontSize: 13, fontWeight: "bold", color: C.black, textAlign: "right" },
   gen: { fontSize: 7.5, color: C.faint, textAlign: "right", marginTop: 2 },
-  kpiRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  kpi: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 5, paddingVertical: 6, paddingHorizontal: 8 },
-  kpiPrimary: { borderColor: C.ink, borderWidth: 1.5 },
-  kpiLabel: { fontSize: 7.5, color: C.muted, textTransform: "uppercase" },
-  kpiVal: { fontSize: 15, fontWeight: "bold" },
-  kpiValBig: { fontSize: 18, fontWeight: "bold" },
-  cols: { flexDirection: "row", gap: 24, marginBottom: 16 },
+  kpiRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  kpi: { flex: 1, borderWidth: 1, borderColor: "#a3a3a3", borderRadius: 6, paddingVertical: 7, paddingHorizontal: 9 },
+  kpiPrimary: { borderColor: C.black, borderWidth: 2 },
+  kpiLabel: { fontSize: 7.5, color: C.muted },
+  kpiVal: { fontSize: 16, fontWeight: "bold", color: C.black, marginTop: 1 },
+  kpiValBig: { fontSize: 21, fontWeight: "bold", color: C.black, marginTop: 1 },
+  cols: { flexDirection: "row", gap: 24, marginBottom: 18 },
   col: { flex: 1 },
-  secTitle: { fontSize: 8.5, fontWeight: "bold", color: C.muted, textTransform: "uppercase", borderBottomWidth: 1, borderBottomColor: C.ink, paddingBottom: 2, marginBottom: 4 },
-  kv: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#e6e2db", borderStyle: "dashed", paddingVertical: 2 },
+  secTitle: { fontSize: 8.5, fontWeight: "bold", color: C.muted, borderBottomWidth: 1, borderBottomColor: C.black, paddingBottom: 2, marginBottom: 5 },
+  kv: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: C.dash, borderStyle: "dashed", paddingVertical: 3, fontSize: 9.5 },
   kvVal: { fontWeight: "bold" },
-  th: { flexDirection: "row", backgroundColor: C.soft, borderTopWidth: 1, borderColor: C.border },
-  tr: { flexDirection: "row", borderTopWidth: 1, borderColor: C.border },
-  cell: { paddingVertical: 3, paddingHorizontal: 4, borderRightWidth: 1, borderColor: C.border },
-  cellL: { borderLeftWidth: 1, borderColor: C.border },
+  // minimal table: horizontal row dividers only (no vertical grid / header fill)
+  th: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.line, paddingBottom: 3 },
+  tr: { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.line, alignItems: "flex-start" },
+  cell: { paddingVertical: 4, paddingHorizontal: 3 },
+  cellL: {},
   hCell: { fontWeight: "bold", fontSize: 7.5, color: C.muted },
-  foot: { flexDirection: "row", borderTopWidth: 1.5, borderColor: C.ink, backgroundColor: C.soft },
-  signRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 40 },
+  foot: { flexDirection: "row", borderTopWidth: 2, borderTopColor: C.black, paddingTop: 1 },
+  signRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 44 },
   sign: { width: "42%", alignItems: "center" },
   signLine: { borderBottomWidth: 1, borderColor: C.faint, width: "100%", height: 1, marginBottom: 4 },
 });
