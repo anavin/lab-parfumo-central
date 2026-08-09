@@ -7,7 +7,7 @@ export async function searchProducts(term: string) {
     select id, barcode, scent, grade, size, sku, price::float
     from products
     where scent ilike $1 or barcode ilike $1 or sku ilike $1
-    order by scent, size limit 25`, [t]);
+    order by scent, (substring(size from '[0-9]+'))::int nulls last, size limit 25`, [t]);
 }
 
 /** Exact-match a product by scanned barcode (for the sale form scanner). */
