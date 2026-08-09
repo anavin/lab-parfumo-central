@@ -6,6 +6,7 @@ import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
 import { requirePermission } from "@/lib/auth/require-user";
+import { pushLine, siteBaseUrl } from "@/lib/line";
 
 // ---------------------------------------------------------------- staff: submit
 // Staff entries land in `submissions` (status='pending'). Nothing touches the
@@ -100,6 +101,24 @@ export async function submitBill(input: unknown) {
   }
   await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}${d.attachments?.length ? ` · แนบ ${d.attachments.length} รูป` : ""}`);
   revalidatePath("/my"); revalidatePath("/review");
+
+  // LINE alert to the shop group — fully optional & fail-soft (a LINE outage or
+  // missing config must never break the sale). Awaited so it runs before the
+  // serverless function returns, but its result is ignored.
+  try {
+    const pieces = d.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+    const pay = split ? "จ่าย 2 ช่องทาง" : billPc;
+    const nation = d.nation === "Foreign" ? "🌏 ต่างชาติ" : d.nation === "Thai" ? "🇹🇭 ไทย" : d.nation;
+    const base = siteBaseUrl();
+    const lines = [
+      `🧾 บิลใหม่ · ${user.full_name}`,
+      ref,
+      `${pieces} ชิ้น · ฿${Math.round(sum).toLocaleString()} · ${pay} · ${nation}`,
+      ...(base ? [`ดูใบเสร็จ: ${base}/receipt/${encodeURIComponent(ref)}`] : []),
+    ];
+    await pushLine(lines.join("\n"));
+  } catch (e) { console.error("[submitBill] line notify failed", e); }
+
   return { ref };   // so the UI can offer a "print receipt" link for the bill just saved
 }
 
