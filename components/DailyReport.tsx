@@ -176,10 +176,12 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
           </div>
           <PhotoStrip photos={slips} size={56} onDelete={removeSlip} />
           {slips.length < 6 && (
-            <button type="button" onClick={() => slipRef.current?.click()} disabled={slipBusy}
-              className="mt-1.5 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-dashed border-line text-xs text-muted hover:bg-canvas disabled:opacity-50">
-              {slipBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} แนบสลิป
-            </button>
+            <div className="flex justify-end mt-1.5">
+              <button type="button" onClick={() => slipRef.current?.click()} disabled={slipBusy}
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-dashed border-line text-xs text-muted hover:bg-canvas disabled:opacity-50">
+                {slipBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} แนบสลิป
+              </button>
+            </div>
           )}
           <input ref={slipRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addSlips(e.target.files)} />
           {slipErr && <div className="mt-1 text-[11px] text-danger leading-snug">{slipErr}</div>}
