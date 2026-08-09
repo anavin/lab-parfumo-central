@@ -523,7 +523,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       <div className="border-t border-line pt-3">
         <div className="space-y-0.5 text-sm">
           <div className="flex justify-between text-muted"><span>ยอดรวม</span><span>{baht(subtotal)}</span></div>
-          {discountTotal > 0 && <div className="flex justify-between text-muted"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
+          {discountTotal > 0 && <div className="flex justify-between text-danger font-medium"><span>ส่วนลด{pct > 0 ? ` (รวม ${pct}%)` : ""}</span><span>−{baht(discountTotal)}</span></div>}
         </div>
         {(split ? tenders.some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <div className="mt-3"><KShopQr key={qrKey} /></div>}
       </div>
@@ -554,8 +554,8 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 // Module-level so it keeps a stable component identity — defining it inside
 // ItemCard made React remount the inputs on every keystroke (couldn't type
 // more than one digit at a time).
-const Cell = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div><span className="block text-[10px] text-muted text-center mb-0.5">{label}</span>{children}</div>
+const Cell = ({ label, children, active = false }: { label: string; children: React.ReactNode; active?: boolean }) => (
+  <div><span className={`block text-[10px] text-center mb-0.5 ${active ? "text-danger font-semibold" : "text-muted"}`}>{label}</span>{children}</div>
 );
 
 function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean }) {
@@ -611,7 +611,9 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
           <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty)} className="py-2.5 justify-center min-h-[44px]" />
         </Cell>
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
-        <Cell label="ส่วนลด"><input {...numAttrs("discount")} className={fld} /></Cell>
+        <Cell label="ส่วนลด" active={Number(it.discount) > 0}>
+          <input {...numAttrs("discount")} className={`${fld} ${Number(it.discount) > 0 ? "!text-danger !border-danger/50 font-semibold" : ""}`} />
+        </Cell>
       </div>
       {/* quick per-item discount — the shop's standard amounts; tap to apply, tap
           again to clear. Hidden for free / complimentary items (price 0). */}
@@ -810,7 +812,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <Field label="จำนวน"><Select value={String(Number(state.qty) || 1)} onValueChange={(v) => s("qty", Number(v))} options={qtyOptions(state.qty)} className="py-2.5" /></Field>
         <Field label="ราคา/หน่วย"><input {...numFld("unit_price")} className={inp} /></Field>
-        <Field label="ส่วนลด"><input {...numFld("discount")} className={inp} /></Field>
+        <Field label="ส่วนลด"><input {...numFld("discount")} className={`${inp} ${Number(state.discount) > 0 ? "!text-danger !border-danger/50 font-semibold" : ""}`} /></Field>
         <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">

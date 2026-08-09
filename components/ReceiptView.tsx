@@ -13,6 +13,15 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<ReceiptLang>("th");
+
+  // The receipt usually opens in a NEW TAB (target=_blank) where there's no history,
+  // so router.back() does nothing. Fall back to the page that opened it, else close.
+  const goBack = () => {
+    if (window.history.length > 1) { router.back(); return; }
+    const ref = document.referrer;
+    try { if (ref && new URL(ref).origin === location.origin) { location.href = ref; return; } } catch {}
+    window.close();
+  };
   const pdfUrl = (disp: "inline" | "download") =>
     `/api/receipt/${encodeURIComponent(receiptNo)}/pdf?lang=${lang}${disp === "inline" ? "&disp=inline" : ""}`;
 
@@ -28,7 +37,7 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
       <div className="no-print mb-4 space-y-2.5">
         {/* row 1: back · language */}
         <div className="flex items-center justify-between gap-2">
-          <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-muted hover:bg-canvas hover:text-ink transition-colors">
+          <button onClick={goBack} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-muted hover:bg-canvas hover:text-ink transition-colors">
             <ArrowLeft className="w-4 h-4" /> กลับ
           </button>
           <div className="inline-flex rounded-lg bg-canvas p-0.5 border border-line" role="group" aria-label="ภาษา">
