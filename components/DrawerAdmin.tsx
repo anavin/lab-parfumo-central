@@ -27,11 +27,11 @@ function DrawerRow({ r }: { r: Row }) {
       <tr className="border-b border-line-soft hover:bg-canvas align-middle">
         <td className="px-5 py-2.5 font-medium text-ink whitespace-nowrap">{fmtDay(r.entry_date)}</td>
         <td className="px-3 py-2.5 text-right">
-          <input value={opening} disabled={r.posted || pending} inputMode="numeric"
+          <input value={opening} disabled={r.confirmed || pending} inputMode="numeric"
             onChange={(e) => setOpening(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
         </td>
         <td className="px-3 py-2.5 text-right">
-          <input value={deposit} disabled={r.posted || pending} inputMode="numeric"
+          <input value={deposit} disabled={r.confirmed || pending} inputMode="numeric"
             onChange={(e) => setDeposit(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
         </td>
         <td className="px-3 py-2.5 text-right font-semibold text-ink tabular-nums whitespace-nowrap">{baht(r.closing)}</td>
@@ -40,16 +40,13 @@ function DrawerRow({ r }: { r: Row }) {
             className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium mr-1 ${viewDate ? "text-brand-dark bg-brand/10" : "text-muted hover:text-ink hover:bg-canvas"}`}>
             <FileText className="w-3.5 h-3.5" /> ดูรายงาน
           </button>
-          {r.posted ? (
+          {r.confirmed ? (
             <span className="inline-flex items-center gap-1 text-xs text-success font-medium"><Lock className="w-3.5 h-3.5" /> เข้าระบบแล้ว</span>
           ) : (
-            <span className="inline-flex items-center gap-2">
-              {r.confirmed && <span className="inline-flex items-center gap-1 text-xs text-success font-medium"><Check className="w-3.5 h-3.5" /> ยืนยันแล้ว</span>}
-              <button onClick={save} disabled={pending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-brand-dark disabled:opacity-50">
-                <Check className="w-3.5 h-3.5" /> {pending ? "กำลังบันทึก…" : r.confirmed ? "ยืนยันใหม่" : "ยืนยัน & บันทึกเข้าระบบ"}
-              </button>
-            </span>
+            <button onClick={save} disabled={pending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-brand-dark disabled:opacity-50">
+              <Check className="w-3.5 h-3.5" /> {pending ? "กำลังบันทึก…" : "ยืนยัน & บันทึกเข้าระบบ"}
+            </button>
           )}
         </td>
       </tr>
