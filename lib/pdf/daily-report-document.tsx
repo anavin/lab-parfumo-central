@@ -1,9 +1,10 @@
 /**
  * รายงานสรุปยอดขายประจำวัน — server-rendered A4 PDF (react-pdf), same reliable path
  * as the receipt PDF so Safari never prints it blank. Mirrors DailyReportPrint.
- * NOTE: react-pdf's Thai shaper drops a leading consonant before า in a word-initial
- * C+า cluster (ร+า in รายงาน/รายละเอียด/รายการ; บ+า in บาท). Avoid those: use
- * สรุป / บิลทั้งหมด / สินค้า, and the ฿ symbol instead of "บาท".
+ * NOTE: react-pdf's Thai shaper is inconsistent with word-initial C+า clusters —
+ * "บาท" reliably loses its บ, so use the ฿ symbol instead. (ร+า words like รายงาน/
+ * รายการ/รายละเอียด render fine here, though they can drop the ร in other contexts.)
+ * Kept in sync with the on-screen preview (DailyReportPrint) so both look identical.
  */
 import path from "path";
 import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
@@ -98,21 +99,21 @@ export function DailyReportDocument({ date, source, report, bills: rawBills, gen
         <View style={s.head}>
           <View>
             <Text style={s.brand}>Lab Parfumo</Text>
-            <Text style={s.sub}>สรุปยอดขายประจำวัน · {srcLabel}</Text>
+            <Text style={s.sub}>รายงานสรุปยอดขายประจำวัน · {srcLabel}</Text>
             {sellers.length > 0 && <Text style={s.seller}>พนักงานขาย: <Text style={{ fontWeight: "bold" }}>{sellers.join(" · ")}</Text></Text>}
           </View>
           <View>
             <Text style={s.dateBig}>{thaiDate(date)}</Text>
-            <Text style={s.gen}>ออกเอกสารเมื่อ {generatedAt} น.</Text>
+            <Text style={s.gen}>ออกรายงานเมื่อ {generatedAt} น.</Text>
           </View>
         </View>
 
         {/* KPIs */}
         <View style={s.kpiRow}>
-          <View style={[s.kpi, s.kpiPrimary]}><Text style={s.kpiLabel}>ยอดขายรวม</Text><Text style={s.kpiValBig}>{nf(report.total)}</Text></View>
+          <View style={[s.kpi, s.kpiPrimary]}><Text style={s.kpiLabel}>ยอดขายรวม</Text><Text style={s.kpiValBig}>฿{nf(report.total)}</Text></View>
           <View style={s.kpi}><Text style={s.kpiLabel}>จำนวนบิล</Text><Text style={s.kpiVal}>{report.orders}</Text></View>
           <View style={s.kpi}><Text style={s.kpiLabel}>จำนวนชิ้น</Text><Text style={s.kpiVal}>{Math.round(totalQty)}</Text></View>
-          <View style={s.kpi}><Text style={s.kpiLabel}>เฉลี่ย/บิล</Text><Text style={s.kpiVal}>{nf(aov)}</Text></View>
+          <View style={s.kpi}><Text style={s.kpiLabel}>เฉลี่ย/บิล</Text><Text style={s.kpiVal}>฿{nf(aov)}</Text></View>
         </View>
 
         {/* breakdowns */}
@@ -150,9 +151,9 @@ export function DailyReportDocument({ date, source, report, bills: rawBills, gen
         )}
 
         {/* per-bill detail */}
-        <Text style={s.secTitle}>บิลทั้งหมด</Text>
+        <Text style={s.secTitle}>รายละเอียดแต่ละบิล</Text>
         <View style={s.th}>
-          {["#", "เวลา", "สินค้า", "ชำระ", "สัญชาติ", "ยอด (฿)"].map((h, i) => (
+          {["#", "เวลา", "รายการ", "ชำระ", "สัญชาติ", "ยอด (฿)"].map((h, i) => (
             <Text key={i} style={[s.cell, i === 0 ? s.cellL : {}, s.hCell, { width: W[i], textAlign: i === 5 ? "right" : "left" }]}>{h}</Text>
           ))}
         </View>
@@ -166,8 +167,8 @@ export function DailyReportDocument({ date, source, report, bills: rawBills, gen
                 return (
                   <View key={r.id} style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ flex: 1, fontSize: 8 }}>{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</Text>
-                    <Text style={{ width: 70, textAlign: "right", fontSize: 8, color: C.muted }}>เต็ม {nf(g)}</Text>
-                    <Text style={{ width: 54, textAlign: "right", fontSize: 8, color: C.muted }}>ลด {nf(r.discount ?? 0)}</Text>
+                    <Text style={{ width: 70, textAlign: "right", fontSize: 8, color: C.muted }}>เต็ม ฿{nf(g)}</Text>
+                    <Text style={{ width: 54, textAlign: "right", fontSize: 8, color: C.muted }}>ลด ฿{nf(r.discount ?? 0)}</Text>
                   </View>
                 );
               })}
@@ -179,7 +180,7 @@ export function DailyReportDocument({ date, source, report, bills: rawBills, gen
         ))}
         <View style={s.foot}>
           <Text style={[s.cell, s.cellL, { width: W[0] + W[1], fontWeight: "bold" }]}>รวม</Text>
-          <Text style={[s.cell, { width: W[2], textAlign: "right", fontWeight: "bold" }]}>เต็ม {nf(gross)} · ลด {nf(disc)}</Text>
+          <Text style={[s.cell, { width: W[2], textAlign: "right", fontWeight: "bold" }]}>เต็ม ฿{nf(gross)} · ลด ฿{nf(disc)}</Text>
           <Text style={[s.cell, { width: W[3] + W[4], fontWeight: "bold" }]}>{bills.length} บิล</Text>
           <Text style={[s.cell, { width: W[5], textAlign: "right", fontWeight: "bold" }]}>{nf(report.total)}</Text>
         </View>

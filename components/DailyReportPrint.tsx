@@ -172,14 +172,14 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
             <div className="grid grid-cols-2 gap-x-10 mb-6">
               <div>
                 <SecTitle>ช่องทางรับเงิน</SecTitle>
-                <KV k="เงินสด" v={`${nf(data!.cash)} บาท`} />
-                <KV k="โอน / เครดิต" v={`${nf(data!.nonCash)} บาท`} />
+                <KV k="เงินสด" v={`฿${nf(data!.cash)}`} />
+                <KV k="โอน / เครดิต" v={`฿${nf(data!.nonCash)}`} />
               </div>
               <div>
                 <SecTitle>สัญชาติลูกค้า</SecTitle>
-                <KV k={`คนไทย (${data!.thaiCount})`} v={`${nf(data!.thaiAmt)} บาท`} />
-                <KV k={`ต่างชาติ (${data!.foreignCount})`} v={`${nf(data!.foreignAmt)} บาท`} />
-                {data!.otherCount > 0 && <KV k={`อื่นๆ (${data!.otherCount})`} v={`${nf(data!.otherAmt)} บาท`} />}
+                <KV k={`คนไทย (${data!.thaiCount})`} v={`฿${nf(data!.thaiAmt)}`} />
+                <KV k={`ต่างชาติ (${data!.foreignCount})`} v={`฿${nf(data!.foreignAmt)}`} />
+                {data!.otherCount > 0 && <KV k={`อื่นๆ (${data!.otherCount})`} v={`฿${nf(data!.otherAmt)}`} />}
               </div>
             </div>
 
@@ -193,7 +193,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
                     <tr className="text-left text-neutral-500 text-[11px] uppercase tracking-wide">
                       <th className="pb-1.5 font-semibold">พนักงานขาย</th>
                       <th className="pb-1.5 w-24 text-right font-semibold">จำนวนบิล</th>
-                      <th className="pb-1.5 w-28 text-right font-semibold">ยอด (บาท)</th>
+                      <th className="pb-1.5 w-28 text-right font-semibold">ยอด (฿)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -221,7 +221,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
                       <th className="pb-1.5 pr-2 font-semibold">รายการ</th>
                       <th className="pb-1.5 pr-2 w-24 font-semibold">ชำระ</th>
                       <th className="pb-1.5 pr-2 w-14 font-semibold">สัญชาติ</th>
-                      <th className="pb-1.5 text-right w-20 font-semibold">ยอด (บาท)</th>
+                      <th className="pb-1.5 text-right w-20 font-semibold">ยอด (฿)</th>
                     </tr>
                   </thead>
                   <tbody>
