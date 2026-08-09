@@ -374,6 +374,8 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
   const named = state.items.filter((it) => String(it.item || "").trim());
   const itemCount = named.reduce((s, it) => s + (Number(it.qty) || 0), 0);   // total pieces so far
+  // block adding another blank "เพิ่มเอง" card until the current one has a scent
+  const hasEmptyItem = state.items.some((it) => !String(it.item || "").trim());
   const hasData = named.length > 0 || state.items.some((it) => Number(it.unit_price) > 0) || state.attachments.length > 0;
   const tryCancel = () => (hasData ? setConfirmCancel(true) : onCancel());
 
@@ -393,7 +395,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* add item */}
       <div className="flex gap-2 mb-2">
         <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
-        <button onClick={addManual} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
+        <button onClick={addManual} disabled={hasEmptyItem} title={hasEmptyItem ? "กรอกกลิ่นของรายการก่อนหน้าก่อน" : undefined} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-surface"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
       </div>
       {/* hardware scanner status / last-scan feedback */}
       <div className="mb-4 min-h-[20px] text-xs">
