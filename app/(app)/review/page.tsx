@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function ReviewPage() {
   await requirePermission("review");
   const rows = await pendingSubmissions();
+  const pendingBills = new Set(rows.map((r) => r.receipt_no || `id:${r.id}`)).size;   // rows sharing a receipt = one bill
   const approved = await recentlyApprovedSubmissions();
   const refs = [...rows, ...approved].map((r) => r.receipt_no).filter(Boolean) as string[];
   const attachments = await attachmentsForRefs(refs);
@@ -32,7 +33,7 @@ export default async function ReviewPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <div className="no-print">
         <PageHeader icon={ClipboardCheck} title="ตรวจสอบยอดขาย"
-          subtitle={rows.length ? `${rows.length} รายการรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
+          subtitle={pendingBills ? `${pendingBills} บิลรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
         <div className="mb-6"><MonthlyExcelButton /></div>
       </div>
       <ReviewInsights revision={`${rows.length}|${approved.length}`}>

@@ -344,7 +344,11 @@ export async function recentlyApprovedSubmissions() {
 
 /** Count of pending items — drives the sidebar badge. */
 export async function pendingCount() {
-  return q<{ n: number }>(`select count(*)::int n from submissions where status='pending'${await aliveAnd("")}`).then((r) => r[0].n);
+  // count BILLS (rows sharing a receipt_no = one bill), not individual line items
+  return q<{ n: number }>(
+    `select count(distinct coalesce(nullif(receipt_no,''), 'id:'||id::text))::int n
+     from submissions where status='pending'${await aliveAnd("")}`,
+  ).then((r) => r[0].n);
 }
 
 /** One staff member's submissions for a given day (all statuses). */
