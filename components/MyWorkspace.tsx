@@ -595,7 +595,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
         <div className="flex-1 relative min-w-0">
           <input ref={nameRef} className="w-full border border-line rounded-lg px-3 py-2 text-sm font-medium scroll-mt-20 focus:outline-none focus:border-brand" value={it.item} onChange={(e) => onName(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" />
           {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
-            {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <span className="text-muted">{p.size} · {p.barcode}</span></button>)}
+            {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <b className="text-ink">{p.size}</b> <span className="text-muted">· {p.barcode}</span></button>)}
           </div>}
         </div>
         {/* size stays hidden WHILE searching (dropdown open) so the search field stays
