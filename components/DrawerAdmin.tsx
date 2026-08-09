@@ -1,25 +1,48 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Lock, FileText } from "lucide-react";
-import { confirmDrawer } from "@/lib/actions/cash";
+import { Check, Lock, FileText, Paperclip, Loader2 } from "lucide-react";
+import { confirmDrawer, addCashAttachments, deleteCashAttachment } from "@/lib/actions/cash";
 import { DailyReport } from "@/components/DailyReport";
+import { PhotoStrip } from "@/components/BillPhotos";
+import { compressImage } from "@/lib/img";
 import { baht } from "@/lib/format";
+import type { CashAttachment } from "@/lib/queries";
 
 type Row = { entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
 const fmtDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "2-digit" });
 
-function DrawerRow({ r }: { r: Row }) {
+function DrawerRow({ r, slips }: { r: Row; slips: CashAttachment[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [opening, setOpening] = useState(String(Math.round(r.opening)));
   const [deposit, setDeposit] = useState(String(Math.round(r.deposit)));
   const [viewDate, setViewDate] = useState<string | null>(null);   // report expanded for this day
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [upBusy, setUpBusy] = useState(false);
+  const [upErr, setUpErr] = useState<string | null>(null);
   const inp = "w-24 border border-line rounded-md px-2 py-1 text-sm text-right tabular-nums bg-surface text-ink focus:outline-none focus:border-brand disabled:bg-canvas disabled:text-muted";
 
   const save = () => start(async () => {
     const res = await confirmDrawer(r.entry_date, Number(opening) || 0, Number(deposit) || 0);
     if (res?.ok) router.refresh(); else alert(res?.error ?? "บันทึกไม่สำเร็จ");
+  });
+
+  const attach = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUpBusy(true); setUpErr(null);
+    try {
+      const room = Math.max(0, 6 - slips.length);
+      const out: string[] = [];
+      for (const f of Array.from(files).slice(0, room)) { try { out.push(await compressImage(f)); } catch { /* skip bad image */ } }
+      if (!out.length) { setUpErr("แนบไม่สำเร็จ — รองรับ JPG/PNG"); return; }
+      const res = await addCashAttachments(r.entry_date, out);
+      if (res?.ok) router.refresh(); else setUpErr(res?.error ?? "แนบไม่สำเร็จ");
+    } finally { setUpBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+  const removeSlip = (id: number) => start(async () => {
+    const res = await deleteCashAttachment(id);
+    if (res?.ok) router.refresh(); else alert(res?.error ?? "ลบไม่สำเร็จ");
   });
 
   return (
@@ -30,9 +53,20 @@ function DrawerRow({ r }: { r: Row }) {
           <input value={opening} disabled={r.confirmed || pending} inputMode="numeric"
             onChange={(e) => setOpening(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
         </td>
-        <td className="px-3 py-2.5 text-right">
+        <td className="px-3 py-2.5 text-right align-top">
           <input value={deposit} disabled={r.confirmed || pending} inputMode="numeric"
             onChange={(e) => setDeposit(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
+          <div className="mt-1.5 flex flex-col items-end gap-1">
+            <PhotoStrip photos={slips} size={44} onDelete={r.confirmed ? undefined : removeSlip} />
+            {slips.length < 6 && (
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={upBusy}
+                className="inline-flex items-center gap-1 text-[11px] text-muted hover:text-brand-dark disabled:opacity-50">
+                {upBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />} แนบสลิป
+              </button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => attach(e.target.files)} />
+            {upErr && <span className="text-[10px] text-danger leading-tight">{upErr}</span>}
+          </div>
         </td>
         <td className="px-3 py-2.5 text-right font-semibold text-ink tabular-nums whitespace-nowrap">{baht(r.closing)}</td>
         <td className="px-5 py-2.5 text-right whitespace-nowrap">
@@ -63,7 +97,7 @@ function DrawerRow({ r }: { r: Row }) {
   );
 }
 
-export function DrawerAdmin({ rows }: { rows: Row[] }) {
+export function DrawerAdmin({ rows, attachments = {} }: { rows: Row[]; attachments?: Record<string, CashAttachment[]> }) {
   if (!rows.length) return <div className="p-8 text-center text-muted text-sm">ยังไม่มีข้อมูลเงินสดหน้าร้าน</div>;
   return (
     <>
@@ -71,11 +105,11 @@ export function DrawerAdmin({ rows }: { rows: Row[] }) {
         <thead className="bg-canvas"><tr className="th border-b border-line-soft">
           <th className="px-5 py-2.5 text-left">วันที่</th>
           <th className="px-3 py-2.5 text-right">ยกมา</th>
-          <th className="px-3 py-2.5 text-right">🏦 เข้าธนาคาร</th>
+          <th className="px-3 py-2.5 text-right">🏦 เข้าธนาคาร / สลิป</th>
           <th className="px-3 py-2.5 text-right">คงเหลือหน้าร้าน</th>
           <th className="px-5 py-2.5 text-right">จัดการ</th>
         </tr></thead>
-        <tbody>{rows.map((r) => <DrawerRow key={r.entry_date} r={r} />)}</tbody>
+        <tbody>{rows.map((r) => <DrawerRow key={r.entry_date} r={r} slips={attachments[r.entry_date] ?? []} />)}</tbody>
       </table>
       <p className="text-[11px] text-muted px-5 py-2">
         กด “ดูรายงาน” เพื่อตรวจยอดขายของวันนั้น · ตรวจ/แก้ ยกมา–เข้าธนาคาร แล้ว “ยืนยัน & บันทึกเข้าระบบ” → ยอดเข้าธนาคารลงบัญชีเงินสด (โพสต์ครั้งเดียว แล้วล็อกแถว) · คงเหลือ = ยกมา + เงินสดขาย − เข้าธนาคาร

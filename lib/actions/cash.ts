@@ -36,3 +36,30 @@ export async function confirmDrawer(date: string, opening: number, deposit: numb
     return { ok: false, error: "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
 }
+
+/** Attach bank-deposit slip photos to a day's shop-cash record. */
+export async function addCashAttachments(date: string, images: string[]): Promise<{ ok: boolean; error?: string }> {
+  const me = await requirePermission("cash");
+  const imgs = (images || []).filter((s) => typeof s === "string" && s.startsWith("data:image/") && s.length <= 3_000_000).slice(0, 6);
+  if (!imgs.length) return { ok: false, error: "ไม่มีรูปที่ถูกต้อง" };
+  try {
+    for (const a of imgs) await q(`insert into cash_attachments (entry_date, created_by, data) values ($1,$2,$3)`, [date, me.id, a]);
+    await logAudit("update", "cash", date, `แนบสลิปเงินสด ${date} · ${imgs.length} รูป`);
+    revalidatePath("/cash");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตารางแนบไฟล์ (รัน SQL 0015 ก่อน)" };
+    console.error("[addCashAttachments] failed", e);
+    return { ok: false, error: "แนบไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+}
+
+/** Remove a bank-deposit slip photo. */
+export async function deleteCashAttachment(id: number): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("cash");
+  try {
+    await q(`delete from cash_attachments where id = $1`, [id]);
+    revalidatePath("/cash");
+    return { ok: true };
+  } catch (e) { console.error("[deleteCashAttachment] failed", e); return { ok: false, error: "ลบไม่สำเร็จ" }; }
+}

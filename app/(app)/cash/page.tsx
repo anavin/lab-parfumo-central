@@ -6,12 +6,13 @@ import { ExportButton } from "@/components/ExportButton";
 import { CashTable } from "@/components/CashTable";
 import { DrawerAdmin } from "@/components/DrawerAdmin";
 import { q } from "@/lib/db";
-import { dailyCashLog } from "@/lib/queries";
+import { dailyCashLog, cashAttachmentsByDate } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function CashPage() {
   const drawer = await dailyCashLog(90);
+  const cashSlips = await cashAttachmentsByDate();
   const rows = await q<{ cash_date: string; description: string; amount: number; type: string }>(`
     select cash_date, description, amount::float, type
     from cash_entries order by cash_date desc nulls last, id desc`);
@@ -32,7 +33,7 @@ export default async function CashPage() {
       </div>
       {drawer.length > 0 && (
         <Card title="เงินสดหน้าร้าน (รายวัน) · ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto" className="mb-6">
-          <DrawerAdmin rows={drawer} />
+          <DrawerAdmin rows={drawer} attachments={cashSlips} />
         </Card>
       )}
 

@@ -609,12 +609,18 @@ const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_ca
  *  latest prior day's closing when not yet saved. Zeros gracefully if the table is absent. */
 export async function getDailyCash(date: string) {
   try {
-    const [row] = await q<{ opening: number; deposit: number }>(
-      `select opening::float, deposit::float from daily_cash where entry_date=$1`, [date]);
-    if (row) return { opening: row.opening, deposit: row.deposit, saved: true };
-    const [prev] = await q<{ closing: number }>(
-      `select closing::float from daily_cash where entry_date<$1 order by entry_date desc limit 1`, [date]);
-    return { opening: prev?.closing ?? 0, deposit: 0, saved: false };
+    const [row] = await q<{ opening: number; deposit: number; confirmed: boolean }>(
+      `select opening::float, deposit::float, confirmed from daily_cash where entry_date=$1`, [date]);
+    // A confirmed (admin-reviewed) day keeps its own opening. Otherwise "ยกมา" = the prior
+    // day's LIVE closing (opening + เงินสดขาย − เข้าธนาคาร), so it always equals the admin
+    // table and carries the true คงเหลือ forward — not the stale stored closing.
+    if (row?.confirmed) return { opening: row.opening, deposit: row.deposit, saved: true };
+    const [prev] = await q<{ entry_date: string; opening: number; deposit: number }>(
+      `select entry_date::text entry_date, opening::float, deposit::float
+       from daily_cash where entry_date<$1 order by entry_date desc limit 1`, [date]);
+    if (!prev) return { opening: row?.opening ?? 0, deposit: row?.deposit ?? 0, saved: !!row };
+    const prevClosing = Math.max(0, prev.opening + (await dailyReport(prev.entry_date, "CTW")).cash - prev.deposit);
+    return { opening: prevClosing, deposit: row?.deposit ?? 0, saved: !!row };
   } catch (e) { if (missingDailyCash(e)) return { opening: 0, deposit: 0, saved: false }; throw e; }
 }
 
@@ -636,19 +642,28 @@ export async function dailyCashLog(limit = 90) {
       `select entry_date::text entry_date, opening::float, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
        from daily_cash order by entry_date desc limit $1`, [limit]);
-    // "ยกมา" of each day should equal the PREVIOUS day's คงเหลือ. For days the admin
-    // hasn't reviewed yet, carry it automatically from the immediately-older entry's
-    // STORED closing (no cascade, so it never ripples into other days). Days the admin
-    // already confirmed keep their reviewed values untouched.
-    const storedClosing = rows.map((r) => r.closing);   // snapshot before mutating
-    for (let i = 0; i < rows.length; i++) {
-      const prevClosing = storedClosing[i + 1];          // the older entry (rows are desc)
-      const r = rows[i];
-      if (prevClosing == null || r.confirmed || r.opening === prevClosing) continue;
-      const cash = r.closing - r.opening + r.deposit;    // that day's cash sales
-      r.opening = prevClosing;
-      r.closing = Math.max(0, r.opening + cash - r.deposit);
+    // "คงเหลือ" is computed LIVE = ยกมา + เงินสดขายวันนั้น − เข้าธนาคาร, exactly like the
+    // daily report's "เงินสดหน้าร้านคงเหลือ" — that live value is what carries to the next
+    // day. (The stored closing gets frozen at confirm time and can go stale.)
+    const cashByDate = new Map<string, number>();
+    await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, "CTW")).cash)));
+    let prevClosing: number | null = null;
+    for (const r of [...rows].reverse()) {   // oldest → newest
+      if (prevClosing !== null && !r.confirmed) r.opening = prevClosing;   // un-reviewed day: ยกมา = คงเหลือเมื่อวาน
+      r.closing = Math.max(0, r.opening + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
+      prevClosing = r.closing;
     }
     return rows;
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
+}
+
+export type CashAttachment = { id: number; entry_date: string; data: string };
+/** Bank-deposit slip photos grouped by day (for the admin /cash drawer). */
+export async function cashAttachmentsByDate(): Promise<Record<string, CashAttachment[]>> {
+  try {
+    const rows = await q<CashAttachment>(`select id, entry_date::text entry_date, data from cash_attachments order by id`);
+    const map: Record<string, CashAttachment[]> = {};
+    for (const r of rows) (map[r.entry_date] ??= []).push(r);
+    return map;
+  } catch (e) { if ((e as any)?.code === "42P01") return {}; throw e; }
 }
