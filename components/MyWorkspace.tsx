@@ -45,7 +45,6 @@ const qtyOptions = (cur?: any) => {
   return c > 20 ? [{ value: String(c), label: String(c) }, ...QTY_OPTS] : QTY_OPTS;
 };
 const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
-const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
 // K Shop channels share the shop's static QR (shown for the customer to scan)
 const isKShop = (v?: string) => v === "K Shop" || v === "K Shop Credit Card";
 
@@ -815,6 +814,20 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="ส่วนลด"><input {...numFld("discount")} className={`${inp} ${Number(state.discount) > 0 ? "!text-danger !border-danger/50 font-semibold" : ""}`} /></Field>
         <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
       </div>
+      {/* quick per-item discount — same as the add form */}
+      {Number(state.unit_price) > 0 && (
+        <div className="mb-3 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-muted mr-0.5">ลดเร็ว</span>
+          {[200, 100, 50].map((v) => {
+            const active = Number(state.discount) === v;
+            return (
+              <button key={v} type="button" onClick={() => s("discount", active ? 0 : v)}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border transition ${active ? "bg-brand text-white border-brand" : "border-line text-ink hover:bg-canvas"}`}>−฿{v}</button>
+            );
+          })}
+          {Number(state.discount) > 0 && <button type="button" onClick={() => s("discount", 0)} className="px-2 py-1 rounded-full text-xs text-muted hover:bg-canvas">ล้าง</button>}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <Field label="ช่องทางชำระ *">
           <Select value={state.payment_channel} onValueChange={paymentPick} onPick={bumpQr}
@@ -822,7 +835,14 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
             placeholder="- เลือกช่องทางชำระ -"
             className={"py-2.5" + (split ? "" : errRing("ช่องทางชำระ"))} />
         </Field>
-        <Field label="สัญชาติลูกค้า *"><Select value={state.nation} onValueChange={(v) => { s("nation", v); clearMiss("สัญชาติลูกค้า"); }} options={NATION_OPTIONS} placeholder="- เลือกสัญชาติ -" className={"py-2.5" + errRing("สัญชาติลูกค้า")} /></Field>
+        <Field label="สัญชาติลูกค้า *">
+          <div className={"grid grid-cols-2 gap-2 rounded-lg" + errRing("สัญชาติลูกค้า")}>
+            {([["Thai", "🇹🇭 ไทย"], ["Foreign", "🌏 ต่างชาติ"]] as const).map(([v, l]) => (
+              <button key={v} type="button" onClick={() => { s("nation", v); clearMiss("สัญชาติลูกค้า"); }}
+                className={"py-2.5 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
+            ))}
+          </div>
+        </Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
       </div>
       {split && (
