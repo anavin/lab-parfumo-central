@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
-import { Printer, ArrowLeft, Download } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Printer, ArrowLeft, Download, Mail, Check, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { emailReceipt } from "@/lib/actions/receipt";
 import { Receipt, type ReceiptItem, type ReceiptTender, type ReceiptLang } from "./Receipt";
 
 // Client wrapper: TH/EN language toggle + server-PDF actions, around the on-screen receipt.
@@ -13,6 +14,19 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
 }) {
   const router = useRouter();
   const [lang, setLang] = useState<ReceiptLang>("th");
+  const [email, setEmail] = useState("");
+  const [sending, startSend] = useTransition();
+  const [sent, setSent] = useState(false);
+  const [mailErr, setMailErr] = useState<string | null>(null);
+
+  const sendEmail = () => {
+    setMailErr(null); setSent(false);
+    startSend(async () => {
+      const res = await emailReceipt(receiptNo, email.trim(), lang);
+      if (res?.ok) { setSent(true); setEmail(""); setTimeout(() => setSent(false), 4000); }
+      else setMailErr(res?.error ?? "ส่งอีเมลไม่สำเร็จ");
+    });
+  };
 
   // The receipt usually opens in a NEW TAB (target=_blank) where there's no history,
   // so router.back() does nothing. Fall back to the page that opened it, else close.
@@ -55,6 +69,21 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-line bg-surface text-ink text-sm font-semibold whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
             <Printer className="w-4 h-4 shrink-0" /> พิมพ์
           </a>
+        </div>
+        {/* row 3: email the receipt to the customer (also collects their email) */}
+        <div>
+          <div className="flex gap-2">
+            <input type="email" inputMode="email" value={email} onChange={(e) => { setEmail(e.target.value); setMailErr(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && email.trim() && !sending) sendEmail(); }}
+              placeholder="อีเมลลูกค้า เพื่อส่งใบเสร็จ" disabled={sending}
+              className="flex-1 min-w-0 border border-line rounded-xl px-3 py-3 text-sm bg-surface text-ink focus:outline-none focus:border-brand disabled:bg-canvas" />
+            <button onClick={sendEmail} disabled={sending || !email.trim()}
+              className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-ink text-surface text-sm font-semibold whitespace-nowrap hover:opacity-90 active:scale-[.99] transition disabled:opacity-50">
+              {sending ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Mail className="w-4 h-4 shrink-0" />} ส่งอีเมล
+            </button>
+          </div>
+          {sent && <div className="mt-1.5 text-xs text-success inline-flex items-center gap-1"><Check className="w-3.5 h-3.5" /> ส่งใบเสร็จให้ลูกค้าแล้ว</div>}
+          {mailErr && <div className="mt-1.5 text-xs text-danger">{mailErr}</div>}
         </div>
       </div>
       <div className="print-area receipt-sheet rounded-xl border border-line shadow-sm bg-white text-black">
