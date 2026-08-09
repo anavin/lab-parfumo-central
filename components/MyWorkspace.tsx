@@ -447,13 +447,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* payment — last major step, once items + discount give a final net total */}
       <div className="mb-4 border-t border-line/60 pt-3" data-field="ช่องทางชำระ">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-muted">ช่องทางชำระ *{state.splitPay ? " (ค่าเริ่มต้นทุกชิ้น)" : ""}</span>
-          {!split && (
-            <label className="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
-              <input type="checkbox" checked={state.splitPay} onChange={(e) => set({ splitPay: e.target.checked })} className="accent-brand w-3.5 h-3.5" />
-              แยกจ่ายรายชิ้น
-            </label>
-          )}
+          <span className="text-xs text-muted">ช่องทางชำระ *</span>
         </div>
         <Select value={state.payment_channel} onValueChange={paymentPick} onPick={bumpQr}
           options={[...payOptions(split ? "" : state.payment_channel), { value: SPLIT2, label: "จ่าย 2 ช่องทาง (แยกยอด)" }]}
