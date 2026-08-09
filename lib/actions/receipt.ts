@@ -45,8 +45,13 @@ export async function emailReceipt(receiptNo: string, email: string, lang: Recei
     await logAudit("update", "submission", ref, `ส่งใบเสร็จทางอีเมล ${ref} → ${to}`);
     return { ok: true };
   } catch (e: any) {
-    console.error("[emailReceipt] send failed", e);
-    if (e?.code === "EAUTH") return { ok: false, error: "อีเมลผู้ส่งล็อกอินไม่ผ่าน — ตรวจ SMTP_USER / App Password" };
-    return { ok: false, error: "ส่งอีเมลไม่สำเร็จ ลองใหม่อีกครั้ง" };
+    console.error("[emailReceipt] send failed", e?.code, e?.responseCode, e?.command, e?.message, e);
+    if (e?.code === "EAUTH") return { ok: false, error: "อีเมลผู้ส่งล็อกอินไม่ผ่าน — ตรวจ SMTP_USER / App Password (ต้องเปิด 2-Step ก่อน)" };
+    if (e?.code === "EENVELOPE") return { ok: false, error: "อีเมลปลายทาง/ผู้ส่งไม่ถูกต้อง (ตรวจ MAIL_FROM ให้เป็นโดเมนเดียวกับ SMTP_USER)" };
+    if (e?.code === "ETIMEDOUT" || e?.code === "ESOCKET" || e?.code === "ECONNECTION")
+      return { ok: false, error: "ต่อ SMTP ไม่ได้ (ตรวจ SMTP_HOST/PORT — Gmail ใช้ smtp.gmail.com:465)" };
+    // temporary: surface the raw code/message so we can diagnose the exact cause
+    const detail = [e?.code, e?.responseCode, String(e?.message || "").slice(0, 140)].filter(Boolean).join(" · ");
+    return { ok: false, error: `ส่งอีเมลไม่สำเร็จ: ${detail || "unknown"}` };
   }
 }
