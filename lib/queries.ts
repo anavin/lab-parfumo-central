@@ -632,20 +632,9 @@ export async function saveDailyCash(date: string, opening: number, deposit: numb
 /** Per-day shop drawer figures for the admin cash page (review + confirm + post). */
 export async function dailyCashLog(limit = 90) {
   try {
-    const rows = await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
+    return await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
       `select entry_date::text entry_date, opening::float, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
        from daily_cash order by entry_date desc limit $1`, [limit]);
-    // carry each day's closing into the NEXT day's opening (ยกมา = คงเหลือของเมื่อวาน),
-    // recomputing so the chain stays correct even after an earlier day is edited.
-    // cash sales that day are derived from the stored values (closing = opening + cash − deposit).
-    let prevClosing: number | null = null;
-    for (const r of [...rows].reverse()) {   // oldest → newest
-      const cash = r.closing - r.opening + r.deposit;   // that day's cash sales
-      if (prevClosing !== null) r.opening = prevClosing;
-      r.closing = Math.max(0, r.opening + cash - r.deposit);
-      prevClosing = r.closing;
-    }
-    return rows;
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
 }
