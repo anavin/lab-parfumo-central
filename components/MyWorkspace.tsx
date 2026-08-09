@@ -229,7 +229,10 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         <span className="text-xs text-muted">{activeBillCount} บิล</span>
       </div>
       {bills.length === 0 ? (
-        <div className="card px-4 py-10 text-center text-sm text-muted">ยังไม่มีรายการในวันนี้ — กด “สแกนบาร์โค้ด” เพื่อเริ่ม</div>
+        <div className="card px-4 py-10 text-center text-sm text-muted leading-relaxed">
+          <div>ยังไม่มีรายการในวันนี้</div>
+          <div>กด “สแกนบาร์โค้ด” หรือ “เพิ่มเอง” เพื่อเริ่ม</div>
+        </div>
       ) : (
         <div className="space-y-3">
           {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending}
