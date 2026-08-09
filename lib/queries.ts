@@ -632,9 +632,23 @@ export async function saveDailyCash(date: string, opening: number, deposit: numb
 /** Per-day shop drawer figures for the admin cash page (review + confirm + post). */
 export async function dailyCashLog(limit = 90) {
   try {
-    return await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
+    const rows = await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
       `select entry_date::text entry_date, opening::float, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
        from daily_cash order by entry_date desc limit $1`, [limit]);
+    // "ยกมา" of each day should equal the PREVIOUS day's คงเหลือ. For days the admin
+    // hasn't reviewed yet, carry it automatically from the immediately-older entry's
+    // STORED closing (no cascade, so it never ripples into other days). Days the admin
+    // already confirmed keep their reviewed values untouched.
+    const storedClosing = rows.map((r) => r.closing);   // snapshot before mutating
+    for (let i = 0; i < rows.length; i++) {
+      const prevClosing = storedClosing[i + 1];          // the older entry (rows are desc)
+      const r = rows[i];
+      if (prevClosing == null || r.confirmed || r.opening === prevClosing) continue;
+      const cash = r.closing - r.opening + r.deposit;    // that day's cash sales
+      r.opening = prevClosing;
+      r.closing = Math.max(0, r.opening + cash - r.deposit);
+    }
+    return rows;
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
 }
