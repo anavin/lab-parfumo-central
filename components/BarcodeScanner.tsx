@@ -61,6 +61,42 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
   const [manual, setManual] = useState(false);
   const [manualVal, setManualVal] = useState("");
   const [focusPing, setFocusPing] = useState<{ x: number; y: number; k: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [decoding, setDecoding] = useState(false);   // reading a captured photo
+
+  // Decode a barcode from a captured/selected photo — the reliable path on old
+  // WebViews (SUNMI) where the live camera preview won't render. Uses the device
+  // camera app via the file input, then reads the image with the OS detector / ZXing.
+  const decodeFromFile = async (file: File) => {
+    setDecoding(true);
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+      const maxW = 1600;
+      const scale = img.width > maxW ? maxW / img.width : 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(2, Math.round(img.width * scale));
+      canvas.height = Math.max(2, Math.round(img.height * scale));
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      let code = "";
+      const NativeBD: any = (window as any).BarcodeDetector;
+      if (NativeBD) {
+        try { const det = new NativeBD({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] }); const codes = await det.detect(canvas); if (codes?.length) code = codes[0].rawValue; } catch {}
+      }
+      if (!code) {
+        relaxUpcEanChecksum();
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        try { const res = new BrowserMultiFormatReader(hints).decodeFromCanvas(canvas); if (res) code = res.getText(); } catch {}
+      }
+      if (code) commitRef.current(code.trim());
+      else alert("ไม่พบบาร์โค้ดในรูป — ถ่ายใหม่ให้ชัด จัดบาร์โค้ดให้เต็มกรอบ");
+    } catch { alert("อ่านรูปไม่สำเร็จ ลองใหม่"); }
+    finally { setDecoding(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
 
   useEffect(() => {
     relaxUpcEanChecksum();
@@ -373,17 +409,29 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         {/* footer (only when not showing a result) */}
         {!result && !checking && (
           <div className="p-3 flex items-center justify-between gap-2">
-            <button onClick={() => setManual(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/25 text-white/90 text-sm hover:bg-white/10 whitespace-nowrap">
-              <Keyboard className="w-4 h-4" /> พิมพ์เลข
-            </button>
-            <span className="text-xs text-white/70 flex-1 text-center truncate">
-              {continuous && count > 0 ? <>เพิ่มแล้ว <b className="text-white">{count}</b></> : "จ่อบาร์โค้ดในกรอบ"}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setManual(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/25 text-white/90 text-sm hover:bg-white/10 whitespace-nowrap">
+                <Keyboard className="w-4 h-4" /> พิมพ์เลข
+              </button>
+              <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/25 text-white/90 text-sm hover:bg-white/10 whitespace-nowrap">
+                <Camera className="w-4 h-4" /> ถ่ายรูป
+              </button>
+            </div>
             {continuous ? (
               <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark whitespace-nowrap">
                 <Check className="w-4 h-4" /> เสร็จ
               </button>
             ) : <span className="w-[64px]" />}
+          </div>
+        )}
+
+        {/* hidden capture input — opens the device camera app (works on any WebView) */}
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) decodeFromFile(f); }} />
+        {decoding && (
+          <div className="absolute inset-0 z-30 bg-black/90 flex flex-col items-center justify-center text-white/80">
+            <ScanLine className="w-10 h-10 mb-3 animate-pulse" />
+            <div className="text-sm">กำลังอ่านรูป…</div>
           </div>
         )}
       </div>

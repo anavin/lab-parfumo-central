@@ -2,17 +2,22 @@ package com.labparfumo.pos
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -29,6 +34,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var printer: SunmiPrinterService? = null
+
+    // <input type=file capture> support — lets the "ถ่ายรูป" scanner open the camera app
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private lateinit var fileChooser: ActivityResultLauncher<Intent>
 
     // Printable width in dots for a 58mm head (SUNMI V2/V3 = 384). An 80mm head = 576.
     private val printWidth = 384
@@ -57,6 +66,13 @@ class MainActivity : AppCompatActivity() {
         // let a computer inspect this WebView at chrome://inspect (diagnose JS errors)
         WebView.setWebContentsDebuggingEnabled(true)
 
+        // receives the photo picked by the camera app for <input type=file capture>
+        fileChooser = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val cb = filePathCallback
+            filePathCallback = null
+            cb?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
+        }
+
         webView = WebView(this)
         setContentView(webView)
 
@@ -71,6 +87,12 @@ class MainActivity : AppCompatActivity() {
         // camera (barcode scanner) permission inside the WebView
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) { request.grant(request.resources) }
+            override fun onShowFileChooser(view: WebView?, callback: ValueCallback<Array<Uri>>?, params: FileChooserParams?): Boolean {
+                filePathCallback?.onReceiveValue(null)
+                filePathCallback = callback
+                return try { fileChooser.launch(params?.createIntent()); true }
+                catch (e: Exception) { filePathCallback = null; false }
+            }
         }
         webView.webViewClient = WebViewClient()
         webView.addJavascriptInterface(Bridge(), "SunmiBridge")
