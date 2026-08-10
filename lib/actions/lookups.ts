@@ -2,7 +2,9 @@
 import { q } from "@/lib/db";
 
 export async function searchProducts(term: string) {
-  const t = `%${(term ?? "").trim()}%`;
+  // prefix match ("ขึ้นต้นด้วย" — ตรงจากตัวอักษรแรกตามตำแหน่ง): พิมพ์ B → Bu → Buo
+  // เจอเฉพาะกลิ่นที่ขึ้นต้นด้วยตัวนั้น (ไม่ใช่มีอยู่กลางคำ)
+  const t = `${(term ?? "").trim()}%`;
   return q<{ id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number }>(`
     select id, barcode, scent, grade, size, sku, price::float
     from products
