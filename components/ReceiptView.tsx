@@ -34,16 +34,40 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
 
   useEffect(() => { setNativePrinter(typeof window !== "undefined" && !!window.SunmiBridge?.printImage); }, []);
 
-  // Render the on-screen receipt to a PNG and hand it to the SUNMI app to print
-  // on the built-in thermal head. Rendered at 2× for a crisp 58mm slip.
+  // Render the on-screen receipt to a crisp black-&-white PNG for the 58mm thermal
+  // head. Thermal heads print 1-bit: grey pixels dither to sparse dots (faint), so
+  // we render at 2×, downscale to the head's 384-dot width, then BINARIZE to pure
+  // black/white — that's what makes the slip sharp instead of pale.
+  const PRINT_WIDTH = 384;        // 58mm head = 384 dots (80mm = 576)
+  const THRESHOLD = 180;          // lum < this → black (keeps thin text + dashed rules)
   const printThermal = async () => {
     if (!sheetRef.current) return;
     setThermalBusy(true); setThermalErr(null);
     try {
       const el = sheetRef.current.querySelector<HTMLElement>(".receipt") ?? sheetRef.current;
       const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
-      const base64 = canvas.toDataURL("image/png").split(",")[1] || "";
+      const big = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+
+      // downscale to exactly the print width (Android then prints 1:1, no re-blur)
+      const out = document.createElement("canvas");
+      out.width = PRINT_WIDTH;
+      out.height = Math.max(1, Math.round((big.height * PRINT_WIDTH) / big.width));
+      const ctx = out.getContext("2d");
+      if (!ctx) throw new Error("no ctx");
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(big, 0, 0, out.width, out.height);
+
+      // binarize → solid black text/lines on white (no faint grey)
+      const im = ctx.getImageData(0, 0, out.width, out.height);
+      const d = im.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const v = lum < THRESHOLD ? 0 : 255;
+        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
+      ctx.putImageData(im, 0, 0);
+
+      const base64 = out.toDataURL("image/png").split(",")[1] || "";
       if (!base64) throw new Error("empty image");
       window.SunmiBridge?.printImage?.(base64);
     } catch (e) {
