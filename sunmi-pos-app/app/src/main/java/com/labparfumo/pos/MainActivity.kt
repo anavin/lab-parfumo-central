@@ -2,7 +2,10 @@ package com.labparfumo.pos
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -42,6 +45,21 @@ class MainActivity : AppCompatActivity() {
 
     // native barcode scanner (for WebViews that can't reach the camera, e.g. SUNMI V3)
     private lateinit var scanLauncher: ActivityResultLauncher<Intent>
+
+    // built-in SUNMI laser scan engine (SS1104) in Broadcast output mode → the code
+    // arrives here; we inject it into the web as a 'sunmi-hw-scan' event.
+    private val scanReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val code = intent?.getStringExtra("data")
+                ?: intent?.getStringExtra("code")
+                ?: intent?.getStringExtra("barcode")
+                ?: intent?.getStringExtra("SCAN_BARCODE1")
+                ?: return
+            if (code.isBlank()) return
+            val js = "window.dispatchEvent(new CustomEvent('sunmi-hw-scan',{detail:" + JSONObject.quote(code) + "}))"
+            runOnUiThread { if (::webView.isInitialized) webView.evaluateJavascript(js, null) }
+        }
+    }
 
     // Printable width in dots for a 58mm head (SUNMI V2/V3 = 384). An 80mm head = 576.
     private val printWidth = 384
@@ -115,6 +133,10 @@ class MainActivity : AppCompatActivity() {
         }
         webView.addJavascriptInterface(Bridge(), "SunmiBridge")
         webView.loadUrl(BuildConfig.APP_URL)
+
+        // listen for the SUNMI scan engine's broadcast (its default output mode)
+        val filter = IntentFilter("com.sunmi.scanner.ACTION_DATA_CODE_RECEIVED")
+        ContextCompat.registerReceiver(this, scanReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
     }
 
     /** Exposed to the web page as window.SunmiBridge.* */
@@ -161,6 +183,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         try { InnerPrinterManager.getInstance().unBindService(this, printerCallback) } catch (_: Exception) {}
+        try { unregisterReceiver(scanReceiver) } catch (_: Exception) {}
         super.onDestroy()
     }
 

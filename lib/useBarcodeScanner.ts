@@ -45,7 +45,19 @@ export function useBarcodeScanner(enabled: boolean, onScan: (code: string) => vo
       if (e.key.length === 1) buf += e.key;   // a single printable character
     };
 
+    // The SUNMI built-in laser scanner (SS1104) outputs via broadcast, which the
+    // native app forwards as a 'sunmi-hw-scan' event — accept it directly (no focus
+    // guard, it isn't keystrokes).
+    const onHw = (e: Event) => {
+      const code = String((e as CustomEvent).detail || "").trim();
+      if (code.length >= MIN_LEN) cb.current(code);
+    };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("sunmi-hw-scan", onHw as EventListener);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("sunmi-hw-scan", onHw as EventListener);
+    };
   }, [enabled]);
 }
