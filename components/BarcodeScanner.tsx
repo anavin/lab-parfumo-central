@@ -142,8 +142,16 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         stream = await getStream();
         if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
         video.srcObject = stream;
+        video.muted = true;                       // required for inline autoplay on mobile
+        video.setAttribute("muted", "true");
         video.setAttribute("playsinline", "true");
-        await video.play().catch(() => {});
+        (video as any).playsInline = true;
+        const tryPlay = () => { video.play().catch(() => {}); };
+        video.onloadedmetadata = tryPlay;         // some browsers only allow play() after metadata
+        tryPlay();
+        // a couple of nudges for stubborn mobile browsers that pause the stream
+        setTimeout(tryPlay, 300);
+        setTimeout(tryPlay, 1000);
 
         // Continuous autofocus — the single biggest fix for blurry, unreadable frames.
         const track = stream.getVideoTracks()[0];
@@ -260,7 +268,8 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         </div>
 
         <div className="relative bg-black aspect-[3/4]" onClick={refocus}>
-          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+          <video ref={videoRef} className="w-full h-full object-cover" muted autoPlay playsInline
+            onClick={() => videoRef.current?.play().catch(() => {})} />
 
           {/* torch */}
           {caps.torch && !paused && !error && !manual && (
