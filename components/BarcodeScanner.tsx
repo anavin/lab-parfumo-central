@@ -40,6 +40,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);   // false = show a big tap-to-start button
   const [count, setCount] = useState(0);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -146,7 +147,9 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         video.setAttribute("muted", "true");
         video.setAttribute("playsinline", "true");
         (video as any).playsInline = true;
-        const tryPlay = () => { video.play().catch(() => {}); };
+        video.onplaying = () => setPlaying(true);
+        video.onpause = () => setPlaying(false);
+        const tryPlay = () => { video.play().then(() => setPlaying(true)).catch(() => setPlaying(false)); };
         video.onloadedmetadata = tryPlay;         // some browsers only allow play() after metadata
         tryPlay();
         // a couple of nudges for stubborn mobile browsers that pause the stream
@@ -270,6 +273,16 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         <div className="relative bg-black aspect-[3/4]" onClick={refocus}>
           <video ref={videoRef} className="w-full h-full object-cover" muted autoPlay playsInline
             onClick={() => videoRef.current?.play().catch(() => {})} />
+
+          {/* big tap-to-start button — some mobile browsers won't autoplay the camera */}
+          {!playing && !error && (
+            <button type="button"
+              onClick={(e) => { e.stopPropagation(); const v = videoRef.current; if (v) { v.muted = true; v.play().then(() => setPlaying(true)).catch(() => {}); } }}
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 text-white">
+              <Camera className="w-12 h-12" />
+              <span className="text-base font-semibold">แตะเพื่อเปิดกล้อง</span>
+            </button>
+          )}
 
           {/* torch */}
           {caps.torch && !paused && !error && !manual && (
