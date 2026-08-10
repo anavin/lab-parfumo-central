@@ -91,23 +91,23 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={LOGO_DATA_URI} alt="LAB PARFUMO" className="mx-auto w-[155px] max-w-[70%] h-auto object-contain" />
-        <div className="text-[15px] font-bold mt-2 leading-snug">{t.company}</div>
-        <div className="text-[14px] leading-snug">{t.headOffice}</div>
-        <div className="text-[14px] leading-snug">{SHOP.branch}</div>
-        <div className="text-[13px] text-neutral-700 mt-1 leading-snug">{t.address}</div>
-        <div className="text-[14px] font-semibold mt-2">{t.taxId} {SHOP.taxId}</div>
-        <div className="text-[14px] font-semibold">{t.tel} {SHOP.tel}</div>
+        <div className="text-[16px] font-extrabold mt-2 leading-snug">{t.company}</div>
+        <div className="text-[15px] font-semibold leading-snug">{t.headOffice}</div>
+        <div className="text-[15px] font-semibold leading-snug">{SHOP.branch}</div>
+        <div className="text-[13px] font-medium text-neutral-800 mt-1 leading-snug">{t.address}</div>
+        <div className="text-[15px] font-bold mt-2">{t.taxId} {SHOP.taxId}</div>
+        <div className="text-[15px] font-bold">{t.tel} {SHOP.tel}</div>
       </div>
 
       <div className="border-t border-black my-3" />
-      <div className="text-[15px] font-bold">{t.doc}</div>
-      <div className="text-[14px] text-neutral-700">{receiptNo}</div>
+      <div className="text-[16px] font-extrabold">{t.doc}</div>
+      <div className="text-[15px] font-semibold text-neutral-800">{receiptNo}</div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
-      <div className="text-[14px] space-y-1">
-        <div className="flex justify-between gap-3"><span className="font-semibold">{t.salesperson}</span><span className="text-right">{salesperson || "-"}</span></div>
-        <div className="flex justify-between gap-3"><span className="font-semibold">{t.date}</span><span className="tabular-nums text-right">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
-        <div className="flex justify-between gap-3"><span className="font-semibold">{t.payment}</span><span className="text-right">{payMethod}</span></div>
+      <div className="text-[15px] space-y-1">
+        <div className="flex justify-between gap-3"><span className="font-semibold">{t.salesperson}</span><span className="font-bold text-right">{salesperson || "-"}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">{t.date}</span><span className="font-bold tabular-nums text-right">{ddmmyyyy(date)}{time ? ` ${time}` : ""}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-semibold">{t.payment}</span><span className="font-bold text-right">{payMethod}</span></div>
       </div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
@@ -132,7 +132,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       </div>
 
       <div className="border-t border-dashed border-neutral-400 my-3" />
-      <div className="text-[14px] font-semibold mb-2">{t.totalQty} {Math.round(totalQty)}</div>
+      <div className="text-[15px] font-bold mb-2">{t.totalQty} {Math.round(totalQty)}</div>
       <div className="space-y-1">
         <Row label={t.subtotal} value={nf(gross)} />
         <Row label={t.discount} value={nf(discount)} />
@@ -144,19 +144,19 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="border-t border-black mt-3 pt-2">
         <Row label={t.grandTotal} value={nf(net)} strong />
       </div>
-      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[14px] font-semibold">{t.vatIncluded}</div>
+      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[15px] font-bold">{t.vatIncluded}</div>
 
       <div className="text-center mt-4">
-        <div className="text-[14px] text-neutral-700 font-medium">{t.thanks}</div>
-        <div className="text-[12px] text-neutral-500 mt-1 leading-relaxed">{t.tel} {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
+        <div className="text-[15px] text-neutral-800 font-bold">{t.thanks}</div>
+        <div className="text-[13px] text-neutral-800 font-medium mt-1 leading-relaxed">{t.tel} {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
       </div>
 
       {/* follow / review QR (Linktree) */}
       <div className="text-center mt-4 pt-3 border-t border-dashed border-neutral-400">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={QR_DATA_URI} alt="Lab Parfumo QR" className="mx-auto w-[110px] h-[110px] object-contain" />
-        <div className="text-[13px] text-neutral-700 font-medium mt-1">{t.qrTitle}</div>
-        <div className="text-[12px] text-neutral-500">{t.qrSub}</div>
+        <img src={QR_DATA_URI} alt="Lab Parfumo QR" className="mx-auto w-[120px] h-[120px] object-contain" />
+        <div className="text-[14px] text-neutral-800 font-semibold mt-1">{t.qrTitle}</div>
+        <div className="text-[13px] text-neutral-700 font-medium">{t.qrSub}</div>
       </div>
     </div>
   );
