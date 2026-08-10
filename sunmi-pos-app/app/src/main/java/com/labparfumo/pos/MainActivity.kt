@@ -21,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import org.json.JSONObject
 import com.sunmi.peripheral.printer.InnerPrinterCallback
 import com.sunmi.peripheral.printer.InnerPrinterManager
 import com.sunmi.peripheral.printer.SunmiPrinterService
@@ -38,6 +39,9 @@ class MainActivity : AppCompatActivity() {
     // <input type=file capture> support — lets the "ถ่ายรูป" scanner open the camera app
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var fileChooser: ActivityResultLauncher<Intent>
+
+    // native barcode scanner (for WebViews that can't reach the camera, e.g. SUNMI V3)
+    private lateinit var scanLauncher: ActivityResultLauncher<Intent>
 
     // Printable width in dots for a 58mm head (SUNMI V2/V3 = 384). An 80mm head = 576.
     private val printWidth = 384
@@ -73,6 +77,17 @@ class MainActivity : AppCompatActivity() {
             cb?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
         }
 
+        // receives a scanned code from the native scanner → hand it to the web page
+        scanLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val code = result.data?.getStringExtra("code")
+                if (!code.isNullOrBlank()) {
+                    val js = "window.dispatchEvent(new CustomEvent('sunmi-scan',{detail:" + JSONObject.quote(code) + "}))"
+                    webView.evaluateJavascript(js, null)
+                }
+            }
+        }
+
         webView = WebView(this)
         setContentView(webView)
 
@@ -103,6 +118,15 @@ class MainActivity : AppCompatActivity() {
     inner class Bridge {
         @JavascriptInterface
         fun isReady(): Boolean = printer != null
+
+        /** Open the native barcode scanner; the result comes back via a
+         *  'sunmi-scan' window event carrying the decoded code. */
+        @JavascriptInterface
+        fun scanBarcode() {
+            runOnUiThread {
+                try { scanLauncher.launch(Intent(this@MainActivity, ScannerActivity::class.java)) } catch (_: Exception) {}
+            }
+        }
 
         @JavascriptInterface
         fun printImage(base64Png: String) {

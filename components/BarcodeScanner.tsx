@@ -42,6 +42,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);   // true once real frames are rendering
   const [stalled, setStalled] = useState(false);   // preview didn't start after a grace period
+  const [nativeMode, setNativeMode] = useState(false);   // using the SUNMI native scanner (no web camera)
   const [count, setCount] = useState(0);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -56,6 +57,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
   const voteRef = useRef<{ last: string; n: number }>({ last: "", n: 0 });   // consensus for unknown codes
   const trackRef = useRef<MediaStreamTrack | null>(null);                    // camera track for torch/zoom/focus
   const commitRef = useRef<(code: string) => void>(() => {});                // manual entry funnels here
+  const nativeRef = useRef(false);                                           // using the SUNMI native scanner?
   const [caps, setCaps] = useState<{ torch: boolean; zoom: { min: number; max: number; step: number } | null }>({ torch: false, zoom: null });
   const [torch, setTorch] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -159,6 +161,19 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
       if (v.last === code) v.n += 1; else { v.last = code; v.n = 1; }
       if (v.n >= UNKNOWN_CONFIRM) commit(code);
     };
+
+    // SUNMI native scanner: some WebViews (SUNMI V3) can't reach the camera via
+    // getUserMedia, so hand off to the app's native ML Kit scanner. Codes come back
+    // through a 'sunmi-scan' window event and funnel into the same onCode pipeline.
+    const bridge: any = (window as any).SunmiBridge;
+    if (bridge && typeof bridge.scanBarcode === "function") {
+      nativeRef.current = true;
+      setNativeMode(true); setPlaying(true); setStalled(false);
+      const onNative = (e: any) => { const code = e?.detail; if (code) onCode(String(code)); };
+      window.addEventListener("sunmi-scan", onNative as any);
+      try { bridge.scanBarcode(); } catch {}
+      return () => { stopped = true; window.removeEventListener("sunmi-scan", onNative as any); };
+    }
 
     // Grab the rear camera at the highest resolution the device will give — more
     // pixels on the barcode = far fewer "won't scan" misses. Fall back gracefully.
@@ -284,7 +299,11 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
     return () => clearTimeout(t);
   }, [error, checking, result]);
 
-  const scanNext = () => { setResult(null); voteRef.current = { last: "", n: 0 }; cooldownRef.current = Date.now() + 1000; pausedRef.current = false; };
+  const scanNext = () => {
+    setResult(null); voteRef.current = { last: "", n: 0 }; cooldownRef.current = Date.now() + 1000; pausedRef.current = false;
+    if (nativeRef.current) { try { (window as any).SunmiBridge?.scanBarcode?.(); } catch {} }   // reopen native scanner
+  };
+  const launchNative = () => { try { (window as any).SunmiBridge?.scanBarcode?.(); } catch {} };
   const paused = checking || result !== null;
 
   const applyTrack = (adv: any) => { trackRef.current?.applyConstraints({ advanced: [adv] }).catch(() => {}); };
@@ -338,6 +357,16 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
                 <Camera className="w-4 h-4" /> เปิดไม่ได้? กด “ถ่ายรูปบาร์โค้ด”
               </button>
             </div>
+          )}
+
+          {/* native scanner mode (SUNMI): the web camera is bypassed; tap to (re)open it */}
+          {nativeMode && !result && !checking && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); launchNative(); }}
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/85 text-white px-6 text-center">
+              <Camera className="w-14 h-14" />
+              <span className="text-base font-semibold">แตะเพื่อเปิดกล้องสแกน</span>
+              <span className="text-xs text-white/70">กล้องจะเปิดในแอป — จ่อบาร์โค้ดให้อยู่กลางจอ</span>
+            </button>
           )}
 
           {/* torch */}
