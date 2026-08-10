@@ -12,7 +12,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 4
-        versionName "1.3-splash"
+        versionName "1.3"
 
         // The web app the POS wraps. Change here if the URL ever changes.
         buildConfigField "String", "APP_URL", "\"https://lab-parfumo-central.vercel.app/login?next=/my\""
@@ -35,7 +35,7 @@ android {
     // (e.g. LabParfumoPOS-1.2-nativescan.apk) instead of a generic app-debug.apk
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
-            output.outputFileName = "LabParfumoPOS-${variant.versionName}.apk"
+            output.outputFileName = "lp${variant.versionName}.apk"
         }
     }
 }
