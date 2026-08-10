@@ -169,7 +169,8 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
     if (bridge && typeof bridge.scanBarcode === "function") {
       nativeRef.current = true;
       setNativeMode(true); setPlaying(true); setStalled(false);
-      const onNative = (e: any) => { const code = e?.detail; if (code) onCode(String(code)); };
+      // a native scan is one deliberate capture → accept it directly (no multi-read vote)
+      const onNative = (e: any) => { const code = e?.detail; if (code) commit(String(code)); };
       window.addEventListener("sunmi-scan", onNative as any);
       try { bridge.scanBarcode(); } catch {}
       return () => { stopped = true; window.removeEventListener("sunmi-scan", onNative as any); };

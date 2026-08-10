@@ -2,7 +2,16 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X } from "lucide-react";
-import { findProductByBarcode, productBarcodes } from "@/lib/actions/lookups";
+import { productBarcodes } from "@/lib/actions/lookups";
+
+// WebView-safe exact barcode lookup (GET JSON) — Next.js server actions don't run
+// on old WebViews (SUNMI), which silently broke scan-to-add. Returns product|null.
+async function lookupBarcode(code: string): Promise<any | null> {
+  try {
+    const r = await fetch(`/api/products/barcode?code=${encodeURIComponent(code)}`, { headers: { accept: "application/json" } });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -102,7 +111,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // Once a bill is open, BillForm's own scanner listener adds subsequent items.
   const scanToNewBill = (code: string) => start(async () => {
     try {
-      const p = await findProductByBarcode(code);
+      const p = await lookupBarcode(code);
       const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
                    : newItem({ barcode: code });
       setEdit(null); setAutoScan(false); setBill({ ...blankBill(today, false), items: [it] });
@@ -271,7 +280,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const clearMiss = (f: string) => setMissing((m) => m.filter((x) => x !== f));
 
   const onScanned = async (code: string): Promise<ScanResult> => {
-    const p = await findProductByBarcode(code);
+    const p = await lookupBarcode(code);
     if (p) {
       // POS convention: scanning the same product again bumps its quantity
       // instead of adding a duplicate line.
@@ -790,7 +799,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   };
   const onScanned = async (code: string) => {
     setScanning(false);
-    const p = await findProductByBarcode(code);
+    const p = await lookupBarcode(code);
     if (p) setState({ ...state, item: p.scent, barcode: p.barcode, size: p.size || state.size, unit_price: p.price ?? state.unit_price });
     else { setState({ ...state, barcode: code }); alert(`ไม่พบสินค้าบาร์โค้ดนี้ (${code}) — กรอกกลิ่นเองได้`); }
   };
