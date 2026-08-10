@@ -80,8 +80,8 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
     : payLabel(paymentChannel, lang);
 
   const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
-    <div className={`flex justify-between gap-3 ${strong ? "font-extrabold text-[19px]" : "font-medium text-[14px]"}`}>
-      <span className="text-neutral-700">{label}</span><span className="tabular-nums">{value}</span>
+    <div className={`flex justify-between gap-3 ${strong ? "font-extrabold text-[19px]" : "font-bold text-[14px]"}`}>
+      <span className={strong ? "text-neutral-700" : "text-black"}>{label}</span><span className="tabular-nums">{value}</span>
     </div>
   );
 
@@ -144,11 +144,13 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       <div className="border-t border-black mt-3 pt-2">
         <Row label={t.grandTotal} value={nf(net)} strong />
       </div>
-      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[15px] font-bold">{t.vatIncluded}</div>
+      <div className="border-t border-double border-black mt-3 pt-3 text-center text-[15px] font-bold leading-snug">
+        {(() => { const [main, ...rest] = t.vatIncluded.split(" ("); return <>{main}{rest.length ? <><br />({rest.join(" (")}</> : null}</>; })()}
+      </div>
 
       <div className="text-center mt-4">
         <div className="text-[15px] text-neutral-800 font-bold">{t.thanks}</div>
-        <div className="text-[13px] text-neutral-800 font-medium mt-1 leading-relaxed">{t.tel} {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
+        <div className="text-[13px] text-black font-bold mt-1 leading-relaxed">{t.tel} {SHOP.tel} · {SHOP.web}<br />IG &amp; LINE {SHOP.ig}</div>
       </div>
 
       {/* follow / review QR (Linktree) */}
