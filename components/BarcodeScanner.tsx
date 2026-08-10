@@ -312,12 +312,18 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
 
           {/* big tap-to-start button — some mobile browsers won't autoplay the camera */}
           {!playing && !error && (
-            <button type="button"
-              onClick={(e) => { e.stopPropagation(); const v = videoRef.current; if (v) { v.muted = true; v.play().then(() => setPlaying(true)).catch(() => {}); } }}
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 text-white">
-              <Camera className="w-12 h-12" />
-              <span className="text-base font-semibold">แตะเพื่อเปิดกล้อง</span>
-            </button>
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 text-white px-6 text-center">
+              <button type="button"
+                onClick={(e) => { e.stopPropagation(); const v = videoRef.current; if (v) { v.muted = true; v.play().then(() => setPlaying(true)).catch(() => {}); } }}
+                className="flex flex-col items-center gap-2">
+                <Camera className="w-12 h-12" />
+                <span className="text-base font-semibold">แตะเพื่อเปิดกล้อง</span>
+              </button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold">
+                <Camera className="w-4 h-4" /> เปิดไม่ได้? กด “ถ่ายรูปบาร์โค้ด”
+              </button>
+            </div>
           )}
 
           {/* torch */}
