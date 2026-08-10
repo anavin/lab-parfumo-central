@@ -1,6 +1,7 @@
 "use client";
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { ReviewDayContext } from "@/components/review-day-context";
 import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Receipt as ReceiptIcon } from "lucide-react";
 import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
@@ -120,6 +121,16 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   const approvedDays = groupDays(approved.filter(match));
   // show one day at a time (today by default); other days are picked from the dropdown
   const [approvedDate, setApprovedDate] = useState("");
+  // clicking a bar in the daily chart jumps this section to that day + opens + scrolls
+  const approvedRef = useRef<HTMLDivElement>(null);
+  const { day: pickedDay, nonce } = useContext(ReviewDayContext);
+  useEffect(() => {
+    if (!pickedDay) return;
+    setApprovedDate(pickedDay);
+    setShowApproved(true);
+    const t = setTimeout(() => approvedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    return () => clearTimeout(t);
+  }, [pickedDay, nonce]);
   const activeApprovedDate = approvedDate && approvedDays.some((d) => d.date === approvedDate)
     ? approvedDate
     : (approvedDays.find((d) => d.date === bkkToday())?.date ?? approvedDays[0]?.date ?? "");
@@ -311,7 +322,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
 
       {/* -------- approved bills (undo an approval) -------- */}
       {approvedDays.length > 0 && (
-        <div>
+        <div ref={approvedRef} className="scroll-mt-4">
           <button onClick={() => setShowApproved((v) => !v)}
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-canvas/60 text-ink hover:bg-canvas transition-colors">
             <ShieldCheck className="w-4 h-4 text-success shrink-0" />
