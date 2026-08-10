@@ -331,14 +331,15 @@ export async function pendingSubmissions() {
     order by s.created_by, s.entry_date, s.created_at`);
 }
 
-/** Recently approved submissions (last 7 days) so an admin can undo a wrong approval. */
+/** Recently approved submissions (last 30 days) so an admin can review/undo an
+ *  approval and still see its attached files well after the day it was approved. */
 export async function recentlyApprovedSubmissions() {
   return q<SubmissionRow>(`
     select ${SUB_COLS}
     from submissions s
     join users u on u.id = s.created_by
     left join users r on r.id = s.reviewed_by
-    where s.status = 'approved' and s.reviewed_at >= now() - interval '7 days'${await aliveAnd("s")}
+    where s.status = 'approved' and s.reviewed_at >= now() - interval '30 days'${await aliveAnd("s")}
     order by s.entry_date desc, s.created_at`);
 }
 
