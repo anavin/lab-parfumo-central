@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- rounded-square gold tile -->
+    <path android:pathData="M20,4 L88,4 A16,16 0 0 1 104,20 L104,88 A16,16 0 0 1 88,104 L20,104 A16,16 0 0 1 4,88 L4,20 A16,16 0 0 1 20,4 Z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="0" android:startY="0" android:endX="108" android:endY="108">
+                <item android:offset="0" android:color="#FFE7C873" />
+                <item android:offset="0.55" android:color="#FFC9A24B" />
+                <item android:offset="1" android:color="#FFA9812F" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- L -->
+    <path android:fillColor="#FF1E1A12" android:pathData="M39,40 L48,40 L48,64 L61,64 L61,72 L39,72 Z" />
+    <!-- P stem + bowl -->
+    <path android:fillColor="#FF1E1A12" android:pathData="M63,40 h9 v32 h-9 Z" />
+    <path android:fillColor="#FF1E1A12" android:pathData="M72,40 h3 a9,9 0 0 1 0,18 h-3 Z" />
+</vector>
