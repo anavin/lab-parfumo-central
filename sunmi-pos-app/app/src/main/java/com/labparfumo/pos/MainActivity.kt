@@ -54,9 +54,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // connect to the built-in printer service
+        // connect to the built-in printer service (SUNMI only; silent on phones without it)
         try { InnerPrinterManager.getInstance().bindService(this, printerCallback) }
-        catch (e: Exception) { toast("เชื่อมต่อเครื่องพิมพ์ไม่ได้: ${e.message}") }
+        catch (e: Exception) { /* no SUNMI printer on this device — ignore */ }
 
         // camera runtime permission (barcode scanner in the WebView)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
