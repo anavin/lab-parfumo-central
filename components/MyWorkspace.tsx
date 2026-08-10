@@ -2,15 +2,23 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X } from "lucide-react";
-import { productBarcodes } from "@/lib/actions/lookups";
-
-// WebView-safe exact barcode lookup (GET JSON) — Next.js server actions don't run
-// on old WebViews (SUNMI), which silently broke scan-to-add. Returns product|null.
+// The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
+// don't run on the SUNMI WebView) and cached, so barcode scans resolve instantly
+// instead of hitting the network per scan (slow on LTE).
+let _catalog: Map<string, any> | null = null;
+let _catalogPromise: Promise<Map<string, any>> | null = null;
+function loadCatalog(): Promise<Map<string, any>> {
+  if (_catalog) return Promise.resolve(_catalog);
+  return (_catalogPromise ??= fetch("/api/products/all", { headers: { accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : []))
+    .then((rows: any[]) => { _catalog = new Map((Array.isArray(rows) ? rows : []).map((p) => [String(p.barcode), p])); return _catalog; })
+    .catch(() => { _catalogPromise = null; return new Map<string, any>(); }));
+}
+// exact barcode → product, from the cached catalog (tolerates UPC/EAN leading-zero drift)
 async function lookupBarcode(code: string): Promise<any | null> {
-  try {
-    const r = await fetch(`/api/products/barcode?code=${encodeURIComponent(code)}`, { headers: { accept: "application/json" } });
-    return r.ok ? await r.json() : null;
-  } catch { return null; }
+  const map = await loadCatalog();
+  const bare = code.replace(/^0+/, "");
+  return map.get(code) ?? map.get(bare) ?? map.get("0" + code) ?? map.get("00" + code) ?? null;
 }
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -24,14 +32,14 @@ import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
 
-// All product barcodes, loaded once and cached, so the camera scanner can trust exact
-// matches instantly and reject misreads. Shared across every scanner on the page.
+// Known barcode set (for the camera to accept exact matches instantly) — built from
+// the same cached catalog. Loading it also warms the catalog before the first scan.
 let _barcodeCache: Set<string> | null = null;
 function useKnownBarcodes() {
   const [codes, setCodes] = useState<Set<string> | null>(_barcodeCache);
   useEffect(() => {
     if (_barcodeCache) return;
-    productBarcodes().then((list) => { _barcodeCache = new Set(list); setCodes(_barcodeCache); }).catch(() => {});
+    loadCatalog().then((map) => { _barcodeCache = new Set(map.keys()); setCodes(_barcodeCache); }).catch(() => {});
   }, []);
   return codes;
 }
@@ -92,6 +100,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const formRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
+  useEffect(() => { loadCatalog(); }, []);   // warm the product cache so the first scan is instant too
   const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast((t) => (t === msg ? null : t)), 2600); };
   // In production a server action's error is a generic "Server Components render"
   // message with a digest — usually a transient revalidation/render blip AFTER
