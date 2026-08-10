@@ -1,15 +1,16 @@
 "use server";
 import { q } from "@/lib/db";
+import { PRODUCT_SEARCH_ORDER } from "@/lib/product-order";
 
 export async function searchProducts(term: string) {
   // prefix match ("ขึ้นต้นด้วย" — ตรงจากตัวอักษรแรกตามตำแหน่ง): พิมพ์ B → Bu → Buo
-  // เจอเฉพาะกลิ่นที่ขึ้นต้นด้วยตัวนั้น (ไม่ใช่มีอยู่กลางคำ)
+  // เจอเฉพาะกลิ่นที่ขึ้นต้นด้วยตัวนั้น (ไม่ใช่มีอยู่กลางคำ) · เรียง featured ก่อน
   const t = `${(term ?? "").trim()}%`;
   return q<{ id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number }>(`
     select id, barcode, scent, grade, size, sku, price::float
     from products
     where scent ilike $1 or barcode ilike $1 or sku ilike $1
-    order by scent, (substring(size from '[0-9]+'))::int nulls last, size limit 25`, [t]);
+    ${PRODUCT_SEARCH_ORDER}`, [t]);
 }
 
 /** Exact-match a product by scanned barcode (for the sale form scanner). */
