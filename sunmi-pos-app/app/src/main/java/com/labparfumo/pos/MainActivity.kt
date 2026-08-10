@@ -1,9 +1,10 @@
 package com.labparfumo.pos
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.webkit.JavascriptInterface
@@ -13,6 +14,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.sunmi.peripheral.printer.InnerPrinterCallback
 import com.sunmi.peripheral.printer.InnerPrinterManager
 import com.sunmi.peripheral.printer.SunmiPrinterService
@@ -45,6 +48,14 @@ class MainActivity : AppCompatActivity() {
         // connect to the built-in printer service
         try { InnerPrinterManager.getInstance().bindService(this, printerCallback) }
         catch (e: Exception) { toast("เชื่อมต่อเครื่องพิมพ์ไม่ได้: ${e.message}") }
+
+        // camera runtime permission (barcode scanner in the WebView)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
+        }
+
+        // let a computer inspect this WebView at chrome://inspect (diagnose JS errors)
+        WebView.setWebContentsDebuggingEnabled(true)
 
         webView = WebView(this)
         setContentView(webView)

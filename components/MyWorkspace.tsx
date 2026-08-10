@@ -558,6 +558,7 @@ const Cell = ({ label, children, active = false }: { label: string; children: Re
 function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
+  const [searchErr, setSearchErr] = useState<string | null>(null);   // surfaced so WebView issues are visible
   const nameRef = useRef<HTMLInputElement>(null);
   // when this card was just added via "เพิ่มเอง", scroll it near the TOP (below the
   // header via scroll-mt) so the keyboard + the search dropdown below the box have
@@ -569,7 +570,15 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   }, [autoFocus]);
   // qty is a dropdown now (no keyboard) — just fill the product and close the list
   const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); };
-  const onName = (v: string) => { onChange({ item: v, barcode: "" }); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
+  const onName = (v: string) => {
+    onChange({ item: v, barcode: "" });
+    setSearchErr(null);
+    if (v.trim()) {
+      searchProducts(v)
+        .then((r) => { setRes(r); setAcOpen(true); })
+        .catch((e) => { setRes([]); setAcOpen(true); setSearchErr(String(e?.message || e) || "ค้นหาไม่สำเร็จ"); });
+    } else setAcOpen(false);
+  };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
   // clamp per-item discount to the line subtotal so the card never shows a
   // misleading negative total (mirrors the authoritative BillForm math).
@@ -593,6 +602,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
           {acOpen && res.length > 0 && <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
             {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <b className="text-ink">{p.size}</b> <span className="text-muted">· {p.barcode}</span></button>)}
           </div>}
+          {searchErr && <div className="absolute z-20 mt-1 w-full bg-danger-soft border border-danger/40 rounded-lg px-3 py-2 text-[11px] text-danger break-words">ค้นหาไม่สำเร็จ: {searchErr}</div>}
         </div>
         {/* size stays hidden WHILE searching (dropdown open) so the search field stays
             full-width & easy to read; it appears only after a product is chosen or the
