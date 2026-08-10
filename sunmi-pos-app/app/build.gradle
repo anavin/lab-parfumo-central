@@ -30,6 +30,14 @@ android {
     }
     kotlinOptions { jvmTarget = '17' }
     buildFeatures { buildConfig true }
+
+    // name the APK with its version so you can SEE which build you're installing
+    // (e.g. LabParfumoPOS-1.2-nativescan.apk) instead of a generic app-debug.apk
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            output.outputFileName = "LabParfumoPOS-${variant.versionName}.apk"
+        }
+    }
 }
 
 dependencies {
