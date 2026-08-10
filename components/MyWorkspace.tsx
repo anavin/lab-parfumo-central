@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X } from "lucide-react";
-import { searchProducts, findProductByBarcode, productBarcodes } from "@/lib/actions/lookups";
+import { findProductByBarcode, productBarcodes } from "@/lib/actions/lookups";
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -574,8 +574,10 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     onChange({ item: v, barcode: "" });
     setSearchErr(null);
     if (v.trim()) {
-      searchProducts(v)
-        .then((r) => { setRes(r); setAcOpen(true); })
+      // plain GET JSON (WebView-friendly) instead of a server action
+      fetch(`/api/products/search?q=${encodeURIComponent(v.trim())}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+        .then((r) => { setRes(Array.isArray(r) ? r : []); setAcOpen(true); })
         .catch((e) => { setRes([]); setAcOpen(true); setSearchErr(String(e?.message || e) || "ค้นหาไม่สำเร็จ"); });
     } else setAcOpen(false);
   };
@@ -777,7 +779,15 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => s(k, e.target.value.replace(/^0+(?=\d)/, "")),
   });
-  const onItem = (v: string) => { s("item", v); if (v.trim()) searchProducts(v).then((r) => { setRes(r); setAcOpen(true); }); else setAcOpen(false); };
+  const onItem = (v: string) => {
+    s("item", v);
+    if (v.trim()) {
+      fetch(`/api/products/search?q=${encodeURIComponent(v.trim())}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((r) => { setRes(Array.isArray(r) ? r : []); setAcOpen(true); })
+        .catch(() => setAcOpen(false));
+    } else setAcOpen(false);
+  };
   const onScanned = async (code: string) => {
     setScanning(false);
     const p = await findProductByBarcode(code);
