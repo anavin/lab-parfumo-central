@@ -122,6 +122,9 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
     // Grab the rear camera at the highest resolution the device will give — more
     // pixels on the barcode = far fewer "won't scan" misses. Fall back gracefully.
     const getStream = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("no-mediaDevices");   // old WebView / insecure context
+      }
       const tries: MediaStreamConstraints[] = [
         { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
         { video: { facingMode: { ideal: "environment" } }, audio: false },
@@ -195,11 +198,18 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         };
         raf = requestAnimationFrame(tick);
       } catch (e: any) {
-        setError(
-          e?.name === "NotAllowedError"
-            ? "ไม่ได้รับอนุญาตให้ใช้กล้อง — เปิดสิทธิ์กล้องในเบราว์เซอร์แล้วลองใหม่"
-            : "เปิดกล้องไม่ได้ — ต้องเปิดผ่าน https และเบราว์เซอร์รองรับกล้อง"
-        );
+        const detail = [e?.name, e?.message].filter(Boolean).join(": ");
+        const msg =
+          e?.message === "no-mediaDevices" || !navigator.mediaDevices
+            ? "อุปกรณ์นี้เปิดกล้องในหน้าเว็บไม่ได้ (WebView เก่า/ไม่รองรับ) — ใช้เครื่องสแกนบาร์โค้ด หรือพิมพ์ค้นหาชื่อแทนได้"
+            : e?.name === "NotAllowedError"
+            ? "ไม่ได้รับอนุญาตให้ใช้กล้อง — เปิดสิทธิ์กล้องของแอป/เบราว์เซอร์แล้วลองใหม่"
+            : e?.name === "NotReadableError"
+            ? "กล้องถูกแอปอื่นใช้อยู่ — ปิดแอปกล้องอื่นแล้วลองใหม่"
+            : e?.name === "NotFoundError"
+            ? "ไม่พบกล้องบนอุปกรณ์นี้"
+            : "เปิดกล้องไม่ได้ — ต้องเปิดผ่าน https และอุปกรณ์รองรับกล้อง";
+        setError(msg + (detail && detail !== "Error: no-mediaDevices" ? ` · [${detail}]` : ""));
       }
     })();
 
