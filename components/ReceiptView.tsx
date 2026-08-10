@@ -1,9 +1,18 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Printer, ArrowLeft, Download, Mail, Check, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { emailReceipt } from "@/lib/actions/receipt";
 import { Receipt, type ReceiptItem, type ReceiptTender, type ReceiptLang } from "./Receipt";
+
+// Bridge injected by the SUNMI Android wrapper app (sunmi-pos-app). When the
+// receipt page runs inside that WebView, window.SunmiBridge lets us print the
+// on-screen receipt straight to the device's built-in thermal printer.
+declare global {
+  interface Window {
+    SunmiBridge?: { printImage?: (base64Png: string) => void; isReady?: () => boolean };
+  }
+}
 
 // Client wrapper: TH/EN language toggle + server-PDF actions, around the on-screen receipt.
 // Both buttons use the server-rendered PDF (always 1 clean page) instead of the browser's
@@ -18,6 +27,30 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
   const [sending, startSend] = useTransition();
   const [sent, setSent] = useState(false);
   const [mailErr, setMailErr] = useState<string | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [nativePrinter, setNativePrinter] = useState(false);   // running inside the SUNMI app?
+  const [thermalBusy, setThermalBusy] = useState(false);
+  const [thermalErr, setThermalErr] = useState<string | null>(null);
+
+  useEffect(() => { setNativePrinter(typeof window !== "undefined" && !!window.SunmiBridge?.printImage); }, []);
+
+  // Render the on-screen receipt to a PNG and hand it to the SUNMI app to print
+  // on the built-in thermal head. Rendered at 2× for a crisp 58mm slip.
+  const printThermal = async () => {
+    if (!sheetRef.current) return;
+    setThermalBusy(true); setThermalErr(null);
+    try {
+      const el = sheetRef.current.querySelector<HTMLElement>(".receipt") ?? sheetRef.current;
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+      const base64 = canvas.toDataURL("image/png").split(",")[1] || "";
+      if (!base64) throw new Error("empty image");
+      window.SunmiBridge?.printImage?.(base64);
+    } catch (e) {
+      console.error("[thermal] print failed", e);
+      setThermalErr("พิมพ์ไม่สำเร็จ ลองใหม่อีกครั้ง");
+    } finally { setThermalBusy(false); }
+  };
 
   const sendEmail = () => {
     setMailErr(null); setSent(false);
@@ -70,6 +103,16 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
             <Printer className="w-4 h-4 shrink-0" /> พิมพ์
           </a>
         </div>
+        {/* thermal print — only inside the SUNMI app (built-in printer) */}
+        {nativePrinter && (
+          <div>
+            <button onClick={printThermal} disabled={thermalBusy}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold whitespace-nowrap hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
+              {thermalBusy ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Printer className="w-4 h-4 shrink-0" />} พิมพ์สลิป (เครื่องนี้)
+            </button>
+            {thermalErr && <div className="mt-1.5 text-xs text-danger">{thermalErr}</div>}
+          </div>
+        )}
         {/* row 3: email the receipt to the customer (also collects their email) */}
         <div>
           <div className="flex gap-2">
@@ -86,7 +129,7 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
           {mailErr && <div className="mt-1.5 text-xs text-danger">{mailErr}</div>}
         </div>
       </div>
-      <div className="print-area receipt-sheet rounded-xl border border-line shadow-sm bg-white text-black">
+      <div ref={sheetRef} className="print-area receipt-sheet rounded-xl border border-line shadow-sm bg-white text-black">
         <Receipt lang={lang} receiptNo={receiptNo} date={date} time={time} salesperson={salesperson}
           items={items} paymentChannel={paymentChannel} tenders={tenders} />
       </div>

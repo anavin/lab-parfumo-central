@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        // SUNMI printer SDK (com.sunmi:printerlibrary). If this repo ever fails to
+        // resolve, see README "ถ้า SDK โหลดไม่ได้".
+        maven { url 'https://maven.sunmi.com/repository/releases/' }
+        maven { url 'https://jitpack.io' }
+    }
+}
+rootProject.name = "LabParfumoPOS"
+include ':app'
