@@ -80,13 +80,13 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
     : payLabel(paymentChannel, lang);
 
   const Row = ({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) => (
-    <div className={`flex justify-between gap-3 ${strong ? "font-bold text-[15px]" : "text-[14px]"}`}>
-      <span className="text-neutral-600">{label}</span><span className="tabular-nums">{value}</span>
+    <div className={`flex justify-between gap-3 ${strong ? "font-extrabold text-[19px]" : "font-medium text-[14px]"}`}>
+      <span className="text-neutral-700">{label}</span><span className="tabular-nums">{value}</span>
     </div>
   );
 
   return (
-    <div className="receipt mx-auto w-[302px] bg-white text-black px-3 py-6 font-sans">
+    <div className="receipt mx-auto w-[302px] bg-white text-black px-3 py-6 font-sans font-medium">
       {/* header */}
       <div className="text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -114,14 +114,14 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
       {/* items: qty · name · amount (gross per line) */}
       <div className="space-y-2">
         {items.map((it, i) => (
-          <div key={i} className="text-[14px]">
-            <div className="flex gap-2">
+          <div key={i} className="text-[16px]">
+            <div className="flex gap-2 font-bold">
               <span className="w-7 shrink-0 tabular-nums">{Math.round(it.qty)}</span>
               <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}</span>
               <span className="tabular-nums text-right">{nf(lineFull(it))}</span>
             </div>
             {it.discount > 0 && (
-              <div className="flex gap-2 text-neutral-500">
+              <div className="flex gap-2 text-[14px] font-medium text-neutral-700">
                 <span className="w-7 shrink-0" />
                 <span className="flex-1 min-w-0 pl-2">{t.lineDiscount}</span>
                 <span className="tabular-nums text-right">-{nf(it.discount)}</span>
