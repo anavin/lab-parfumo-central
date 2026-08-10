@@ -40,7 +40,8 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [playing, setPlaying] = useState(false);   // false = show a big tap-to-start button
+  const [playing, setPlaying] = useState(false);   // true once real frames are rendering
+  const [stalled, setStalled] = useState(false);   // preview didn't start after a grace period
   const [count, setCount] = useState(0);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -103,11 +104,14 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
     const video = videoRef.current!;
     let stream: MediaStream | null = null;
     let raf = 0;
+    let playPoll: any = 0;
     let stopped = false;
+    setPlaying(false); setStalled(false);
 
     const stopAll = () => {
       stopped = true;
       if (raf) cancelAnimationFrame(raf);
+      if (playPoll) clearInterval(playPoll);
       stream?.getTracks().forEach((t) => t.stop());
     };
 
@@ -183,14 +187,23 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         video.setAttribute("muted", "true");
         video.setAttribute("playsinline", "true");
         (video as any).playsInline = true;
-        video.onplaying = () => setPlaying(true);
-        video.onpause = () => setPlaying(false);
-        const tryPlay = () => { video.play().then(() => setPlaying(true)).catch(() => setPlaying(false)); };
+        const tryPlay = () => { video.play().catch(() => {}); };
         video.onloadedmetadata = tryPlay;         // some browsers only allow play() after metadata
+        video.onplaying = () => setPlaying(true);
         tryPlay();
         // a couple of nudges for stubborn mobile browsers that pause the stream
         setTimeout(tryPlay, 300);
         setTimeout(tryPlay, 1000);
+        // Poll actual playback instead of trusting the 'playing' event (some WebViews
+        // never fire it even while the preview renders fine) — this is what makes the
+        // tap-to-start overlay disappear correctly on both phones and the SUNMI.
+        playPoll = setInterval(() => {
+          if (stopped) return;
+          const live = !video.paused && video.readyState >= 2 && video.videoWidth > 0;
+          if (live) setPlaying(true);
+        }, 350);
+        // if no frames after a grace period, reveal the tap/photo fallback
+        setTimeout(() => { if (!stopped && (video.paused || !video.videoWidth)) setStalled(true); }, 2500);
 
         // Continuous autofocus — the single biggest fix for blurry, unreadable frames.
         const track = stream.getVideoTracks()[0];
@@ -310,8 +323,9 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
           <video ref={videoRef} className="w-full h-full object-cover" muted autoPlay playsInline
             onClick={() => videoRef.current?.play().catch(() => {})} />
 
-          {/* big tap-to-start button — some mobile browsers won't autoplay the camera */}
-          {!playing && !error && (
+          {/* tap-to-start / photo fallback — only after the preview truly fails to start,
+              so it never covers a working camera on phones/POS where 'playing' lags */}
+          {!playing && stalled && !error && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 text-white px-6 text-center">
               <button type="button"
                 onClick={(e) => { e.stopPropagation(); const v = videoRef.current; if (v) { v.muted = true; v.play().then(() => setPlaying(true)).catch(() => {}); } }}
