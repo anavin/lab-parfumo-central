@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.LabParfumoPOS" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:statusBarColor">#111111</item>
+        <item name="android:statusBarColor">#171209</item>
+        <item name="android:windowBackground">#171209</item>
     </style>
 </resources>

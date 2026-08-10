@@ -88,8 +88,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        webView = WebView(this)
-        setContentView(webView)
+        setContentView(R.layout.activity_main)
+        webView = findViewById(R.id.webview)
+        val splash = findViewById<android.view.View>(R.id.splash)
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -109,7 +110,9 @@ class MainActivity : AppCompatActivity() {
                 catch (e: Exception) { filePathCallback = null; false }
             }
         }
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) { splash.visibility = android.view.View.GONE }
+        }
         webView.addJavascriptInterface(Bridge(), "SunmiBridge")
         webView.loadUrl(BuildConfig.APP_URL)
     }
