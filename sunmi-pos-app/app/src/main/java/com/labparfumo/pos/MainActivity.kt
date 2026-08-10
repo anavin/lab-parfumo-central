@@ -144,6 +144,12 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isReady(): Boolean = printer != null
 
+        /** True on SUNMI hardware — the WebView camera doesn't work there, but a
+         *  built-in laser scan engine does, so the web should skip the camera popup
+         *  and just let laser broadcasts feed the bill continuously. */
+        @JavascriptInterface
+        fun hasScanEngine(): Boolean = android.os.Build.MANUFACTURER.equals("SUNMI", ignoreCase = true)
+
         /** Open the native barcode scanner; the result comes back via a
          *  'sunmi-scan' window event carrying the decoded code. */
         @JavascriptInterface

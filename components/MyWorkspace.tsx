@@ -101,6 +101,15 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
   useEffect(() => { loadCatalog(); }, []);   // warm the product cache so the first scan is instant too
+  // laserMode = SUNMI hardware laser scanner (no working WebView camera). Skip the
+  // black camera popup entirely and let laser broadcasts feed the bill continuously.
+  const [laserMode, setLaserMode] = useState(false);
+  useEffect(() => {
+    if ((window as any).SunmiBridge?.hasScanEngine?.()) setLaserMode(true);
+    const on = () => setLaserMode(true);                 // any laser shot = confirm it's a laser device
+    window.addEventListener("sunmi-hw-scan", on);
+    return () => window.removeEventListener("sunmi-hw-scan", on);
+  }, []);
   const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast((t) => (t === msg ? null : t)), 2600); };
   // In production a server action's error is a generic "Server Components render"
   // message with a digest — usually a transient revalidation/render blip AFTER
@@ -113,7 +122,13 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   };
 
   // new sales are always recorded for TODAY (not the day being reviewed)
-  const startScan = () => { setLastReceipt(null); setEdit(null); setAutoScan(true); setBill(blankBill(today, false)); };
+  // On SUNMI (laser) don't open the camera popup — just open an empty bill; the
+  // laser then adds items continuously. Elsewhere, auto-open the camera scanner.
+  const startScan = () => {
+    setLastReceipt(null); setEdit(null);
+    if (laserMode) { setAutoScan(false); setBill(blankBill(today, false)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
+    setAutoScan(true); setBill(blankBill(today, false));
+  };
   const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(today, true)); };
 
   // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
@@ -228,7 +243,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
           คุณกำลังดูวันย้อนหลัง — บิลนี้จะบันทึกลง <b>วันนี้</b> ตามปกติ
         </div>
       )}
-      {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan}
+      {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan} laserMode={laserMode}
         onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
 
       {edit && <SaleForm state={edit} setState={setEdit} pending={pending} fullName={fullName}
@@ -268,10 +283,10 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
 }
 
 // ---------------------------------------------------------------- bill builder
-function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean;
+function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false }: {
+  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean;
 }) {
-  const [scanning, setScanning] = useState(!!autoScan);
+  const [scanning, setScanning] = useState(!!autoScan && !laserMode);
   const knownCodes = useKnownBarcodes();
   const [missing, setMissing] = useState<string[]>([]);
   const [qrKey, setQrKey] = useState(0);   // bump to re-pop the K Shop QR (even on same-value pick)
@@ -415,7 +430,11 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
       {/* add item */}
       <div className="flex gap-2 mb-2">
-        <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
+        {laserMode ? (
+          <div className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-brand/50 bg-brand-soft text-brand-dark text-sm font-semibold"><ScanLine className="w-4 h-4" /> ยิง laser ที่บาร์โค้ดได้เลย</div>
+        ) : (
+          <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
+        )}
         <button onClick={addManual} disabled={hasEmptyItem} title={hasEmptyItem ? "กรอกกลิ่นของรายการก่อนหน้าก่อน" : undefined} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-surface"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
       </div>
       {/* hardware scanner status / last-scan feedback */}

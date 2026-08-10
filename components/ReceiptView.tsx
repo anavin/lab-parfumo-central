@@ -10,7 +10,7 @@ import { Receipt, type ReceiptItem, type ReceiptTender, type ReceiptLang } from 
 // on-screen receipt straight to the device's built-in thermal printer.
 declare global {
   interface Window {
-    SunmiBridge?: { printImage?: (base64Png: string) => void; isReady?: () => boolean; scanBarcode?: () => void };
+    SunmiBridge?: { printImage?: (base64Png: string) => void; isReady?: () => boolean; scanBarcode?: () => void; hasScanEngine?: () => boolean };
   }
 }
 
