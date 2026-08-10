@@ -1,14 +1,21 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- kept inside the adaptive-icon safe zone (~center 66dp) -->
-    <!-- L -->
-    <path android:fillColor="#FF1E1A12"
-        android:pathData="M39,40 L48,40 L48,64 L61,64 L61,72 L39,72 Z" />
-    <!-- P (stem) -->
-    <path android:fillColor="#FF1E1A12"
-        android:pathData="M63,40 h9 v32 h-9 Z" />
-    <!-- P (bowl) -->
-    <path android:fillColor="#FF1E1A12"
-        android:pathData="M72,40 h3 a9,9 0 0 1 0,18 h-3 Z" />
+    <!-- thin gold monogram frame (inside the adaptive safe zone) -->
+    <path android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:strokeColor="#C9A24B"
+        android:pathData="M32,24 h44 a8,8 0 0 1 8,8 v44 a8,8 0 0 1 -8,8 h-44 a8,8 0 0 1 -8,-8 v-44 a8,8 0 0 1 8,-8 Z" />
+
+    <!-- LP monogram, gold foil gradient -->
+    <path android:pathData="M35,38 h6 v28 h12 v6 h-18 Z M55,38 h6 v34 h-6 Z M61,38 h4 a9,9 0 0 1 0,18 h-4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="35" android:startY="36" android:endX="74" android:endY="72">
+                <item android:offset="0" android:color="#FFF6E4A8" />
+                <item android:offset="0.5" android:color="#FFD8B25A" />
+                <item android:offset="1" android:color="#FFA9812F" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

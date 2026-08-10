@@ -1,20 +1,41 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- rounded-square gold tile -->
+    <!-- dark rounded-square tile -->
     <path android:pathData="M20,4 L88,4 A16,16 0 0 1 104,20 L104,88 A16,16 0 0 1 88,104 L20,104 A16,16 0 0 1 4,88 L4,20 A16,16 0 0 1 20,4 Z">
-        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+        <aapt:attr name="android:fillColor">
             <gradient android:type="linear"
-                android:startX="0" android:startY="0" android:endX="108" android:endY="108">
-                <item android:offset="0" android:color="#FFE7C873" />
-                <item android:offset="0.55" android:color="#FFC9A24B" />
+                android:startX="8" android:startY="4" android:endX="100" android:endY="104">
+                <item android:offset="0" android:color="#FF2A2117" />
+                <item android:offset="0.5" android:color="#FF171209" />
+                <item android:offset="1" android:color="#FF0C0A06" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- gold sheen -->
+    <path android:pathData="M20,4 L88,4 A16,16 0 0 1 104,20 L104,88 A16,16 0 0 1 88,104 L20,104 A16,16 0 0 1 4,88 L4,20 A16,16 0 0 1 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial"
+                android:centerX="34" android:centerY="28" android:gradientRadius="82">
+                <item android:offset="0" android:color="#40E7C873" />
+                <item android:offset="0.55" android:color="#12C9A24B" />
+                <item android:offset="1" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- thin gold border -->
+    <path android:strokeWidth="1.3" android:fillColor="#00000000" android:strokeColor="#B8933F"
+        android:pathData="M22,10 h64 a12,12 0 0 1 12,12 v64 a12,12 0 0 1 -12,12 h-64 a12,12 0 0 1 -12,-12 v-64 a12,12 0 0 1 12,-12 Z" />
+    <!-- LP monogram, gold foil -->
+    <path android:pathData="M35,38 h6 v28 h12 v6 h-18 Z M55,38 h6 v34 h-6 Z M61,38 h4 a9,9 0 0 1 0,18 h-4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="35" android:startY="36" android:endX="74" android:endY="72">
+                <item android:offset="0" android:color="#FFF6E4A8" />
+                <item android:offset="0.5" android:color="#FFD8B25A" />
                 <item android:offset="1" android:color="#FFA9812F" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- L -->
-    <path android:fillColor="#FF1E1A12" android:pathData="M39,40 L48,40 L48,64 L61,64 L61,72 L39,72 Z" />
-    <!-- P stem + bowl -->
-    <path android:fillColor="#FF1E1A12" android:pathData="M63,40 h9 v32 h-9 Z" />
-    <path android:fillColor="#FF1E1A12" android:pathData="M72,40 h3 a9,9 0 0 1 0,18 h-3 Z" />
 </vector>
