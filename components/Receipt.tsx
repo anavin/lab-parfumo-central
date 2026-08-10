@@ -94,7 +94,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
         <div className="text-[16px] font-extrabold mt-2 leading-snug">{t.company}</div>
         <div className="text-[15px] font-semibold leading-snug">{t.headOffice}</div>
         <div className="text-[15px] font-semibold leading-snug">{SHOP.branch}</div>
-        <div className="text-[13px] font-medium text-neutral-800 mt-1 leading-snug">{t.address}</div>
+        <div className="text-[13px] font-bold text-black mt-1 leading-snug">{t.address}</div>
         <div className="text-[15px] font-bold mt-2">{t.taxId} {SHOP.taxId}</div>
         <div className="text-[15px] font-bold">{t.tel} {SHOP.tel}</div>
       </div>
