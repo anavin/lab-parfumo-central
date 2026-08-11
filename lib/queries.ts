@@ -192,37 +192,60 @@ export function monthlyCash() {
     order by date_trunc('month',cash_date)`);
 }
 
-// ---- stock (computed live from requisitions − sales) ----------------------
+// ---- stock (computed live from requisitions − sales), per branch ----------
+// Each leg is keyed to a canonical branch code (CTW/SCS): shipments + returns
+// derive it from the "0N_XXX …" branch_label token; sales use sales.source.
 const STOCK_CTE = `
   with ship as (
-    select i.barcode, sum(i.qty)::float q from po_items i
+    select i.barcode,
+           upper(coalesce(substring(po.branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
+           sum(i.qty)::float q
+    from po_items i
     join purchase_orders po on po.id = i.po_id
-    where i.barcode is not null and po.deleted_at is null group by i.barcode),
+    where i.barcode is not null and po.deleted_at is null group by 1, 2),
   sold as (
-    select barcode, sum(qty)::float q from sales
-    where barcode is not null group by barcode),
+    select barcode, upper(coalesce(nullif(source,''),'CTW')) branch, sum(qty)::float q
+    from sales where barcode is not null group by 1, 2),
   ret as (
-    select serial as barcode, count(*)::float q from return_items
-    where serial is not null and receive_status='Returned' group by serial),
+    select serial as barcode,
+           upper(coalesce(substring(branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
+           count(*)::float q
+    from return_items where serial is not null and receive_status='Returned' group by 1, 2),
+  keys as (
+    select barcode, branch from ship
+    union select barcode, branch from sold
+    union select barcode, branch from ret),
   stock as (
-    select p.barcode, p.scent, p.size,
-           coalesce(ship.q,0) shipped, coalesce(sold.q,0) sold,
-           coalesce(ret.q,0) returned,
+    select p.barcode, p.scent, p.size, k.branch,
+           coalesce(ship.q,0) shipped, coalesce(sold.q,0) sold, coalesce(ret.q,0) returned,
            -- returns go back to HQ (leave the branch), so subtract them from stock
            coalesce(ship.q,0) - coalesce(sold.q,0) - coalesce(ret.q,0) remaining
-    from products p
-    left join ship on ship.barcode = p.barcode
-    left join sold on sold.barcode = p.barcode
-    left join ret  on ret.barcode  = p.barcode
-    where coalesce(ship.q,0) > 0 or coalesce(sold.q,0) > 0)
+    from keys k
+    join products p on p.barcode = k.barcode
+    left join ship on ship.barcode = k.barcode and ship.branch = k.branch
+    left join sold on sold.barcode = k.barcode and sold.branch = k.branch
+    left join ret  on ret.barcode  = k.barcode and ret.branch  = k.branch)
 `;
 
-export function stockLive() {
+/** Live stock rows. Pass a branch code for that branch only; null/undefined =
+ *  all branches combined (summed per product, i.e. the whole-company view). */
+export function stockLive(branch: string | null = null) {
   return q<{ barcode: string; scent: string; size: string; shipped: number; sold: number; returned: number; remaining: number }>(
-    `${STOCK_CTE} select * from stock order by remaining asc, scent`);
+    branch
+      ? `${STOCK_CTE} select barcode, scent, size, shipped, sold, returned, remaining
+         from stock where branch = $1 order by remaining asc, scent`
+      : `${STOCK_CTE} select barcode, scent, size,
+           sum(shipped)::float shipped, sum(sold)::float sold,
+           sum(returned)::float returned, sum(remaining)::float remaining
+         from stock group by barcode, scent, size order by remaining asc, scent`,
+    branch ? [branch] : []);
 }
 
-export async function stockSummary() {
+export async function stockSummary(branch: string | null = null) {
+  const inner = branch
+    ? `select remaining, shipped, sold from stock where branch = $1`
+    : `select sum(remaining)::float remaining, sum(shipped)::float shipped, sum(sold)::float sold
+       from stock group by barcode`;
   const [r] = await q<{ shipped: number; sold: number; remaining: number; skus: number; out: number; low: number }>(
     `${STOCK_CTE}
      select coalesce(sum(shipped),0)::float shipped,
@@ -231,7 +254,8 @@ export async function stockSummary() {
             count(*)::int skus,
             count(*) filter (where remaining <= 0)::int out,
             count(*) filter (where remaining > 0 and remaining <= 3)::int low
-     from stock`);
+     from (${inner}) x`,
+    branch ? [branch] : []);
   return r;
 }
 

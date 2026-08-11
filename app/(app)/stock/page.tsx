@@ -5,18 +5,24 @@ import { ExportButton } from "@/components/ExportButton";
 import { StockTable } from "@/components/StockTable";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
+import { BranchTabs } from "@/components/BranchTabs";
+import { isBranch, branchName } from "@/lib/branches";
 import { Package, AlertTriangle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function StockPage() {
-  const [rows, s, user] = await Promise.all([stockLive(), stockSummary(), getCurrentUser()]);
+export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
+  const sp = await searchParams;
+  const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
+  const [rows, s, user] = await Promise.all([stockLive(branch), stockSummary(branch), getCurrentUser()]);
   const lowCount = (s.low ?? 0) + (s.out ?? 0);
   const canRequisition = !!user && can(user, "requisitions");
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
-      <PageHeader icon={Package} title="สต๊อกคงเหลือ" subtitle="คำนวณสดจาก ส่งไป − ขาย (อัปเดตอัตโนมัติเมื่อบันทึกส่ง/ขาย)" action={<ExportButton kind="stock" />} />
+      <PageHeader icon={Package} title="สต๊อกคงเหลือ"
+        subtitle={`คำนวณสดจาก ส่งไป − ขาย · ${branch ? branchName(branch) : "ทุกสาขา"}`}
+        action={<div className="flex items-center gap-2"><BranchTabs withAll /><ExportButton kind="stock" /></div>} />
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Stat label="คงเหลือรวม" value={num(s.remaining)} tone="success" />
         <Stat label="ส่งไปทั้งหมด" value={num(s.shipped)} />
