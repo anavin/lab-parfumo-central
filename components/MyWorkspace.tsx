@@ -121,15 +121,16 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
     else alert(e?.message ?? "ทำรายการไม่สำเร็จ");
   };
 
-  // new sales are always recorded for TODAY (not the day being reviewed)
+  // new bills record for the day being VIEWED (today, or a back-dated day picked
+  // via the date selector) so sales can be logged retroactively.
   // On SUNMI (laser) don't open the camera popup — just open an empty bill; the
   // laser then adds items continuously. Elsewhere, auto-open the camera scanner.
   const startScan = () => {
     setLastReceipt(null); setEdit(null);
-    if (laserMode) { setAutoScan(false); setBill(blankBill(today, false)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
-    setAutoScan(true); setBill(blankBill(today, false));
+    if (laserMode) { setAutoScan(false); setBill(blankBill(date, false)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
+    setAutoScan(true); setBill(blankBill(date, false));
   };
-  const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(today, true)); };
+  const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(date, true)); };
 
   // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
   // Once a bill is open, BillForm's own scanner listener adds subsequent items.
@@ -138,7 +139,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       const p = await lookupBarcode(code);
       const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
                    : newItem({ barcode: code });
-      setEdit(null); setAutoScan(false); setBill({ ...blankBill(today, false), items: [it] });
+      setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false), items: [it] });
       try { navigator.vibrate?.(40); } catch {}
     } catch (e: any) { onActionError(e); }
   });
@@ -162,8 +163,9 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       setBill(null);
       if (res?.ref) setLastReceipt({ ref: res.ref, net: net ?? 0 });
       flash(`บันทึกบิลแล้ว · ${baht(net ?? 0)}`);
-      // the sale is recorded for today — jump to today's view so it's visible
-      if (viewingPast) router.push("/my"); else refresh();
+      // the sale is recorded for the day being viewed (today, or a back-dated day) —
+      // stay on that day so the new bill is visible
+      refresh();
     } catch (e: any) { onActionError(e, () => setBill(null)); }
   });
 
@@ -239,8 +241,8 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       )}
 
       {bill && viewingPast && (
-        <div className="mb-3 text-sm bg-warn-soft border border-warn/30 text-warn rounded-lg px-4 py-2.5">
-          คุณกำลังดูวันย้อนหลัง — บิลนี้จะบันทึกลง <b>วันนี้</b> ตามปกติ
+        <div className="mb-3 text-sm bg-brand-soft border border-brand/30 text-brand-dark rounded-lg px-4 py-2.5">
+          📅 บันทึกย้อนหลัง — บิลนี้จะลง <b>วันที่ {new Date(date + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "2-digit" })}</b> (วันที่คุณกำลังดู)
         </div>
       )}
       {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan} laserMode={laserMode}
