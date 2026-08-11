@@ -737,6 +737,29 @@ export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) 
       prevClosing = r.closing;
     }
     return rows;
+  } catch (e) {
+    if (missingDailyCash(e)) return [];
+    if ((e as any)?.code === "42703") return dailyCashLogLegacy(limit);   // branch/seed not migrated yet
+    throw e;
+  }
+}
+
+/** Pre-multi-branch fallback for the admin drawer table: single shared drawer, no seed. */
+async function dailyCashLogLegacy(limit: number) {
+  try {
+    const rows = await q<{ entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
+      `select entry_date::text entry_date, opening::float, 0::float seed, deposit::float, closing::float,
+              confirmed, (posted_cash_id is not null) posted
+       from daily_cash order by entry_date desc limit $1`, [limit]);
+    const cashByDate = new Map<string, number>();
+    await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, DEFAULT_BRANCH)).cash)));
+    let prevClosing = 0;
+    for (const r of [...rows].reverse()) {
+      if (!r.confirmed) r.opening = prevClosing;
+      r.closing = Math.max(0, r.opening + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
+      prevClosing = r.closing;
+    }
+    return rows;
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
 }
 
