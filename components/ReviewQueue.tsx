@@ -14,6 +14,14 @@ import { branchOptions } from "@/lib/branches";
 
 const SOURCE_OPTIONS = branchOptions();
 const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
+
+// Stable bill number = the running segment of the receipt no (CTW-260812-003 → "003"),
+// so a bill keeps the SAME number whether it's pending or approved (un-approving a bill
+// must not renumber it). Falls back to the list position only when there's no receipt no.
+const billSeq = (ref: string | undefined, i: number) => {
+  const m = (ref || "").match(/(\d+)\s*$/);
+  return m ? m[1] : String(i + 1);
+};
 const payEditOptions = (cur?: string) => {
   const base = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
   if (cur && cur !== SPLIT2 && !PAYMENTS.some((p) => p.v === cur)) base.unshift({ value: cur, label: cur });
@@ -243,7 +251,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                     {/* bill header */}
                     <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0">#{i + 1}</span>
+                        <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0" title={bill.ref || undefined}>#{billSeq(bill.ref, i)}</span>
                         <div className="min-w-0">
                           <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -366,7 +374,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                           <div key={bill.key} className="rounded-xl border border-green-200 bg-surface shadow-sm overflow-hidden">
                             <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-success-soft/60 border-b border-success/20">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0">#{i + 1}</span>
+                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0" title={bill.ref || undefined}>#{billSeq(bill.ref, i)}</span>
                                 <div className="min-w-0">
                                   <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                                   <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
