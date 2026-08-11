@@ -29,6 +29,7 @@ import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { branchOptions, DEFAULT_BRANCH } from "@/lib/branches";
+import { billSeq } from "@/lib/bill-no";
 import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
@@ -797,7 +798,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       {/* header bar — makes each bill clearly its own card */}
       <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0">#{index}</span>
+          <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0" title={ref || undefined}>#{billSeq(ref, index)}</span>
           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 min-w-0">
             {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
             {first.payment_channel && <span>· {first.payment_channel}</span>}
