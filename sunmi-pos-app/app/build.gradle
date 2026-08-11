@@ -11,8 +11,8 @@ android {
         applicationId "com.labparfumo.pos"
         minSdk 24
         targetSdk 34
-        versionCode 7
-        versionName "1.6"
+        versionCode 8
+        versionName "1.7"
 
         // The web app the POS wraps. Change here if the URL ever changes.
         buildConfigField "String", "APP_URL", "\"https://lab-parfumo-central.vercel.app/login?next=/my\""

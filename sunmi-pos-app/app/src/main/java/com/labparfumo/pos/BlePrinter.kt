@@ -73,6 +73,7 @@ object BlePrinter {
         private val chunks = ArrayDeque<ByteArray>()
         private var mtu = 20
         private var finished = false
+        private var writeRetries = 0
         private val timeout = Runnable { finish(false, "เชื่อมต่อเครื่องพิมพ์ไม่ทัน (timeout)") }
 
         fun start() { handler.postDelayed(timeout, 18000); gatt = device.connectGatt(ctx, false, cb, BluetoothDevice.TRANSPORT_LE) }
@@ -103,7 +104,9 @@ object BlePrinter {
                     BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT else BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                 val size = (mtu - 5).coerceIn(20, 500)
                 var i = 0; while (i < data.size) { val e = minOf(i + size, data.size); chunks.add(data.copyOfRange(i, e)); i = e }
-                writeNext(g)
+                // let the stack settle after service discovery before the first write,
+                // otherwise the GATT queue is still busy and writeCharacteristic() fails
+                handler.postDelayed({ writeNext(g) }, 150)
             }
             override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
                 if (writeChar?.writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
@@ -115,11 +118,19 @@ object BlePrinter {
         @Suppress("DEPRECATION")
         private fun writeNext(g: BluetoothGatt) {
             if (finished) return
-            val next = chunks.poll() ?: run { handler.postDelayed({ finish(true, "") }, 600); return }  // drain, then done
+            val next = chunks.peek() ?: run { handler.postDelayed({ finish(true, "") }, 600); return }  // drain, then done
             val ch = writeChar!!
             ch.value = next
-            if (!g.writeCharacteristic(ch)) { finish(false, "ส่งข้อมูลไม่สำเร็จ"); return }
-            if (ch.writeType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) handler.postDelayed({ writeNext(g) }, 22)  // pace: no callback
+            if (g.writeCharacteristic(ch)) {
+                writeRetries = 0
+                chunks.poll()                                   // enqueued — remove from queue
+                // WITH-response: wait for onCharacteristicWrite. NO-response: pace manually.
+                if (ch.writeType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) handler.postDelayed({ writeNext(g) }, 22)
+            } else {
+                // GATT queue still busy — back off and retry the SAME chunk instead of failing
+                if (++writeRetries > 60) { finish(false, "ส่งข้อมูลไม่สำเร็จ (คิวไม่ว่าง)"); return }
+                handler.postDelayed({ writeNext(g) }, 30)
+            }
         }
     }
 }
