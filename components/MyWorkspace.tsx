@@ -74,7 +74,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ---- bill (multi-item) types ----
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
-type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string };
+type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean };
 type Tender = { channel: string; amount: any };
 type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[]; attachments: string[]; splitPay: boolean; tenders: Tender[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number; payment_channel: string };
@@ -339,14 +339,15 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const pct = Math.min(100, Math.max(0, Number(state.discount_pct) || 0));
   const lines = state.items.map((it) => {
     const sub = (Number(it.qty) || 0) * (Number(it.unit_price) || 0);
-    const itemDisc = Math.min(sub, Number(it.discount) || 0);
+    // ของแถม (gift) → discount = full price so the line is free (฿0)
+    const itemDisc = it.gift ? sub : Math.min(sub, Number(it.discount) || 0);
     const billDisc = Math.round(((sub - itemDisc) * pct) / 100);
     const discount = itemDisc + billDisc;   // total discount stored on this line
     return { it, sub, discount, total: sub - discount, channel: effChannel(it) };
   });
   const subtotal = lines.reduce((s, l) => s + l.sub, 0);
   const discountTotal = lines.reduce((s, l) => s + l.discount, 0);
-  const itemDiscTotal = lines.reduce((s, l) => s + Math.min(l.sub, Number(l.it.discount) || 0), 0);
+  const itemDiscTotal = lines.reduce((s, l) => s + (l.it.gift ? l.sub : Math.min(l.sub, Number(l.it.discount) || 0)), 0);
   const billDiscTotal = discountTotal - itemDiscTotal;   // baht from the bill-level %
   const net = subtotal - discountTotal;
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
@@ -619,9 +620,11 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     } else setAcOpen(false);
   };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
+  const is4ml = /^4\s*ml/i.test(String(it.size || "").trim());   // giveaway-eligible size
   // clamp per-item discount to the line subtotal so the card never shows a
   // misleading negative total (mirrors the authoritative BillForm math).
-  const dc = Math.min(q * up, Number(it.discount) || 0);
+  // ของแถม (gift) → full discount → line is free (฿0).
+  const dc = it.gift ? q * up : Math.min(q * up, Number(it.discount) || 0);
   const line = q * up - dc;
   const fld = "w-full border border-line rounded-lg px-1.5 py-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
   // numeric field: select-all on focus + strip leading zeros so a leading 0 disappears when typing
@@ -657,13 +660,21 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
           <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty)} className="py-2.5 justify-center min-h-[44px]" />
         </Cell>
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
-        <Cell label="ส่วนลด" active={Number(it.discount) > 0}>
-          <input {...numAttrs("discount")} className={`${fld} ${Number(it.discount) > 0 ? "!text-danger !border-danger/50 font-semibold" : ""}`} />
+        <Cell label="ส่วนลด" active={it.gift || Number(it.discount) > 0}>
+          <input {...(it.gift ? { value: String(Math.round(q * up)), readOnly: true, inputMode: "numeric" as const } : numAttrs("discount"))}
+            className={`${fld} ${(it.gift || Number(it.discount) > 0) ? "!text-danger !border-danger/50 font-semibold" : ""}`} />
         </Cell>
       </div>
+      {/* ของแถม — only for 4ml testers; ticking gives a full discount (free ฿0) */}
+      {is4ml && (
+        <label className="mt-2 pl-7 flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input type="checkbox" checked={!!it.gift} onChange={(e) => onChange({ gift: e.target.checked, discount: e.target.checked ? 0 : it.discount })} className="accent-brand w-4 h-4" />
+          <span className={it.gift ? "font-semibold text-success" : "text-ink"}>🎁 ของแถม — ไม่คิดเงิน (ฟรี ฿0)</span>
+        </label>
+      )}
       {/* quick per-item discount — the shop's standard amounts; tap to apply, tap
-          again to clear. Hidden for free / complimentary items (price 0). */}
-      {up > 0 && (
+          again to clear. Hidden for free / complimentary items (price 0) and gifts. */}
+      {up > 0 && !it.gift && (
         <div className="mt-2 pl-7 flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-muted mr-0.5">ลดเร็ว</span>
           {[200, 100, 50].map((v) => {
@@ -688,7 +699,10 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
             options={payOptions(it.payment_channel || paymentDefault)} placeholder="- เลือกช่องทาง -" />
         </div>
       )}
-      <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">รวม <b className="text-ink text-base">{baht(line)}</b></div>
+      <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">
+        {it.gift && <span className="text-success font-semibold mr-2">🎁 ของแถม</span>}
+        รวม <b className={`text-base ${it.gift ? "text-success" : "text-ink"}`}>{baht(line)}</b>
+      </div>
     </div>
   );
 }
