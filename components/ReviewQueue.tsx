@@ -23,6 +23,8 @@ const payEditOptions = (cur?: string) => {
 };
 
 const chLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v;
+// full payment label exactly as shown in the edit dropdown (e.g. "บัตรเครดิต (EDC)")
+const payLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label || v;
 
 const inp = "w-full min-w-0 border border-line rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-brand";
 const numAttrs = (v: any, on: (s: string) => void) => ({
@@ -274,7 +276,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                           <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <BillTime bill={bill} onSaved={refresh} />
-                            {first.payment_channel && <span>· {first.payment_channel}</span>}
+                            {first.payment_channel && <span>· {payLabel(first.payment_channel)}</span>}
                             {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
                             {isSale && <span>· {bill.rows.length} รายการ</span>}
                           </div>
@@ -397,7 +399,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                   <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                                   <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
                                     {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
-                                    {first.payment_channel && <span>· {first.payment_channel}</span>}
+                                    {first.payment_channel && <span>· {payLabel(first.payment_channel)}</span>}
                                     {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
                                     {isSale && <span>· {bill.rows.length} รายการ</span>}
                                     {first.reviewer && <span>· โดย {first.reviewer}</span>}
