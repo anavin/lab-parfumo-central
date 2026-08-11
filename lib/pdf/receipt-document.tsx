@@ -72,6 +72,7 @@ const nf = (n: number) => (Math.round((n || 0) * 100) / 100).toLocaleString("en-
 const ddmmyyyy = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return `${d}/${m}/${y}`; };
 
 const C = { ink: "#000", muted: "#555", faint: "#777" };
+// A4 slip (centered on an A4 page) — used for download + customer email.
 const s = StyleSheet.create({
   page: { fontFamily: "NotoSansThai", fontSize: 9, color: C.ink, paddingVertical: 24, alignItems: "center" },
   slip: { width: 300, paddingHorizontal: 20 },
@@ -92,22 +93,45 @@ const s = StyleSheet.create({
   qr: { width: 96, height: 96, alignSelf: "center", marginTop: 8 },
 });
 
-function Line({ dashed }: { dashed?: boolean }) { return <View style={dashed ? s.dashed : s.solid} />; }
-function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
-  return (
-    <View style={s.row}>
-      <Text style={[strong ? s.bold : {}, strong ? { fontSize: 11 } : { color: C.muted }]}>{k}</Text>
-      <Text style={strong ? [s.bold, { fontSize: 11 }] : {}}>{v}</Text>
-    </View>
-  );
-}
+// 58mm thermal slip — the PDF page itself is 58mm wide so a Bluetooth ESC/POS
+// helper (PosPrinter) prints it 1:1, filling the paper instead of shrinking an A4.
+const PT58 = 164;               // 58mm in PDF points (58/25.4*72)
+const st = StyleSheet.create({
+  page: { fontFamily: "NotoSansThai", fontSize: 7.5, color: C.ink, paddingVertical: 8, paddingHorizontal: 14 },
+  slip: { width: "100%" },
+  center: { textAlign: "center" },
+  logo: { width: 100, height: 39, objectFit: "contain", alignSelf: "center", marginBottom: 4 },
+  company: { fontSize: 8.5, fontWeight: "bold", textAlign: "center" },
+  small: { fontSize: 7, textAlign: "center" },
+  addr: { fontSize: 6.5, color: C.muted, textAlign: "center", marginTop: 2 },
+  bold: { fontWeight: "bold" },
+  solid: { borderTopWidth: 1, borderTopColor: C.ink, marginVertical: 6 },
+  dashed: { borderTopWidth: 1, borderTopColor: "#999", borderStyle: "dashed", marginVertical: 6 },
+  docTitle: { fontSize: 8, fontWeight: "bold" },
+  row: { flexDirection: "row", justifyContent: "space-between", marginVertical: 1 },
+  itemRow: { flexDirection: "row", marginTop: 2 },
+  qty: { width: 14 },
+  name: { flex: 1 },
+  amt: { textAlign: "right" },
+  qr: { width: 84, height: 84, alignSelf: "center", marginTop: 6 },
+});
 
-export function ReceiptDocument({ receiptNo, date, time, salesperson, items, paymentChannel, tenders, lang = "th" }: {
+export function ReceiptDocument({ receiptNo, date, time, salesperson, items, paymentChannel, tenders, lang = "th", thermal = false }: {
   receiptNo: string; date: string; time?: string; salesperson: string; items: PdfReceiptItem[];
-  paymentChannel?: string | null; tenders?: PdfReceiptTender[]; lang?: ReceiptLang;
+  paymentChannel?: string | null; tenders?: PdfReceiptTender[]; lang?: ReceiptLang; thermal?: boolean;
 }) {
   registerFontOnce();
   const t = T[lang];
+  const sty = thermal ? st : s;
+  const strongSize = thermal ? 9 : 11;
+  const amtW = thermal ? 46 : 60;
+  const Line = ({ dashed }: { dashed?: boolean }) => <View style={dashed ? sty.dashed : sty.solid} />;
+  const KV = ({ k, v, strong }: { k: string; v: string; strong?: boolean }) => (
+    <View style={sty.row}>
+      <Text style={[strong ? sty.bold : {}, strong ? { fontSize: strongSize } : { color: C.muted }]}>{k}</Text>
+      <Text style={strong ? [sty.bold, { fontSize: strongSize }] : {}}>{v}</Text>
+    </View>
+  );
   const lineFull = (it: PdfReceiptItem) => it.total + it.discount;
   const gross = items.reduce((a, it) => a + lineFull(it), 0);
   const discount = items.reduce((a, it) => a + it.discount, 0);
@@ -118,22 +142,33 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
   const payMethod = tenders && tenders.length >= 2
     ? tenders.map((x) => payLabel(x.channel, lang)).join(", ")
     : payLabel(paymentChannel, lang);
+  const foot = thermal ? 6.5 : 8;   // footer text size
+
+  // For the 58mm page we must size the page height to the content (react-pdf pages are
+  // fixed-height): too short splits onto a mostly-blank page 2, too tall wastes paper.
+  // Estimate from the wrapping of the address + each item name, then add a safety margin.
+  const addrLines = Math.max(2, Math.ceil(t.address.length / 34));
+  const itemsH = items.reduce((a, it) => {
+    const len = (it.name + (it.size ? ` ${it.size}` : "")).length;
+    return a + Math.max(1, Math.ceil(len / 20)) * 12 + (it.discount > 0 ? 11 : 0);
+  }, 0);
+  const thermalHeight = 502 + addrLines * 9 + itemsH + 30;   // ~pt; +30 safety
 
   return (
     <Document>
-      <Page size="A4" style={s.page}>
-        <View style={s.slip}>
+      <Page size={thermal ? [PT58, thermalHeight] : "A4"} style={sty.page}>
+        <View style={sty.slip}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <Image style={s.logo} src={path.join(PUBLIC, "lab-parfumo-logo.png")} />
-          <Text style={s.company}>{t.company}</Text>
-          <Text style={s.small}>{t.headOffice}</Text>
-          <Text style={s.small}>{SHOP.branch}</Text>
-          <Text style={s.addr}>{t.address}</Text>
-          <Text style={[s.small, s.bold, { marginTop: 4 }]}>{t.taxId} {SHOP.taxId}</Text>
-          <Text style={[s.small, s.bold]}>{t.tel} {SHOP.tel}</Text>
+          <Image style={sty.logo} src={path.join(PUBLIC, "lab-parfumo-logo.png")} />
+          <Text style={sty.company}>{t.company}</Text>
+          <Text style={sty.small}>{t.headOffice}</Text>
+          <Text style={sty.small}>{SHOP.branch}</Text>
+          <Text style={sty.addr}>{t.address}</Text>
+          <Text style={[sty.small, sty.bold, { marginTop: 4 }]}>{t.taxId} {SHOP.taxId}</Text>
+          <Text style={[sty.small, sty.bold]}>{t.tel} {SHOP.tel}</Text>
 
           <Line />
-          <Text style={s.docTitle}>{t.doc}</Text>
+          <Text style={sty.docTitle}>{t.doc}</Text>
           <Text style={{ color: C.muted }}>{receiptNo}</Text>
 
           <Line dashed />
@@ -144,23 +179,23 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
           <Line dashed />
           {items.map((it, i) => (
             <View key={i}>
-              <View style={s.itemRow}>
-                <Text style={s.qty}>{Math.round(it.qty)}</Text>
-                <Text style={s.name}>{it.name}{it.size ? ` ${it.size}` : ""}</Text>
-                <Text style={[s.amt, { width: 60 }]}>{nf(lineFull(it))}</Text>
+              <View style={sty.itemRow}>
+                <Text style={sty.qty}>{Math.round(it.qty)}</Text>
+                <Text style={sty.name}>{it.name}{it.size ? ` ${it.size}` : ""}</Text>
+                <Text style={[sty.amt, { width: amtW }]}>{nf(lineFull(it))}</Text>
               </View>
               {it.discount > 0 && (
-                <View style={s.itemRow}>
-                  <Text style={s.qty}> </Text>
-                  <Text style={[s.name, { color: C.faint }]}>{t.lineDiscount}</Text>
-                  <Text style={[s.amt, { width: 60, color: C.faint }]}>-{nf(it.discount)}</Text>
+                <View style={sty.itemRow}>
+                  <Text style={sty.qty}> </Text>
+                  <Text style={[sty.name, { color: C.faint }]}>{t.lineDiscount}</Text>
+                  <Text style={[sty.amt, { width: amtW, color: C.faint }]}>-{nf(it.discount)}</Text>
                 </View>
               )}
             </View>
           ))}
 
           <Line dashed />
-          <Text style={[s.bold, { marginBottom: 4 }]}>{t.totalQty} {Math.round(totalQty)}</Text>
+          <Text style={[sty.bold, { marginBottom: 4 }]}>{t.totalQty} {Math.round(totalQty)}</Text>
           <KV k={t.subtotal} v={nf(gross)} />
           <KV k={t.discount} v={nf(discount)} />
           <KV k={t.afterDiscount} v={nf(net)} />
@@ -170,17 +205,17 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
           <KV k={t.grandTotal} v={nf(net)} strong />
 
           <View style={{ borderTopWidth: 1, borderTopColor: C.ink, marginTop: 8, paddingTop: 8 }}>
-            <Text style={[s.center, s.bold]}>{t.vatIncluded}</Text>
+            <Text style={[sty.center, sty.bold]}>{t.vatIncluded}</Text>
           </View>
 
-          <Text style={[s.center, { marginTop: 10, color: C.muted }]}>{t.thanks}</Text>
-          <Text style={[s.center, { fontSize: 8, color: C.faint, marginTop: 2 }]}>{t.tel} {SHOP.tel} · {SHOP.web}</Text>
-          <Text style={[s.center, { fontSize: 8, color: C.faint }]}>IG & LINE {SHOP.ig}</Text>
+          <Text style={[sty.center, { marginTop: 10, color: C.muted }]}>{t.thanks}</Text>
+          <Text style={[sty.center, { fontSize: foot, color: C.faint, marginTop: 2 }]}>{t.tel} {SHOP.tel} · {SHOP.web}</Text>
+          <Text style={[sty.center, { fontSize: foot, color: C.faint }]}>IG & LINE {SHOP.ig}</Text>
 
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <Image style={s.qr} src={path.join(PUBLIC, "lab-parfumo-qr.png")} />
-          <Text style={[s.center, { fontSize: 8, marginTop: 3 }]}>{t.qrTitle}</Text>
-          <Text style={[s.center, { fontSize: 8, color: C.faint }]}>{t.qrSub}</Text>
+          <Image style={sty.qr} src={path.join(PUBLIC, "lab-parfumo-qr.png")} />
+          <Text style={[sty.center, { fontSize: foot, marginTop: 3 }]}>{t.qrTitle}</Text>
+          <Text style={[sty.center, { fontSize: foot, color: C.faint }]}>{t.qrSub}</Text>
         </View>
       </Page>
     </Document>

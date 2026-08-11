@@ -94,8 +94,8 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
     try { if (ref && new URL(ref).origin === location.origin) { location.href = ref; return; } } catch {}
     window.close();
   };
-  const pdfUrl = (disp: "inline" | "download") =>
-    `/api/receipt/${encodeURIComponent(receiptNo)}/pdf?lang=${lang}${disp === "inline" ? "&disp=inline" : ""}`;
+  const pdfUrl = (disp: "inline" | "download", thermal?: boolean) =>
+    `/api/receipt/${encodeURIComponent(receiptNo)}/pdf?lang=${lang}${disp === "inline" ? "&disp=inline" : ""}${thermal ? "&thermal=1" : ""}`;
 
   const Tab = ({ v, children }: { v: ReceiptLang; children: React.ReactNode }) => (
     <button onClick={() => setLang(v)}
@@ -123,9 +123,9 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-line bg-surface text-ink text-sm font-semibold whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
             <Download className="w-4 h-4 shrink-0" /> ดาวน์โหลด PDF
           </a>
-          <a href={pdfUrl("inline")} target="_blank" rel="noopener" title="เปิด PDF เพื่อสั่งพิมพ์"
+          <a href={pdfUrl("inline", true)} target="_blank" rel="noopener" title="เปิด PDF สลิป 58mm เพื่อสั่งพิมพ์บลูทูธ"
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-line bg-surface text-ink text-sm font-semibold whitespace-nowrap hover:bg-canvas active:scale-[.99] transition">
-            <Printer className="w-4 h-4 shrink-0" /> พิมพ์
+            <Printer className="w-4 h-4 shrink-0" /> พิมพ์ (58mm)
           </a>
         </div>
         {/* thermal print — inside the app: SUNMI built-in and/or a paired Bluetooth printer */}

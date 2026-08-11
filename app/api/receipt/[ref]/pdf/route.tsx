@@ -14,8 +14,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ ref: str
   const lang: ReceiptLang = sp.get("lang") === "en" ? "en" : "th";
   // disp=inline → view in the browser's PDF viewer (for printing); default = download
   const disposition = sp.get("disp") === "inline" ? "inline" : "attachment";
+  // thermal=1 → 58mm-wide slip page so a Bluetooth ESC/POS helper prints it full-width
+  const thermal = sp.get("thermal") === "1";
 
-  const buffer = await renderReceiptPdf(decoded, lang);
+  const buffer = await renderReceiptPdf(decoded, lang, thermal);
   if (!buffer) return new Response("Not found", { status: 404 });
 
   return new Response(new Uint8Array(buffer), {
