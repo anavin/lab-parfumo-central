@@ -74,9 +74,20 @@ object BlePrinter {
         private var mtu = 20
         private var finished = false
         private var writeRetries = 0
+        private var discovered = false
+        private var retriedConn = false
         private val timeout = Runnable { finish(false, "เชื่อมต่อเครื่องพิมพ์ไม่ทัน (timeout)") }
 
-        fun start() { handler.postDelayed(timeout, 18000); gatt = device.connectGatt(ctx, false, cb, BluetoothDevice.TRANSPORT_LE) }
+        fun start() { handler.postDelayed(timeout, 22000); connect() }
+
+        private fun connect() { gatt = device.connectGatt(ctx, false, cb, BluetoothDevice.TRANSPORT_LE) }
+
+        // one-shot service discovery, guarded so MTU-callback and the fallback timer can't double-fire
+        private fun startDiscover(g: BluetoothGatt) {
+            if (finished || discovered) return
+            discovered = true
+            handler.postDelayed({ if (!finished) try { g.discoverServices() } catch (_: Exception) {} }, 200)
+        }
 
         private fun finish(ok: Boolean, msg: String) {
             if (finished) return; finished = true
@@ -86,10 +97,20 @@ object BlePrinter {
 
         private val cb = object : BluetoothGattCallback() {
             override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-                if (newState == BluetoothProfile.STATE_CONNECTED) g.requestMtu(247)
-                else if (newState == BluetoothProfile.STATE_DISCONNECTED && !finished) finish(false, "การเชื่อมต่อหลุด")
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    // settle, then negotiate MTU; if MTU never comes back, discover anyway
+                    handler.postDelayed({ if (!finished && !g.requestMtu(247)) startDiscover(g) }, 300)
+                    handler.postDelayed({ startDiscover(g) }, 1800)
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED && !finished) {
+                    // GATT 133 / early drop before we got anywhere → close and retry once
+                    if (!discovered && !retriedConn) {
+                        retriedConn = true
+                        try { g.close() } catch (_: Exception) {}
+                        handler.postDelayed({ if (!finished) connect() }, 600)
+                    } else finish(false, "การเชื่อมต่อหลุด ($status)")
+                }
             }
-            override fun onMtuChanged(g: BluetoothGatt, m: Int, status: Int) { mtu = m; g.discoverServices() }
+            override fun onMtuChanged(g: BluetoothGatt, m: Int, status: Int) { if (status == BluetoothGatt.GATT_SUCCESS) mtu = m; startDiscover(g) }
             override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
                 var ch: BluetoothGattCharacteristic? = null
                 loop@ for (s in g.services) for (c in s.characteristics) {
