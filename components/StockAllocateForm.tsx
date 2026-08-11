@@ -11,7 +11,8 @@ type Alloc = { id: number; po_number: string; order_date: string; units: number;
 
 let seq = 1;
 const blank = (): Line => ({ key: seq++, scent: "", barcode: "", size: "", qty: "1", product_id: null });
-const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
+const inpBase = "border border-line rounded-lg px-2.5 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
+const inp = "w-full " + inpBase;
 
 export function StockAllocateForm({ branch, branchName, allocations }: { branch: string; branchName: string; allocations: Alloc[] }) {
   const router = useRouter();
@@ -47,7 +48,7 @@ export function StockAllocateForm({ branch, branchName, allocations }: { branch:
             <div key={l.key} className="flex items-start gap-2">
               <div className="flex-1"><ScentPicker line={l} onChange={(p) => set(l.key, p)} /></div>
               <input value={l.qty} inputMode="numeric" onChange={(e) => set(l.key, { qty: e.target.value.replace(/[^\d]/g, "") })}
-                onFocus={(e) => e.target.select()} className={inp + " w-20 text-right tabular-nums"} placeholder="จำนวน" />
+                onFocus={(e) => e.target.select()} className={inpBase + " w-20 shrink-0 text-right tabular-nums"} placeholder="จำนวน" />
               <button type="button" onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : ls))}
                 className="p-2 text-muted hover:text-danger shrink-0" aria-label="ลบแถว"><Trash2 className="w-4 h-4" /></button>
             </div>
@@ -108,12 +109,12 @@ function ScentPicker({ line, onChange }: { line: Line; onChange: (p: Partial<Lin
   };
   const pick = (p: Prod) => { onChange({ scent: p.scent, barcode: p.barcode, size: p.size, product_id: p.id }); setOpen(false); };
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <input value={line.scent} onChange={(e) => search(e.target.value)} onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="ค้นหากลิ่น…" className={inp} />
       {line.size && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-soft">{line.size}</span>}
       {open && results.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-line bg-surface shadow-pop">
+        <div className="absolute z-20 mt-1 left-0 right-0 max-h-56 overflow-auto rounded-lg border border-line bg-surface shadow-pop">
           {results.map((p) => (
             <button key={p.id} type="button" onMouseDown={(e) => { e.preventDefault(); pick(p); }}
               className="w-full text-left px-3 py-2 text-sm hover:bg-canvas flex items-center justify-between gap-2">
