@@ -188,7 +188,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        /** Print the receipt image to a Bluetooth-LE ESC/POS printer (paired externally). */
+        /** Print the receipt image to a Bluetooth ESC/POS printer (paired externally).
+         *  Classic SPP (e.g. MP210, pairs with a PIN) is tried first; if no classic
+         *  printer is paired, we fall back to a BLE-GATT printer. */
         @JavascriptInterface
         fun printBluetooth(base64Png: String) {
             Thread {
@@ -201,13 +203,30 @@ class MainActivity : AppCompatActivity() {
                         bmp = Bitmap.createScaledBitmap(bmp, printWidth, h, true)
                     }
                     val escpos = escposRaster(bmp)
-                    runOnUiThread { toast("กำลังส่งไปเครื่องพิมพ์บลูทูธ…") }
-                    BlePrinter.print(this@MainActivity, escpos) { ok, msg ->
-                        runOnUiThread { toast(if (ok) "พิมพ์แล้ว ✓" else "พิมพ์บลูทูธไม่สำเร็จ: $msg") }
+                    runOnUiThread { toast("กำลังส่งไปเครื่องพิมพ์…") }
+                    val result = { ok: Boolean, log: String ->
+                        runOnUiThread {
+                            if (ok) toast("พิมพ์แล้ว ✓")
+                            else showLog("พิมพ์บลูทูธไม่สำเร็จ", log)   // screenshot-able diagnostics
+                        }
                     }
+                    // classic SPP printer paired? use it. otherwise BLE.
+                    if (SppPrinter.hasPairedPrinter(this@MainActivity)) SppPrinter.print(this@MainActivity, escpos, result)
+                    else BlePrinter.print(this@MainActivity, escpos, result)
                 } catch (e: Exception) { runOnUiThread { toast("ผิดพลาด: ${e.message}") } }
             }.start()
         }
+    }
+
+    /** Show a long diagnostic message in a dismissable dialog the user can screenshot. */
+    private fun showLog(title: String, body: String) {
+        try {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(body)
+                .setPositiveButton("ปิด", null)
+                .show()
+        } catch (e: Exception) { toast("$title: $body") }
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
