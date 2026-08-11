@@ -80,10 +80,14 @@ class MainActivity : AppCompatActivity() {
         try { InnerPrinterManager.getInstance().bindService(this, printerCallback) }
         catch (e: Exception) { /* no SUNMI printer on this device — ignore */ }
 
-        // camera runtime permission (barcode scanner in the WebView)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
+        // runtime permissions: camera (barcode) + Bluetooth (BLE printer on Android 12+)
+        val needPerms = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) needPerms.add(Manifest.permission.CAMERA)
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) needPerms.add(Manifest.permission.BLUETOOTH_CONNECT)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) needPerms.add(Manifest.permission.BLUETOOTH_SCAN)
         }
+        if (needPerms.isNotEmpty()) ActivityCompat.requestPermissions(this, needPerms.toTypedArray(), 1)
 
         // let a computer inspect this WebView at chrome://inspect (diagnose JS errors)
         WebView.setWebContentsDebuggingEnabled(true)
@@ -182,6 +186,27 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 runOnUiThread { toast("พิมพ์ไม่สำเร็จ: ${e.message}") }
             }
+        }
+
+        /** Print the receipt image to a Bluetooth-LE ESC/POS printer (paired externally). */
+        @JavascriptInterface
+        fun printBluetooth(base64Png: String) {
+            Thread {
+                try {
+                    val bytes = Base64.decode(base64Png, Base64.DEFAULT)
+                    var bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        ?: run { runOnUiThread { toast("รูปสลิปไม่ถูกต้อง") }; return@Thread }
+                    if (bmp.width != printWidth) {
+                        val h = (bmp.height.toFloat() * printWidth / bmp.width).toInt()
+                        bmp = Bitmap.createScaledBitmap(bmp, printWidth, h, true)
+                    }
+                    val escpos = escposRaster(bmp)
+                    runOnUiThread { toast("กำลังส่งไปเครื่องพิมพ์บลูทูธ…") }
+                    BlePrinter.print(this@MainActivity, escpos) { ok, msg ->
+                        runOnUiThread { toast(if (ok) "พิมพ์แล้ว ✓" else "พิมพ์บลูทูธไม่สำเร็จ: $msg") }
+                    }
+                } catch (e: Exception) { runOnUiThread { toast("ผิดพลาด: ${e.message}") } }
+            }.start()
         }
     }
 

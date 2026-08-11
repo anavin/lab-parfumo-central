@@ -10,7 +10,7 @@ import { Receipt, type ReceiptItem, type ReceiptTender, type ReceiptLang } from 
 // on-screen receipt straight to the device's built-in thermal printer.
 declare global {
   interface Window {
-    SunmiBridge?: { printImage?: (base64Png: string) => void; isReady?: () => boolean; scanBarcode?: () => void; hasScanEngine?: () => boolean };
+    SunmiBridge?: { printImage?: (base64Png: string) => void; printBluetooth?: (base64Png: string) => void; isReady?: () => boolean; scanBarcode?: () => void; hasScanEngine?: () => boolean };
   }
 }
 
@@ -28,11 +28,15 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
   const [sent, setSent] = useState(false);
   const [mailErr, setMailErr] = useState<string | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const [nativePrinter, setNativePrinter] = useState(false);   // running inside the SUNMI app?
+  const [nativePrinter, setNativePrinter] = useState(false);   // SUNMI built-in printer?
+  const [btPrinter, setBtPrinter] = useState(false);           // Bluetooth ESC/POS printer (app)?
   const [thermalBusy, setThermalBusy] = useState(false);
   const [thermalErr, setThermalErr] = useState<string | null>(null);
 
-  useEffect(() => { setNativePrinter(typeof window !== "undefined" && !!window.SunmiBridge?.printImage); }, []);
+  useEffect(() => {
+    setNativePrinter(typeof window !== "undefined" && !!window.SunmiBridge?.printImage);
+    setBtPrinter(typeof window !== "undefined" && !!window.SunmiBridge?.printBluetooth);
+  }, []);
 
   // Render the on-screen receipt to a crisp black-&-white PNG for the 58mm thermal
   // head. Thermal heads print 1-bit: grey pixels dither to sparse dots (faint), so
@@ -40,41 +44,38 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
   // black/white — that's what makes the slip sharp instead of pale.
   const PRINT_WIDTH = 384;        // 58mm head = 384 dots (80mm = 576)
   const THRESHOLD = 180;          // lum < this → black (keeps thin text + dashed rules)
-  const printThermal = async () => {
+  const renderSlip = async (): Promise<string> => {
+    const el = sheetRef.current!.querySelector<HTMLElement>(".receipt") ?? sheetRef.current!;
+    const { default: html2canvas } = await import("html2canvas");
+    const big = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
+    const out = document.createElement("canvas");
+    out.width = PRINT_WIDTH;
+    out.height = Math.max(1, Math.round((big.height * PRINT_WIDTH) / big.width));
+    const ctx = out.getContext("2d");
+    if (!ctx) throw new Error("no ctx");
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(big, 0, 0, out.width, out.height);
+    const im = ctx.getImageData(0, 0, out.width, out.height);
+    const d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const v = lum < THRESHOLD ? 0 : 255;
+      d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+    }
+    ctx.putImageData(im, 0, 0);
+    const base64 = out.toDataURL("image/png").split(",")[1] || "";
+    if (!base64) throw new Error("empty image");
+    return base64;
+  };
+  const printVia = (send: (b64: string) => void) => async () => {
     if (!sheetRef.current) return;
     setThermalBusy(true); setThermalErr(null);
-    try {
-      const el = sheetRef.current.querySelector<HTMLElement>(".receipt") ?? sheetRef.current;
-      const { default: html2canvas } = await import("html2canvas");
-      const big = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true, logging: false });
-
-      // downscale to exactly the print width (Android then prints 1:1, no re-blur)
-      const out = document.createElement("canvas");
-      out.width = PRINT_WIDTH;
-      out.height = Math.max(1, Math.round((big.height * PRINT_WIDTH) / big.width));
-      const ctx = out.getContext("2d");
-      if (!ctx) throw new Error("no ctx");
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(big, 0, 0, out.width, out.height);
-
-      // binarize → solid black text/lines on white (no faint grey)
-      const im = ctx.getImageData(0, 0, out.width, out.height);
-      const d = im.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        const v = lum < THRESHOLD ? 0 : 255;
-        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
-      }
-      ctx.putImageData(im, 0, 0);
-
-      const base64 = out.toDataURL("image/png").split(",")[1] || "";
-      if (!base64) throw new Error("empty image");
-      window.SunmiBridge?.printImage?.(base64);
-    } catch (e) {
-      console.error("[thermal] print failed", e);
-      setThermalErr("พิมพ์ไม่สำเร็จ ลองใหม่อีกครั้ง");
-    } finally { setThermalBusy(false); }
+    try { send(await renderSlip()); }
+    catch (e) { console.error("[thermal] print failed", e); setThermalErr("พิมพ์ไม่สำเร็จ ลองใหม่อีกครั้ง"); }
+    finally { setThermalBusy(false); }
   };
+  const printThermal = printVia((b) => window.SunmiBridge?.printImage?.(b));
+  const printBt = printVia((b) => window.SunmiBridge?.printBluetooth?.(b));
 
   const sendEmail = () => {
     setMailErr(null); setSent(false);
@@ -127,13 +128,21 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
             <Printer className="w-4 h-4 shrink-0" /> พิมพ์
           </a>
         </div>
-        {/* thermal print — only inside the SUNMI app (built-in printer) */}
-        {nativePrinter && (
-          <div>
-            <button onClick={printThermal} disabled={thermalBusy}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold whitespace-nowrap hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
-              {thermalBusy ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Printer className="w-4 h-4 shrink-0" />} พิมพ์สลิป (เครื่องนี้)
-            </button>
+        {/* thermal print — inside the app: SUNMI built-in and/or a paired Bluetooth printer */}
+        {(nativePrinter || btPrinter) && (
+          <div className="space-y-2">
+            {nativePrinter && (
+              <button onClick={printThermal} disabled={thermalBusy}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold whitespace-nowrap hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
+                {thermalBusy ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Printer className="w-4 h-4 shrink-0" />} พิมพ์สลิป (เครื่องนี้)
+              </button>
+            )}
+            {btPrinter && (
+              <button onClick={printBt} disabled={thermalBusy}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-ink text-surface text-sm font-semibold whitespace-nowrap hover:opacity-90 active:scale-[.99] transition disabled:opacity-50">
+                {thermalBusy ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Printer className="w-4 h-4 shrink-0" />} พิมพ์ (Bluetooth)
+              </button>
+            )}
             {thermalErr && <div className="mt-1.5 text-xs text-danger">{thermalErr}</div>}
           </div>
         )}

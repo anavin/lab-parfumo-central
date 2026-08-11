@@ -6,6 +6,11 @@
     <!-- camera = barcode scanner in the sale form (WebView getUserMedia) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Bluetooth thermal printer (ESC/POS over classic SPP) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
 
     <!-- Android 11+ package visibility: allow binding to the SUNMI printer service -->
     <queries>
