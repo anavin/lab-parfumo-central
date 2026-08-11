@@ -24,20 +24,30 @@ export async function getUserFromToken(token: string | undefined): Promise<User 
   if (!token) return null;
   const sql = (permCol: string) => `
     select u.id, u.username, u.full_name, u.role, ${permCol} as permissions, u.is_active, u.last_login_at, u.created_at,
-           s.last_activity_at
+           s.last_activity_at, s.created_at as session_created_at
     from user_sessions s join users u on u.id = s.user_id
     where s.token = $1 and u.is_active = true`;
-  let rows: (User & { last_activity_at: string })[];
+  type Row = User & { last_activity_at: string; session_created_at: string };
+  let rows: Row[];
   try {
-    rows = await q<User & { last_activity_at: string }>(sql("u.permissions"), [token]);
+    rows = await q<Row>(sql("u.permissions"), [token]);
   } catch (e: any) {
     // Migration 0005 (users.permissions) not applied yet → fall back to role
     // presets so the whole app doesn't hard-crash. (Postgres 42703 = undefined_column.)
     if (e?.code !== "42703" && !/permissions.*does not exist/i.test(String(e?.message || ""))) throw e;
-    rows = await q<User & { last_activity_at: string }>(sql("null::text[]"), [token]);
+    rows = await q<Row>(sql("null::text[]"), [token]);
   }
   const row = rows[0];
   if (!row) return null;
+
+  // Salespeople (role "staff") on the shared POS must re-login each day: expire the
+  // session at Bangkok midnight even with "remember me", since a different person
+  // may use the device tomorrow.
+  const bkkDay = (d: string | number | Date) => new Date(d).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  if (row.role === "staff" && row.session_created_at && bkkDay(row.session_created_at) < bkkDay(Date.now())) {
+    await q(`delete from user_sessions where token = $1`, [token]).catch(() => {});
+    return null;
+  }
 
   // "remember me" sessions skip the idle auto-logout (resilient if column absent)
   let remember = false;
@@ -54,7 +64,7 @@ export async function getUserFromToken(token: string | undefined): Promise<User 
   // touch (fire-and-forget)
   q(`update user_sessions set last_activity_at = now() where token = $1`, [token]).catch(() => {});
 
-  const { last_activity_at, ...user } = row;
+  const { last_activity_at, session_created_at, ...user } = row;
   return user as User;
 }
 
