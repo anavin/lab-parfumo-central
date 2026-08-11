@@ -9,7 +9,6 @@ import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { SplitTenders } from "@/components/SplitTenders";
 import { Select } from "@/components/ui/Select";
-import { billSeq } from "@/lib/bill-no";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 import { branchOptions } from "@/lib/branches";
 
@@ -122,6 +121,31 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
 
   const days = groupDays(rows.filter(match));
   const approvedDays = groupDays(approved.filter(match));
+
+  // Bill number = chronological rank within its day (earliest = #1), computed across
+  // BOTH pending and approved bills so a bill keeps the SAME number in either section
+  // (stable across approve/un-approve) and matches the salesperson page's numbering.
+  const billRank = useMemo(() => {
+    const m = new Map<string, number>();
+    // bucket by (day + salesperson) so each person's bills number 1..N like their own /my page
+    const buckets = new Map<string, Bill[]>();
+    const collect = (d: Day) => {
+      for (const b of d.bills) {
+        const k = `${d.date}|${b.author}`;
+        const arr = buckets.get(k) ?? [];
+        if (!arr.some((x) => x.key === b.key)) arr.push(b);
+        buckets.set(k, arr);
+      }
+    };
+    groupDays(rows).forEach(collect);
+    groupDays(approved).forEach(collect);
+    const sortKey = (b: Bill) => `${b.rows[0]?.sale_time || "99:99"}|${String(b.rows[0]?.id ?? 0).padStart(12, "0")}`;
+    for (const bills of buckets.values()) {
+      [...bills].sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : 1)).forEach((b, i) => m.set(b.key, i + 1));
+    }
+    return m;
+  }, [rows, approved]);
+  const billNo = (b: Bill, fallback: number) => billRank.get(b.key) ?? fallback;
   // show one day at a time (today by default); other days are picked from the dropdown
   const [approvedDate, setApprovedDate] = useState("");
   // clicking a bar in the daily chart jumps this section to that day + opens + scrolls
@@ -245,7 +269,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                     {/* bill header */}
                     <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0" title={bill.ref || undefined}>#{billSeq(bill.ref, i + 1)}</span>
+                        <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0" title={bill.ref || undefined}>#{billNo(bill, i + 1)}</span>
                         <div className="min-w-0">
                           <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -368,7 +392,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                           <div key={bill.key} className="rounded-xl border border-green-200 bg-surface shadow-sm overflow-hidden">
                             <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-success-soft/60 border-b border-success/20">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0" title={bill.ref || undefined}>#{billSeq(bill.ref, i + 1)}</span>
+                                <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-green-600 text-white text-xs font-bold shrink-0" title={bill.ref || undefined}>#{billNo(bill, i + 1)}</span>
                                 <div className="min-w-0">
                                   <div className="text-[13px] font-medium text-ink truncate">{bill.author}</div>
                                   <div className="text-[11px] text-muted flex flex-wrap gap-x-2">

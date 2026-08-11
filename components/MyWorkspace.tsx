@@ -29,7 +29,6 @@ import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { branchOptions, DEFAULT_BRANCH } from "@/lib/branches";
-import { billSeq } from "@/lib/bill-no";
 import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
@@ -205,6 +204,12 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // count only bills that aren't fully rejected, to match the daily-summary KPI
   const activeBillCount = bills.filter((b) => b.rows.some((r) => r.status !== "rejected")).length;
 
+  // bill number = chronological rank in the day (earliest = #1) — same key the admin
+  // review page uses, so a bill shows the SAME number on both pages.
+  const billRank = new Map<string, number>();
+  const rankKey = (b: { rows: SubmissionRow[] }) => `${b.rows[0]?.sale_time || "99:99"}|${String(b.rows[0]?.id ?? 0).padStart(12, "0")}`;
+  [...bills].sort((a, b) => (rankKey(a) < rankKey(b) ? -1 : 1)).forEach((b, i) => billRank.set(b.key, i + 1));
+
   const addPhotos = (ref: string, imgs: string[]) => start(async () => {
     try { await addBillAttachments(ref, imgs); refresh(); } catch (e: any) { onActionError(e); }
   });
@@ -302,7 +307,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         </div>
       ) : (
         <div className="space-y-3">
-          {bills.map((b, i) => <BillGroupCard key={b.key} index={bills.length - i} rows={b.rows} pending={pending}
+          {bills.map((b, i) => <BillGroupCard key={b.key} index={billRank.get(b.key) ?? (bills.length - i)} rows={b.rows} pending={pending}
             onEdit={editRow} onDelete={setDel} photos={attachments[b.rows[0].receipt_no || ""] || []}
             onAddPhotos={addPhotos} onDeletePhoto={delPhoto} />)}
         </div>
@@ -798,7 +803,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       {/* header bar — makes each bill clearly its own card */}
       <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0" title={ref || undefined}>#{billSeq(ref, index)}</span>
+          <span className="inline-flex items-center justify-center h-6 min-w-[30px] px-1.5 rounded-md bg-brand text-white text-xs font-bold shrink-0" title={ref || undefined}>#{index}</span>
           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 min-w-0">
             {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
             {first.payment_channel && <span>· {first.payment_channel}</span>}
