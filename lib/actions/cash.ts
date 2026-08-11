@@ -1,7 +1,7 @@
 "use server";
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { requirePermission, requireUser } from "@/lib/auth/require-user";
+import { requirePermission, requireUser, isAdmin } from "@/lib/auth/require-user";
 import { dailyReport, cashAttachmentsForDate, type CashAttachment } from "@/lib/queries";
 import { logAudit } from "@/lib/audit";
 
@@ -37,10 +37,11 @@ export async function confirmDrawer(date: string, opening: number, deposit: numb
   }
 }
 
-/** Slips a salesperson attached for a day (for the /my daily report). */
+/** Slips attached for a day. A salesperson sees ONLY their own; an admin (who
+ *  reviews on /cash) sees everyone's. */
 export async function getCashSlips(date: string): Promise<CashAttachment[]> {
-  await requireUser();
-  return cashAttachmentsForDate(date);
+  const me = await requireUser();
+  return cashAttachmentsForDate(date, isAdmin(me) ? undefined : me.id);
 }
 
 /** Attach bank-deposit slip photos to a day (salesperson does this on /my when
@@ -61,11 +62,15 @@ export async function addCashAttachments(date: string, images: string[]): Promis
   }
 }
 
-/** Remove a bank-deposit slip photo. */
+/** Remove a bank-deposit slip photo. A salesperson may only delete their own;
+ *  an admin may delete any. */
 export async function deleteCashAttachment(id: number): Promise<{ ok: boolean; error?: string }> {
-  await requireUser();
+  const me = await requireUser();
   try {
-    await q(`delete from cash_attachments where id = $1`, [id]);
+    // scope the delete to the owner unless an admin is doing it
+    const res = isAdmin(me)
+      ? await q(`delete from cash_attachments where id = $1`, [id])
+      : await q(`delete from cash_attachments where id = $1 and created_by = $2`, [id, me.id]);
     revalidatePath("/cash"); revalidatePath("/my");
     return { ok: true };
   } catch (e) { console.error("[deleteCashAttachment] failed", e); return { ok: false, error: "ลบไม่สำเร็จ" }; }

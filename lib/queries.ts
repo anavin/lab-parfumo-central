@@ -669,9 +669,14 @@ export async function cashAttachmentsByDate(): Promise<Record<string, CashAttach
   } catch (e) { if ((e as any)?.code === "42P01") return {}; throw e; }
 }
 
-/** Bank-deposit slip photos for one day (for the salesperson's /my daily report). */
-export async function cashAttachmentsForDate(date: string): Promise<CashAttachment[]> {
+/** Bank-deposit slip photos for one day (for the salesperson's /my daily report).
+ *  Pass userId to return only that person's slips (each salesperson sees only their own). */
+export async function cashAttachmentsForDate(date: string, userId?: number): Promise<CashAttachment[]> {
   try {
-    return await q<CashAttachment>(`select id, entry_date::text entry_date, data from cash_attachments where entry_date=$1 order by id`, [date]);
+    const mine = typeof userId === "number";
+    return await q<CashAttachment>(
+      `select id, entry_date::text entry_date, data from cash_attachments
+       where entry_date=$1${mine ? " and created_by=$2" : ""} order by id`,
+      mine ? [date, userId] : [date]);
   } catch (e) { if ((e as any)?.code === "42P01") return []; throw e; }
 }
