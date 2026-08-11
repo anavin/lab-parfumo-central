@@ -131,7 +131,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       <div className="flex items-center gap-3 mb-4">
         <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน</h3>
+          <h3 className="text-base font-semibold text-ink leading-tight">รายงานประจำวัน · {srcLabel}</h3>
           <p className="text-xs text-muted">
             คัดลอกส่ง LINE ได้เลย
             {mine && (saved

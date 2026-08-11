@@ -99,6 +99,9 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
     setBranch(code);
     try { document.cookie = `my_branch=${code}:${today}; path=/; max-age=86400; samesite=lax`; } catch {}
     setBill((b) => (b ? { ...b, source: code } : b));   // retag the bill currently being entered
+    // the daily-summary card below reads the branch from the cookie server-side, so
+    // re-render the page to make the report + cash float follow the new branch too.
+    router.refresh();
   };
   const [pending, start] = useTransition();
   const [bill, setBill] = useState<BillState | null>(null);
