@@ -96,24 +96,25 @@ const s = StyleSheet.create({
 // 58mm thermal slip — the PDF page itself is 58mm wide so a Bluetooth ESC/POS
 // helper (PosPrinter) prints it 1:1, filling the paper instead of shrinking an A4.
 const PT58 = 164;               // 58mm in PDF points (58/25.4*72)
+const PT100 = 283;              // 100mm — the printer's page length; PDF page = paper so it prints 1:1
 const st = StyleSheet.create({
-  page: { fontFamily: "NotoSansThai", fontSize: 7.5, color: C.ink, paddingVertical: 8, paddingHorizontal: 14 },
+  page: { fontFamily: "NotoSansThai", fontSize: 7.5, color: C.ink, paddingVertical: 5, paddingHorizontal: 14 },
   slip: { width: "100%" },
   center: { textAlign: "center" },
-  logo: { width: 100, height: 39, objectFit: "contain", alignSelf: "center", marginBottom: 4 },
+  logo: { width: 88, height: 34, objectFit: "contain", alignSelf: "center", marginBottom: 3 },
   company: { fontSize: 8.5, fontWeight: "bold", textAlign: "center" },
   small: { fontSize: 7, textAlign: "center" },
-  addr: { fontSize: 6.5, color: C.muted, textAlign: "center", marginTop: 2 },
+  addr: { fontSize: 6.5, color: C.muted, textAlign: "center", marginTop: 1 },
   bold: { fontWeight: "bold" },
-  solid: { borderTopWidth: 1, borderTopColor: C.ink, marginVertical: 6 },
-  dashed: { borderTopWidth: 1, borderTopColor: "#999", borderStyle: "dashed", marginVertical: 6 },
+  solid: { borderTopWidth: 1, borderTopColor: C.ink, marginVertical: 4 },
+  dashed: { borderTopWidth: 1, borderTopColor: "#999", borderStyle: "dashed", marginVertical: 4 },
   docTitle: { fontSize: 8, fontWeight: "bold" },
-  row: { flexDirection: "row", justifyContent: "space-between", marginVertical: 1 },
+  row: { flexDirection: "row", justifyContent: "space-between", marginVertical: 0.5 },
   itemRow: { flexDirection: "row", marginTop: 2 },
   qty: { width: 14 },
   name: { flex: 1 },
   amt: { textAlign: "right" },
-  qr: { width: 84, height: 84, alignSelf: "center", marginTop: 6 },
+  qr: { width: 62, height: 62, alignSelf: "center", marginTop: 4 },
 });
 
 export function ReceiptDocument({ receiptNo, date, time, salesperson, items, paymentChannel, tenders, lang = "th", thermal = false }: {
@@ -144,19 +145,12 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
     : payLabel(paymentChannel, lang);
   const foot = thermal ? 6.5 : 8;   // footer text size
 
-  // For the 58mm page we must size the page height to the content (react-pdf pages are
-  // fixed-height): too short splits onto a mostly-blank page 2, too tall wastes paper.
-  // Estimate from the wrapping of the address + each item name, then add a safety margin.
-  const addrLines = Math.max(2, Math.ceil(t.address.length / 34));
-  const itemsH = items.reduce((a, it) => {
-    const len = (it.name + (it.size ? ` ${it.size}` : "")).length;
-    return a + Math.max(1, Math.ceil(len / 20)) * 12 + (it.discount > 0 ? 11 : 0);
-  }, 0);
-  const thermalHeight = 502 + addrLines * 9 + itemsH + 30;   // ~pt; +30 safety
-
+  // The Bluetooth helper (PosPrinter) scales a whole PDF page to fit the 58x100mm paper.
+  // So the thermal PDF page IS 58x100mm — it prints 1:1 at full width and react-pdf
+  // paginates a long receipt across pages (continuous paper, so page breaks are seamless).
   return (
     <Document>
-      <Page size={thermal ? [PT58, thermalHeight] : "A4"} style={sty.page}>
+      <Page size={thermal ? [PT58, PT100] : "A4"} style={sty.page}>
         <View style={sty.slip}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image style={sty.logo} src={path.join(PUBLIC, "lab-parfumo-logo.png")} />
@@ -204,11 +198,11 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
           <Line />
           <KV k={t.grandTotal} v={nf(net)} strong />
 
-          <View style={{ borderTopWidth: 1, borderTopColor: C.ink, marginTop: 8, paddingTop: 8 }}>
+          <View style={{ borderTopWidth: 1, borderTopColor: C.ink, marginTop: thermal ? 5 : 8, paddingTop: thermal ? 5 : 8 }}>
             <Text style={[sty.center, sty.bold]}>{t.vatIncluded}</Text>
           </View>
 
-          <Text style={[sty.center, { marginTop: 10, color: C.muted }]}>{t.thanks}</Text>
+          <Text style={[sty.center, { marginTop: thermal ? 6 : 10, color: C.muted }]}>{t.thanks}</Text>
           <Text style={[sty.center, { fontSize: foot, color: C.faint, marginTop: 2 }]}>{t.tel} {SHOP.tel} · {SHOP.web}</Text>
           <Text style={[sty.center, { fontSize: foot, color: C.faint }]}>IG & LINE {SHOP.ig}</Text>
 
