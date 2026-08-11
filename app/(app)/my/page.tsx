@@ -1,6 +1,8 @@
 import type { Viewport } from "next";
+import { cookies } from "next/headers";
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
+import { isBranch, DEFAULT_BRANCH } from "@/lib/branches";
 import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs } from "@/lib/queries";
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
@@ -32,6 +34,12 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const today = bkkToday();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date || "") ? sp.date! : today;
 
+  // branch the salesperson picked for TODAY (cookie "my_branch=CODE:YYYY-MM-DD");
+  // ignore it on a different Bangkok day so each day starts with a fresh choice.
+  const jar = await cookies();
+  const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
+  const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
+
   const [kpi, rows, trendRows] = await Promise.all([
     myDayKpis(user.id, date),
     mySubmissions(user.id, date),
@@ -58,7 +66,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         action={<DateNav date={date} today={today} />} />
 
       {/* data entry first */}
-      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} />
+      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} />
 
       {/* daily summary — below the entry */}
       <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>
@@ -75,7 +83,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <Stat label="เฉลี่ย/บิล" value={baht(kpi.aov)} />
       </div>
 
-      <div className="mb-5"><DailyReport mine revision={`${kpi.revenue}|${kpi.bills}|${kpi.qty}`} /></div>
+      <div className="mb-5"><DailyReport mine defaultSource={branch} revision={`${kpi.revenue}|${kpi.bills}|${kpi.qty}`} /></div>
 
       <Card title="ยอดขายของฉัน 14 วันล่าสุด">
         {trend.every((t) => t.revenue === 0) ? (

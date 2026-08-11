@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store } from "lucide-react";
 // The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
 // don't run on the SUNMI WebView) and cached, so barcode scans resolve instantly
 // instead of hitting the network per scan (slow on LTE).
@@ -82,15 +82,24 @@ type BillItemPayload = { item: string; barcode: string; size: string; qty: numbe
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-const blankBill = (date: string, withItem: boolean): BillState => ({ sale_date: date, sale_time: nowHM(), source: "CTW", receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
+const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
-export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {} }:
-  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]> }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string }) {
   const router = useRouter();
   const viewingPast = date !== today;   // browsing an older day; new sales still go to today
+  // Which shop the salesperson is working at today (Central World / Seacon …).
+  // New bills default their source to this; persisted per-day via a cookie so it
+  // survives reloads but resets each Bangkok day (mirrors the staff midnight logout).
+  const [branch, setBranch] = useState(branchProp);
+  const pickBranch = (code: string) => {
+    setBranch(code);
+    try { document.cookie = `my_branch=${code}:${today}; path=/; max-age=86400; samesite=lax`; } catch {}
+    setBill((b) => (b ? { ...b, source: code } : b));   // retag the bill currently being entered
+  };
   const [pending, start] = useTransition();
   const [bill, setBill] = useState<BillState | null>(null);
   const [autoScan, setAutoScan] = useState(false);
@@ -128,10 +137,10 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // laser then adds items continuously. Elsewhere, auto-open the camera scanner.
   const startScan = () => {
     setLastReceipt(null); setEdit(null);
-    if (laserMode) { setAutoScan(false); setBill(blankBill(date, false)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
-    setAutoScan(true); setBill(blankBill(date, false));
+    if (laserMode) { setAutoScan(false); setBill(blankBill(date, false, branch)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
+    setAutoScan(true); setBill(blankBill(date, false, branch));
   };
-  const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(date, true)); };
+  const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(date, true, branch)); };
 
   // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
   // Once a bill is open, BillForm's own scanner listener adds subsequent items.
@@ -140,7 +149,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       const p = await lookupBarcode(code);
       const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
                    : newItem({ barcode: code });
-      setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false), items: [it] });
+      setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false, branch), items: [it] });
       try { navigator.vibrate?.(40); } catch {}
     } catch (e: any) { onActionError(e); }
   });
@@ -211,6 +220,24 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         </div>
       )}
       <div ref={formRef} className="scroll-mt-16" />
+
+      {/* branch picker — which shop the salesperson is working at today. New bills
+          tag this branch automatically; the choice persists per day. */}
+      {!busy && SOURCE_OPTIONS.length > 1 && (
+        <div className="mb-4">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted">
+            <Store className="w-3.5 h-3.5" /> สาขาที่ทำงานวันนี้
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOURCE_OPTIONS.length}, minmax(0,1fr))` }}>
+            {SOURCE_OPTIONS.map((b) => (
+              <button key={b.value} onClick={() => pickBranch(b.value)} type="button"
+                className={`px-4 py-3 rounded-xl border text-sm font-semibold transition active:scale-[.99] ${branch === b.value ? "border-brand bg-brand text-white shadow-sm" : "border-line bg-surface text-ink hover:bg-canvas"}`}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!busy && (
         <div className="flex gap-2.5 mb-4">

@@ -18,7 +18,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const [dateI, setDateI] = useState(bkkToday());
   const date = dateProp ?? dateI;
   const setDate = onDateChange ?? setDateI;
-  const source = defaultSource;   // single location (CTW) — no branch picker
+  const source = defaultSource;   // branch (สาขา) this report is for — chosen on /my, or CTW default
   const [data, setData] = useState<ReportData | null>(null);
   const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (opening float carried from the previous day)
   const [deposit, setDeposit] = useState("");
