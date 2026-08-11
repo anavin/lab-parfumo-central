@@ -34,10 +34,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const [k, rev, cust, scents, sizes, pay, nation, ba, stock, dRev, dCust,
          sstats, grades, dow, hours, stockAll] = await Promise.all([
     kpis(f), monthlyRevenue(f), monthlyCustomers(f), topScents(f, 500),
-    sizeMix(f), paymentMix(f), nationMix(f), byBA(f, 8), stockSummary(),
+    sizeMix(f), paymentMix(f), nationMix(f), byBA(f, 8), stockSummary(source),
     singleMonth ? dailyRevenue(singleMonth, source) : Promise.resolve([]),
     singleMonth ? dailyCustomers(singleMonth) : Promise.resolve([]),
-    salesStats(f), gradeMix(f), salesByDow(f), salesByHour(f), stockLive(),
+    salesStats(f), gradeMix(f), salesByDow(f), salesByHour(f), stockLive(source),
   ]);
 
   // sales efficiency — per-bill metrics use receipted-only figures (บิลที่มีเลขใบเสร็จ)
