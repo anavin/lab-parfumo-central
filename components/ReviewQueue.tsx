@@ -2,8 +2,8 @@
 import { useState, useMemo, useTransition, useEffect, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ReviewDayContext } from "@/components/review-day-context";
-import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Receipt as ReceiptIcon } from "lucide-react";
-import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime } from "@/lib/actions/submissions";
+import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Plus, Receipt as ReceiptIcon } from "lucide-react";
+import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -289,6 +289,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                         ))}
                       </ul>
 
+                      {bill.ref && <AddItemAdmin refId={bill.ref} pending={pending} onDone={refresh} />}
                       <SplitBreakdown tenders={payments[bill.ref]} />
                       {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
 
@@ -485,6 +486,62 @@ function RowEditor({ row, onSave, onCancel, pending, savedTenders }: { row: Subm
           ? { ...f, qty: Number(f.qty) || 0, unit_price: Number(f.unit_price) || 0, discount: Number(f.discount) || 0, tenders: split ? resolveTenders(f.tenders ?? [], total) : undefined }
           : { ...f, customers: Number(f.customers) || 0, thai: Number(f.thai) || 0, foreign: Number(f.foreign) || 0, sell_amount: Number(f.sell_amount) || 0 })}
           disabled={pending || (split && !tendersOk)} className="px-4 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
+      </div>
+    </div>
+  );
+}
+
+// Admin: add a new item to an existing pending bill (product search → qty/price/discount).
+function AddItemAdmin({ refId, pending, onDone }: { refId: string; pending: boolean; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [res, setRes] = useState<any[]>([]);
+  const [acOpen, setAcOpen] = useState(false);
+  const [picked, setPicked] = useState<any | null>(null);
+  const [qty, setQty] = useState("1");
+  const [price, setPrice] = useState("");
+  const [disc, setDisc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fld = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
+  const onText = (v: string) => {
+    setText(v); setPicked(null);
+    if (v.trim()) fetch(`/api/products/search?q=${encodeURIComponent(v.trim())}`, { headers: { accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : [])).then((rows) => { setRes(Array.isArray(rows) ? rows : []); setAcOpen(true); }).catch(() => {});
+    else setAcOpen(false);
+  };
+  const pick = (p: any) => { setPicked(p); setText(`${p.scent} ${p.size}`); setPrice(String(Math.round(p.price || 0))); setAcOpen(false); };
+  const add = () => {
+    const item = (picked?.scent ?? text).trim();
+    if (!item) return;
+    setBusy(true);
+    addBillItemsByAdmin(refId, [{ item, barcode: picked?.barcode, size: picked?.size, qty: Number(qty) || 1, unit_price: Number(price) || 0, discount: Number(disc) || 0 }])
+      .then((r) => { setBusy(false); if (r?.ok) { setOpen(false); setText(""); setPicked(null); setQty("1"); setPrice(""); setDisc(""); onDone(); } else alert(r?.error ?? "เพิ่มไม่สำเร็จ"); })
+      .catch(() => { setBusy(false); alert("เพิ่มไม่สำเร็จ ลองใหม่"); });
+  };
+  if (!open) return (
+    <button onClick={() => setOpen(true)} disabled={pending}
+      className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-brand/50 text-sm font-semibold text-brand-dark hover:bg-brand/5 disabled:opacity-50">
+      <Plus className="w-4 h-4" /> เพิ่มสินค้าในบิลนี้
+    </button>
+  );
+  return (
+    <div className="mt-2 rounded-lg border border-line bg-canvas/40 p-2.5 space-y-2">
+      <div className="relative">
+        <input className={fld + " w-full"} value={text} onChange={(e) => onText(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="พิมพ์ค้นหากลิ่น หรือชื่อสินค้า" autoFocus />
+        {acOpen && res.length > 0 && (
+          <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
+            {res.map((p) => <button key={p.id} onMouseDown={() => pick(p)} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> <b className="text-ink">{p.size}</b> <span className="text-muted">· {p.barcode}</span></button>)}
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-[11px] text-muted">จำนวน<input inputMode="numeric" className={fld + " w-full text-center"} value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} /></label>
+        <label className="text-[11px] text-muted">ราคา<input inputMode="numeric" className={fld + " w-full text-center"} value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} /></label>
+        <label className="text-[11px] text-muted">ส่วนลด<input inputMode="numeric" className={fld + " w-full text-center"} value={disc} onChange={(e) => setDisc(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} /></label>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => { setOpen(false); setText(""); setPicked(null); }} className="px-3 py-1.5 rounded-lg border border-line text-sm">ยกเลิก</button>
+        <button onClick={add} disabled={busy || !(picked?.scent ?? text).trim()} className="flex-1 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold disabled:opacity-50">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
       </div>
     </div>
   );

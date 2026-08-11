@@ -20,7 +20,7 @@ async function lookupBarcode(code: string): Promise<any | null> {
   const bare = code.replace(/^0+/, "");
   return map.get(code) ?? map.get(bare) ?? map.get("0" + code) ?? map.get("00" + code) ?? null;
 }
-import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment } from "@/lib/actions/submissions";
+import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment, addMyBillItems } from "@/lib/actions/submissions";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { KShopQr } from "@/components/KShopQr";
@@ -714,6 +714,39 @@ function StatusPill({ status }: { status: string }) {
   return null; // pending — not shown
 }
 
+// Add a NEW item to an already-saved pending bill (reuses the full ItemCard so
+// scan/search/qty/price/discount/ของแถม all work the same as a fresh bill).
+function AddToBill({ refId, disabled }: { refId: string; disabled?: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [it, setIt] = useState<BillItem>(() => newItem());
+  const [busy, setBusy] = useState(false);
+  const add = () => {
+    if (!String(it.item || "").trim()) return;
+    setBusy(true);
+    const qty = Number(it.qty) || 1, up = Number(it.unit_price) || 0;
+    const discount = it.gift ? qty * up : Number(it.discount) || 0;
+    addMyBillItems(refId, [{ item: it.item, barcode: it.barcode, size: it.size, qty, unit_price: up, discount }])
+      .then((r) => { setBusy(false); if (r?.ok) { setIt(newItem()); setOpen(false); router.refresh(); } else alert(r?.error ?? "เพิ่มไม่สำเร็จ"); })
+      .catch(() => { setBusy(false); alert("เพิ่มไม่สำเร็จ ลองใหม่"); });
+  };
+  if (!open) return (
+    <button onClick={() => setOpen(true)} disabled={disabled}
+      className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-brand/50 text-sm font-semibold text-brand-dark hover:bg-brand-soft disabled:opacity-50">
+      <Plus className="w-4 h-4" /> เพิ่มสินค้าในบิลนี้
+    </button>
+  );
+  return (
+    <div className="mt-2 space-y-2">
+      <ItemCard it={it} index={0} onChange={(p) => setIt((prev) => ({ ...prev, ...p }))} onRemove={() => { setOpen(false); setIt(newItem()); }} />
+      <div className="flex gap-2">
+        <button onClick={() => { setOpen(false); setIt(newItem()); }} className="px-4 py-2 rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
+        <button onClick={add} disabled={busy || !String(it.item || "").trim()} className="flex-1 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
+      </div>
+    </div>
+  );
+}
+
 // one bill = the item lines a customer bought together
 function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], onAddPhotos, onDeletePhoto }: {
   index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; pending: boolean;
@@ -765,6 +798,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
           </li>
         ))}
       </ul>
+      {status === "pending" && ref && <AddToBill refId={ref} disabled={pending} />}
       {(photos.length > 0 || canEditPhotos) && (
         <div className="mt-2 pt-2 border-t border-line/60">
           <PhotoStrip photos={photos} onDelete={canEditPhotos ? onDeletePhoto : undefined} size={52} />

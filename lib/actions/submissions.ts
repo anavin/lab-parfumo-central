@@ -122,6 +122,61 @@ export async function submitBill(input: unknown) {
   return { ref };   // so the UI can offer a "print receipt" link for the bill just saved
 }
 
+// ------- add item(s) to an EXISTING pending bill (same receipt_no) -------
+type AddItem = { item: string; barcode?: string; size?: string; qty: number; unit_price: number; discount?: number };
+
+async function insertBillItems(ref: string, shared: { source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null }, items: AddItem[], userId: number, ba: string) {
+  for (const it of items) {
+    const qty = Number(it.qty) || 0;
+    const total = Math.max(0, qty * (Number(it.unit_price) || 0) - (Number(it.discount) || 0));
+    const [row] = await q<{ id: number }>(
+      `insert into submissions
+         (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
+       values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
+      [userId, ba, shared.entry_date, shared.source, shared.sale_time, ref,
+       it.item, it.barcode || null, it.size || null, qty, Number(it.unit_price) || 0, Number(it.discount) || 0, total,
+       shared.payment_channel, shared.nation]);
+    await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
+  }
+}
+
+/** Salesperson: append items to their own still-pending bill. */
+export async function addMyBillItems(billRef: string, items: AddItem[]) {
+  const user = await requirePermission("my_sales");
+  const ref = String(billRef || "").trim();
+  const rows = (items || []).filter((it) => String(it?.item || "").trim());
+  if (!ref || !rows.length) return { ok: false, error: "ไม่มีสินค้าที่จะเพิ่ม" };
+  const [b] = await q<{ source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null }>(
+    `select source, entry_date::text entry_date, sale_time, nation, payment_channel
+     from submissions where receipt_no = $1 and created_by = $2 and status = 'pending' order by id limit 1`, [ref, user.id]);
+  if (!b) return { ok: false, error: "ไม่พบบิล หรือบิลถูกตรวจแล้ว (เพิ่มไม่ได้)" };
+  try {
+    await insertBillItems(ref, b, rows, user.id, user.full_name);
+    await logAudit("submit", "submission", null, `เพิ่มสินค้าในบิล ${ref} · ${rows.length} รายการ`);
+    revalidatePath("/my"); revalidatePath("/review");
+    return { ok: true };
+  } catch (e) { console.error("[addMyBillItems] failed", e); return { ok: false, error: "เพิ่มไม่สำเร็จ ลองใหม่" }; }
+}
+
+/** Admin: append items to any still-pending bill (review page). */
+export async function addBillItemsByAdmin(billRef: string, items: AddItem[]) {
+  const admin = await requirePermission("review");
+  const ref = String(billRef || "").trim();
+  const rows = (items || []).filter((it) => String(it?.item || "").trim());
+  if (!ref || !rows.length) return { ok: false, error: "ไม่มีสินค้าที่จะเพิ่ม" };
+  const [b] = await q<{ source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null; created_by: number }>(
+    `select source, entry_date::text entry_date, sale_time, nation, payment_channel, created_by
+     from submissions where receipt_no = $1 and status = 'pending' order by id limit 1`, [ref]);
+  if (!b) return { ok: false, error: "ไม่พบบิล หรือบิลถูกตรวจแล้ว" };
+  try {
+    // keep the item under the original salesperson so the bill stays coherent
+    await insertBillItems(ref, b, rows, b.created_by, admin.full_name);
+    await logAudit("update", "submission", ref, `แอดมินเพิ่มสินค้าในบิล ${ref} · ${rows.length} รายการ`);
+    revalidatePath("/review"); revalidatePath("/my");
+    return { ok: true };
+  } catch (e) { console.error("[addBillItemsByAdmin] failed", e); return { ok: false, error: "เพิ่มไม่สำเร็จ ลองใหม่" }; }
+}
+
 // Add / remove photo evidence on a bill you own that is still pending.
 export async function addBillAttachments(billRef: string, images: string[]) {
   const user = await requirePermission("my_sales");
