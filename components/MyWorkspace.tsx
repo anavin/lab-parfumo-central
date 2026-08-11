@@ -791,8 +791,9 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
   const note = rows.find((r) => r.status === "rejected" && r.review_note)?.review_note;
   const ref = first.receipt_no || "";
   const canEditPhotos = status === "pending" && !!ref;
+  const locked = status === "approved";   // เข้าระบบแล้ว → ดูได้อย่างเดียว
   return (
-    <div className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+    <div className={`rounded-xl border shadow-sm overflow-hidden ${locked ? "border-line bg-canvas/50" : "border-line bg-surface"}`}>
       {/* header bar — makes each bill clearly its own card */}
       <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
         <div className="flex items-center gap-2 min-w-0">
