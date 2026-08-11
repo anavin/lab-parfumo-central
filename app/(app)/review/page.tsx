@@ -1,6 +1,7 @@
 import { ClipboardCheck } from "lucide-react";
 import { requirePermission } from "@/lib/auth/require-user";
 import { pendingSubmissions, recentlyApprovedSubmissions, attachmentsForRefs, paymentsForRefs, topScents, monthlySalesTotals, ALL } from "@/lib/queries";
+import { isBranch, DEFAULT_BRANCH } from "@/lib/branches";
 import { PageHeader } from "@/components/ui";
 import { ReviewQueue } from "@/components/ReviewQueue";
 import { ReviewInsights } from "@/components/ReviewInsights";
@@ -12,11 +13,13 @@ const TH_MON = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.�
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewPage() {
+export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   await requirePermission("review");
-  const rows = await pendingSubmissions();
+  const sp = await searchParams;
+  const branch = isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH;   // review one branch at a time
+  const rows = await pendingSubmissions(branch);
   const pendingBills = new Set(rows.map((r) => r.receipt_no || `id:${r.id}`)).size;   // rows sharing a receipt = one bill
-  const approved = await recentlyApprovedSubmissions();
+  const approved = await recentlyApprovedSubmissions(branch);
   const refs = [...rows, ...approved].map((r) => r.receipt_no).filter(Boolean) as string[];
   const attachments = await attachmentsForRefs(refs);
   const payments = await paymentsForRefs(refs);
@@ -36,7 +39,7 @@ export default async function ReviewPage() {
           subtitle={pendingBills ? `${pendingBills} บิลรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
         <div className="mb-6"><MonthlyExcelButton /></div>
       </div>
-      <ReviewInsights revision={`${rows.length}|${approved.length}`}>
+      <ReviewInsights revision={`${rows.length}|${approved.length}`} branch={branch}>
         <div className="no-print">
           <ReviewQueue rows={rows} approved={approved} attachments={attachments} payments={payments} />
         </div>
