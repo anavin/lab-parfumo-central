@@ -1,5 +1,6 @@
 import { q } from "./db";
 import { SPLIT2 } from "@/lib/payments";
+import { DEFAULT_BRANCH } from "@/lib/branches";
 
 // ---- filters --------------------------------------------------------------
 // months: subset of month labels ('Nov-25') to include, or null = all.
@@ -608,46 +609,46 @@ const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_ca
 
 /** Shared shop drawer for a day (same figures for every user). Opening carries from the
  *  latest prior day's closing when not yet saved. Zeros gracefully if the table is absent. */
-export async function getDailyCash(date: string) {
+export async function getDailyCash(date: string, branch: string = DEFAULT_BRANCH) {
   try {
     const [row] = await q<{ opening: number; deposit: number; confirmed: boolean }>(
-      `select opening::float, deposit::float, confirmed from daily_cash where entry_date=$1`, [date]);
+      `select opening::float, deposit::float, confirmed from daily_cash where entry_date=$1 and branch=$2`, [date, branch]);
     // A confirmed (admin-reviewed) day keeps its own opening. Otherwise "ยกมา" = the prior
     // day's LIVE closing (opening + เงินสดขาย − เข้าธนาคาร), so it always equals the admin
     // table and carries the true คงเหลือ forward — not the stale stored closing.
     if (row?.confirmed) return { opening: row.opening, deposit: row.deposit, saved: true };
     const [prev] = await q<{ entry_date: string; opening: number; deposit: number }>(
       `select entry_date::text entry_date, opening::float, deposit::float
-       from daily_cash where entry_date<$1 order by entry_date desc limit 1`, [date]);
+       from daily_cash where entry_date<$1 and branch=$2 order by entry_date desc limit 1`, [date, branch]);
     if (!prev) return { opening: row?.opening ?? 0, deposit: row?.deposit ?? 0, saved: !!row };
-    const prevClosing = Math.max(0, prev.opening + (await dailyReport(prev.entry_date, "CTW")).cash - prev.deposit);
+    const prevClosing = Math.max(0, prev.opening + (await dailyReport(prev.entry_date, branch)).cash - prev.deposit);
     return { opening: prevClosing, deposit: row?.deposit ?? 0, saved: !!row };
   } catch (e) { if (missingDailyCash(e)) return { opening: 0, deposit: 0, saved: false }; throw e; }
 }
 
-export async function saveDailyCash(date: string, opening: number, deposit: number, closing: number, updatedBy: number | null = null) {
+export async function saveDailyCash(date: string, branch: string, opening: number, deposit: number, closing: number, updatedBy: number | null = null) {
   try {
-    await q(`insert into daily_cash (entry_date, opening, deposit, closing, updated_by, updated_at)
-             values ($1,$2,$3,$4,$5, now())
-             on conflict (entry_date)
-             do update set opening=$2, deposit=$3, closing=$4, updated_by=$5, updated_at=now()`,
-      [date, opening, deposit, closing, updatedBy]);
+    await q(`insert into daily_cash (entry_date, branch, opening, deposit, closing, updated_by, updated_at)
+             values ($1,$2,$3,$4,$5,$6, now())
+             on conflict (entry_date, branch)
+             do update set opening=$3, deposit=$4, closing=$5, updated_by=$6, updated_at=now()`,
+      [date, branch, opening, deposit, closing, updatedBy]);
     return { ok: true };
   } catch (e) { if (missingDailyCash(e)) return { ok: false, missing: true }; throw e; }
 }
 
-/** Per-day shop drawer figures for the admin cash page (review + confirm + post). */
-export async function dailyCashLog(limit = 90) {
+/** Per-day shop drawer figures for the admin cash page (review + confirm + post), one branch. */
+export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) {
   try {
     const rows = await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
       `select entry_date::text entry_date, opening::float, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
-       from daily_cash order by entry_date desc limit $1`, [limit]);
+       from daily_cash where branch=$2 order by entry_date desc limit $1`, [limit, branch]);
     // "คงเหลือ" is computed LIVE = ยกมา + เงินสดขายวันนั้น − เข้าธนาคาร, exactly like the
     // daily report's "เงินสดหน้าร้านคงเหลือ" — that live value is what carries to the next
     // day. (The stored closing gets frozen at confirm time and can go stale.)
     const cashByDate = new Map<string, number>();
-    await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, "CTW")).cash)));
+    await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, branch)).cash)));
     let prevClosing: number | null = null;
     for (const r of [...rows].reverse()) {   // oldest → newest
       if (prevClosing !== null && !r.confirmed) r.opening = prevClosing;   // un-reviewed day: ยกมา = คงเหลือเมื่อวาน
@@ -659,24 +660,27 @@ export async function dailyCashLog(limit = 90) {
 }
 
 export type CashAttachment = { id: number; entry_date: string; data: string };
-/** Bank-deposit slip photos grouped by day (for the admin /cash drawer). */
-export async function cashAttachmentsByDate(): Promise<Record<string, CashAttachment[]>> {
+/** Bank-deposit slip photos grouped by day for one branch (admin /cash drawer). */
+export async function cashAttachmentsByDate(branch: string = DEFAULT_BRANCH): Promise<Record<string, CashAttachment[]>> {
   try {
-    const rows = await q<CashAttachment>(`select id, entry_date::text entry_date, data from cash_attachments order by id`);
+    const rows = await q<CashAttachment>(
+      `select id, entry_date::text entry_date, data from cash_attachments where branch=$1 order by id`, [branch]);
     const map: Record<string, CashAttachment[]> = {};
     for (const r of rows) (map[r.entry_date] ??= []).push(r);
     return map;
   } catch (e) { if ((e as any)?.code === "42P01") return {}; throw e; }
 }
 
-/** Bank-deposit slip photos for one day (for the salesperson's /my daily report).
+/** Bank-deposit slip photos for one (day, branch) — for the salesperson's /my daily report.
  *  Pass userId to return only that person's slips (each salesperson sees only their own). */
-export async function cashAttachmentsForDate(date: string, userId?: number): Promise<CashAttachment[]> {
+export async function cashAttachmentsForDate(date: string, userId?: number, branch: string = DEFAULT_BRANCH): Promise<CashAttachment[]> {
   try {
     const mine = typeof userId === "number";
+    const params: any[] = [date, branch];
+    if (mine) params.push(userId);
     return await q<CashAttachment>(
       `select id, entry_date::text entry_date, data from cash_attachments
-       where entry_date=$1${mine ? " and created_by=$2" : ""} order by id`,
-      mine ? [date, userId] : [date]);
+       where entry_date=$1 and branch=$2${mine ? " and created_by=$3" : ""} order by id`,
+      params);
   } catch (e) { if ((e as any)?.code === "42P01") return []; throw e; }
 }

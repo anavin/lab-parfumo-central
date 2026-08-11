@@ -41,16 +41,16 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   // every viewer now that the drawer is shared; only /my autosaves changes back.
   useEffect(() => {
     loaded.current = false;
-    getMyCashFloat(date)
+    getMyCashFloat(date, source)
       .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); })
       .catch(() => {})
       .finally(() => { loaded.current = true; });
-  }, [date, mine]);
+  }, [date, mine, source]);
 
-  // bank-deposit slips for the day (shared; loaded for every viewer)
+  // bank-deposit slips for this (day, branch)
   useEffect(() => {
-    getCashSlips(date).then(setSlips).catch(() => setSlips([]));
-  }, [date, revision]);
+    getCashSlips(date, source).then(setSlips).catch(() => setSlips([]));
+  }, [date, revision, source]);
 
   const addSlips = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -60,8 +60,8 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       const out: string[] = [];
       for (const f of Array.from(files).slice(0, room)) { try { out.push(await compressImage(f)); } catch { /* skip bad image */ } }
       if (!out.length) { setSlipErr("แนบไม่สำเร็จ — รองรับ JPG/PNG"); return; }
-      const res = await addCashAttachments(date, out);
-      if (res?.ok) setSlips(await getCashSlips(date)); else setSlipErr(res?.error ?? "แนบไม่สำเร็จ");
+      const res = await addCashAttachments(date, out, source);
+      if (res?.ok) setSlips(await getCashSlips(date, source)); else setSlipErr(res?.error ?? "แนบไม่สำเร็จ");
     } finally { setSlipBusy(false); if (slipRef.current) slipRef.current.value = ""; }
   };
   const removeSlip = (id: number) => {
@@ -78,10 +78,10 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   useEffect(() => {
     if (!mine || readOnly || !loaded.current) return;
     const t = setTimeout(() => {
-      saveMyCashFloat(date, openingN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
+      saveMyCashFloat(date, source, openingN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [mine, date, openingN, depositN, closing]);
+  }, [mine, date, source, openingN, depositN, closing]);
 
   const text = useMemo(() => {
     if (!data) return "";

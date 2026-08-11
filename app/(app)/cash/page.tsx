@@ -7,12 +7,16 @@ import { CashTable } from "@/components/CashTable";
 import { DrawerAdmin } from "@/components/DrawerAdmin";
 import { q } from "@/lib/db";
 import { dailyCashLog, cashAttachmentsByDate } from "@/lib/queries";
+import { BranchTabs } from "@/components/BranchTabs";
+import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
 
 export const dynamic = "force-dynamic";
 
-export default async function CashPage() {
-  const drawer = await dailyCashLog(90);
-  const cashSlips = await cashAttachmentsByDate();
+export default async function CashPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
+  const sp = await searchParams;
+  const branch = isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH;
+  const drawer = await dailyCashLog(90, branch);
+  const cashSlips = await cashAttachmentsByDate(branch);
   const rows = await q<{ cash_date: string; description: string; amount: number; type: string }>(`
     select cash_date, description, amount::float, type
     from cash_entries order by cash_date desc nulls last, id desc`);
@@ -31,10 +35,16 @@ export default async function CashPage() {
         <Stat label="จำนวนรายการ" value={String(agg.n)} />
         {byType.slice(0, 2).map((t) => <Stat key={t.type} label={t.type} value={baht(t.total)} />)}
       </div>
-      {drawer.length > 0 && (
-        <Card title="เงินสดหน้าร้าน (รายวัน) · ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto" className="mb-6">
-          <DrawerAdmin rows={drawer} attachments={cashSlips} />
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
+        <BranchTabs />
+      </div>
+      {drawer.length > 0 ? (
+        <Card title="ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto" className="mb-6">
+          <DrawerAdmin rows={drawer} attachments={cashSlips} branch={branch} />
         </Card>
+      ) : (
+        <Card className="mb-6"><div className="p-8 text-center text-muted text-sm">ยังไม่มีข้อมูลเงินสดหน้าร้านของ {branchName(branch)}</div></Card>
       )}
 
       <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`}>

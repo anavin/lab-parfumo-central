@@ -11,7 +11,7 @@ import type { CashAttachment } from "@/lib/queries";
 type Row = { entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
 const fmtDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "2-digit" });
 
-function DrawerRow({ r, slips }: { r: Row; slips: CashAttachment[] }) {
+function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; branch: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [opening, setOpening] = useState(String(Math.round(r.opening)));
@@ -20,7 +20,7 @@ function DrawerRow({ r, slips }: { r: Row; slips: CashAttachment[] }) {
   const inp = "w-24 border border-line rounded-md px-2 py-1 text-sm text-right tabular-nums bg-surface text-ink focus:outline-none focus:border-brand disabled:bg-canvas disabled:text-muted";
 
   const save = () => start(async () => {
-    const res = await confirmDrawer(r.entry_date, Number(opening) || 0, Number(deposit) || 0);
+    const res = await confirmDrawer(r.entry_date, branch, Number(opening) || 0, Number(deposit) || 0);
     if (res?.ok) router.refresh(); else alert(res?.error ?? "บันทึกไม่สำเร็จ");
   });
 
@@ -58,7 +58,7 @@ function DrawerRow({ r, slips }: { r: Row; slips: CashAttachment[] }) {
         <tr className="border-b border-line-soft bg-canvas/40">
           <td colSpan={5} className="px-4 py-3">
             <div className="max-w-md mx-auto">
-              <DailyReport date={viewDate} onDateChange={setViewDate} readOnly />
+              <DailyReport date={viewDate} onDateChange={setViewDate} defaultSource={branch} readOnly />
             </div>
           </td>
         </tr>
@@ -67,7 +67,7 @@ function DrawerRow({ r, slips }: { r: Row; slips: CashAttachment[] }) {
   );
 }
 
-export function DrawerAdmin({ rows, attachments = {} }: { rows: Row[]; attachments?: Record<string, CashAttachment[]> }) {
+export function DrawerAdmin({ rows, attachments = {}, branch = "CTW" }: { rows: Row[]; attachments?: Record<string, CashAttachment[]>; branch?: string }) {
   if (!rows.length) return <div className="p-8 text-center text-muted text-sm">ยังไม่มีข้อมูลเงินสดหน้าร้าน</div>;
   return (
     <>
@@ -79,7 +79,7 @@ export function DrawerAdmin({ rows, attachments = {} }: { rows: Row[]; attachmen
           <th className="px-3 py-2.5 text-right">คงเหลือหน้าร้าน</th>
           <th className="px-5 py-2.5 text-right">จัดการ</th>
         </tr></thead>
-        <tbody>{rows.map((r) => <DrawerRow key={r.entry_date} r={r} slips={attachments[r.entry_date] ?? []} />)}</tbody>
+        <tbody>{rows.map((r) => <DrawerRow key={r.entry_date} r={r} slips={attachments[r.entry_date] ?? []} branch={branch} />)}</tbody>
       </table>
       <p className="text-[11px] text-muted px-5 py-2">
         กด “ดูรายงาน” เพื่อตรวจยอดขายของวันนั้น · ตรวจ/แก้ ยกมา–เข้าธนาคาร แล้ว “ยืนยัน & บันทึกเข้าระบบ” → ยอดเข้าธนาคารลงบัญชีเงินสด (โพสต์ครั้งเดียว แล้วล็อกแถว) · คงเหลือ = ยกมา + เงินสดขาย − เข้าธนาคาร

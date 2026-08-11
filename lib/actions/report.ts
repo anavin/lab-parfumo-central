@@ -1,6 +1,7 @@
 "use server";
 import { requireUser } from "@/lib/auth/require-user";
 import { dailyReport, dailySaleRows, dailySalesByMonth, getDailyCash, saveDailyCash } from "@/lib/queries";
+import { DEFAULT_BRANCH, normalizeBranch } from "@/lib/branches";
 
 /** Aggregate daily sales for the copy-ready report. `mine` = only the signed-in
  *  salesperson's own sales (for /my); otherwise the whole branch (for admin pages). */
@@ -21,14 +22,14 @@ export async function getDailyBills(date: string, source: string) {
   return dailySaleRows(date, source);
 }
 
-/** Load the shared shop drawer for a day (same for every user; opening carries forward). */
-export async function getMyCashFloat(date: string) {
+/** Load a branch's shop drawer for a day (opening carries forward per branch). */
+export async function getMyCashFloat(date: string, branch: string = DEFAULT_BRANCH) {
   await requireUser();
-  return getDailyCash(date);
+  return getDailyCash(date, normalizeBranch(branch));
 }
 
-/** Autosave the shared shop drawer for a day (records who last edited). */
-export async function saveMyCashFloat(date: string, opening: number, deposit: number, closing: number) {
+/** Autosave a branch's shop drawer for a day (records who last edited). */
+export async function saveMyCashFloat(date: string, branch: string, opening: number, deposit: number, closing: number) {
   const user = await requireUser();
-  return saveDailyCash(date, opening, deposit, closing, user.id);
+  return saveDailyCash(date, normalizeBranch(branch), opening, deposit, closing, user.id);
 }
