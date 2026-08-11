@@ -5,7 +5,7 @@ import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
-import { branchPrefix } from "@/lib/branches";
+import { branchPrefix, resolveBranch } from "@/lib/branches";
 import { requirePermission } from "@/lib/auth/require-user";
 import { pushLine, siteBaseUrl } from "@/lib/line";
 
@@ -33,7 +33,7 @@ export async function submitSale(input: unknown) {
        (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation, note)
      values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      returning id`,
-    [user.id, user.full_name, d.sale_date, d.source || "CTW", d.sale_time || null,
+    [user.id, user.full_name, d.sale_date, resolveBranch(d.source), d.sale_time || null,
      d.receipt_no || null, d.item, d.barcode || null, d.size || null,
      d.qty, d.unit_price ?? 0, discount, total, d.payment_channel || null, d.nation || null, (d as any).note || null]);
   await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
@@ -77,7 +77,7 @@ export async function submitBill(input: unknown) {
     if (tsum !== Math.round(billTotal)) throw new Error(`ยอดชำระรวม ฿${tsum.toLocaleString()} ไม่เท่ากับยอดบิล ฿${Math.round(billTotal).toLocaleString()}`);
   }
 
-  const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, d.source || "CTW"));
+  const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, resolveBranch(d.source)));
   let count = 0, sum = 0;
   for (const it of d.items) {
     const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
@@ -87,7 +87,7 @@ export async function submitBill(input: unknown) {
          (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
        values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        returning id`,
-      [user.id, user.full_name, d.sale_date, d.source || "CTW", d.sale_time || null, ref,
+      [user.id, user.full_name, d.sale_date, resolveBranch(d.source), d.sale_time || null, ref,
        it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, it.discount ?? 0, total,
        pc, d.nation]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
@@ -279,7 +279,7 @@ export async function updateMySale(id: number, input: unknown) {
        entry_date=$2, source=$3, sale_time=$4, receipt_no=$5, item=$6, barcode=$7, size=$8,
        qty=$9, unit_price=$10, discount=$11, total=$12, payment_channel=$13, nation=$14, updated_at=now()
      where id=$1`,
-    [id, d.sale_date, d.source || "CTW", d.sale_time || null, d.receipt_no || null, d.item,
+    [id, d.sale_date, resolveBranch(d.source), d.sale_time || null, d.receipt_no || null, d.item,
      d.barcode || null, d.size || null, d.qty, d.unit_price ?? 0, discount, total,
      d.payment_channel || null, d.nation || null]);
   await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
@@ -337,7 +337,7 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
          entry_date=$2, source=$3, sale_time=$4, receipt_no=$5, item=$6, barcode=$7, size=$8,
          qty=$9, unit_price=$10, discount=$11, total=$12, payment_channel=$13, nation=$14, updated_at=now()
        where id=$1`,
-      [id, d.sale_date, d.source || "CTW", d.sale_time || null, d.receipt_no || null, d.item,
+      [id, d.sale_date, resolveBranch(d.source), d.sale_time || null, d.receipt_no || null, d.item,
        d.barcode || null, d.size || null, d.qty, d.unit_price ?? 0, discount, total,
        d.payment_channel || null, d.nation || null]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);

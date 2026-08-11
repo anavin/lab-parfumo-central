@@ -60,3 +60,10 @@ export function normalizeBranch(v: string | null | undefined): string {
   if (m && byCode.has(m[1].toUpperCase())) return m[1].toUpperCase();
   return s;
 }
+
+/** Clamp any input to a KNOWN branch code (falls back to DEFAULT_BRANCH). Use at
+ *  server-action trust boundaries so a forged/legacy value can't be stored raw. */
+export function resolveBranch(v: string | null | undefined): string {
+  const n = normalizeBranch(v);
+  return byCode.has(n) ? n : DEFAULT_BRANCH;
+}

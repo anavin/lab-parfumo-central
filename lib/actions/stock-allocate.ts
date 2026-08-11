@@ -19,7 +19,7 @@ async function nextAllocNo(code: string, date: string): Promise<string> {
 
 /** Allocate stock (scent + qty lines) to a branch — recorded as a mini purchase order. */
 export async function allocateBranchStock(branch: string, date: string, items: AllocItem[]): Promise<{ ok: boolean; error?: string }> {
-  await requirePermission("stock");
+  await requirePermission("requisitions");
   const br = normalizeBranch(branch);
   const label = branchStoreCode(br);
   const orderDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
@@ -52,7 +52,7 @@ export async function allocateBranchStock(branch: string, date: string, items: A
 
 /** Remove an allocation (soft-delete so it stops counting toward branch stock). */
 export async function deleteAllocation(poId: number): Promise<{ ok: boolean; error?: string }> {
-  await requirePermission("stock");
+  await requirePermission("requisitions");
   try {
     await q(`update purchase_orders set deleted_at = now() where id = $1 and status = $2`, [poId, ALLOC_STATUS]);
     revalidatePath("/stock"); revalidatePath("/stock/allocate");

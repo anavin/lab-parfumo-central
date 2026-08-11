@@ -205,7 +205,9 @@ const STOCK_CTE = `
     join purchase_orders po on po.id = i.po_id
     where i.barcode is not null and po.deleted_at is null group by 1, 2),
   sold as (
-    select barcode, upper(coalesce(nullif(source,''),'CTW')) branch, sum(qty)::float q
+    select barcode,
+           upper(case when source = 'EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end) branch,
+           sum(qty)::float q
     from sales where barcode is not null group by 1, 2),
   ret as (
     select serial as barcode,
@@ -377,6 +379,20 @@ export async function pendingSubmissions(branch?: string) {
 
 /** Recently approved submissions (last 30 days) so an admin can review/undo an
  *  approval and still see its attached files well after the day it was approved. */
+/** Pending-bill count per branch — so the review page can show every branch's
+ *  backlog even while one branch tab is selected. */
+export async function pendingCountsByBranch(): Promise<Record<string, number>> {
+  try {
+    const rows = await q<{ source: string | null; bills: number }>(`
+      select source, count(distinct coalesce(receipt_no, 'id:' || id))::int bills
+      from submissions where kind = 'sale' and status = 'pending'${await aliveAnd("")}
+      group by source`);
+    const out: Record<string, number> = {};
+    for (const r of rows) { const b = normalizeBranch(r.source); out[b] = (out[b] ?? 0) + Number(r.bills); }
+    return out;
+  } catch { return {}; }
+}
+
 export async function recentlyApprovedSubmissions(branch?: string) {
   const filter = branch ? ` and s.source = $1` : "";
   return q<SubmissionRow>(`
@@ -660,24 +676,27 @@ export async function getDailyCash(date: string, branch: string = DEFAULT_BRANCH
     // A confirmed (admin-reviewed) day keeps its own opening. Otherwise "ยกมา" = the prior
     // day's LIVE closing (ยกมา + เอาไป + เงินสดขาย − เข้าธนาคาร). A brand-new branch has no
     // prior day → ยกมา = 0 (money brought to the branch goes in `seed`, not opening).
-    if (row?.confirmed) return { opening: row.opening, seed: row.seed, deposit: row.deposit, saved: true };
+    // `locked` = admin-confirmed → the /my UI must not edit/overwrite it.
+    if (row?.confirmed) return { opening: row.opening, seed: row.seed, deposit: row.deposit, saved: true, locked: true };
     const [prev] = await q<{ entry_date: string; opening: number; seed: number; deposit: number }>(
       `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float
        from daily_cash where entry_date<$1 and branch=$2 order by entry_date desc limit 1`, [date, branch]);
     const opening = prev ? Math.max(0, prev.opening + prev.seed + (await dailyReport(prev.entry_date, branch)).cash - prev.deposit) : 0;
-    return { opening, seed: row?.seed ?? 0, deposit: row?.deposit ?? 0, saved: !!row };
-  } catch (e) { if (missingDailyCash(e)) return { opening: 0, seed: 0, deposit: 0, saved: false }; throw e; }
+    return { opening, seed: row?.seed ?? 0, deposit: row?.deposit ?? 0, saved: !!row, locked: false };
+  } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return { opening: 0, seed: 0, deposit: 0, saved: false, locked: false }; throw e; }
 }
 
 export async function saveDailyCash(date: string, branch: string, opening: number, seed: number, deposit: number, closing: number, updatedBy: number | null = null) {
   try {
+    // never overwrite an admin-confirmed (locked) drawer via the /my autosave path
     await q(`insert into daily_cash (entry_date, branch, opening, seed, deposit, closing, updated_by, updated_at)
              values ($1,$2,$3,$4,$5,$6,$7, now())
              on conflict (entry_date, branch)
-             do update set opening=$3, seed=$4, deposit=$5, closing=$6, updated_by=$7, updated_at=now()`,
+             do update set opening=$3, seed=$4, deposit=$5, closing=$6, updated_by=$7, updated_at=now()
+             where daily_cash.confirmed = false`,
       [date, branch, opening, seed, deposit, closing, updatedBy]);
     return { ok: true };
-  } catch (e) { if (missingDailyCash(e)) return { ok: false, missing: true }; throw e; }
+  } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return { ok: false, missing: true }; throw e; }
 }
 
 /** Per-day shop drawer figures for the admin cash page (review + confirm + post), one branch. */

@@ -9,7 +9,7 @@ import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
 export const dynamic = "force-dynamic";
 
 export default async function AllocateStockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
-  await requirePermission("stock");
+  await requirePermission("requisitions");
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH;
   const allocations = await branchAllocations(branch);

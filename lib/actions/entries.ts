@@ -5,6 +5,7 @@ import { saleSchema, customerDaySchema, cashSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/auth/require-user";
 import { monthLabel } from "@/lib/month";
+import { resolveBranch } from "@/lib/branches";
 
 export async function createSale(input: unknown) {
   const user = await requirePermission("sales");
@@ -17,7 +18,7 @@ export async function createSale(input: unknown) {
   await q(
     `insert into sales (source, month, sale_date, sale_time, ba, receipt_no, item, barcode, size, qty, unit_price, discount, total, paid, payment_channel, nation, created_by)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13,$14,$15,$16)`,
-    [d.source || "CTW", monthLabel(d.sale_date), d.sale_date, d.sale_time || null, d.ba || null,
+    [resolveBranch(d.source), monthLabel(d.sale_date), d.sale_date, d.sale_time || null, d.ba || null,
      d.receipt_no || null, d.item, d.barcode || null, d.size || null,
      d.qty, d.unit_price ?? 0, discount, total, d.payment_channel || null, d.nation || null, user.id]);
   await q(`update sales s set product_id = p.id from products p where p.barcode = s.barcode and s.product_id is null`);

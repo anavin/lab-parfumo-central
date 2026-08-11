@@ -23,6 +23,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (auto: carried from the previous day)
   const [seed, setSeed] = useState("");         // เงินสดที่เอาไปสาขา (float brought to the branch today)
   const [deposit, setDeposit] = useState("");
+  const [locked, setLocked] = useState(false);  // admin has confirmed this day → read-only on /my
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);   // brief "จำแล้ว" flash on autosave (mine only)
   const [pending, start] = useTransition();
@@ -43,7 +44,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   useEffect(() => {
     loaded.current = false;
     getMyCashFloat(date, source)
-      .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setSeed(r.seed ? String(Math.round(r.seed)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); })
+      .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setSeed(r.seed ? String(Math.round(r.seed)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); setLocked(!!(r as any).locked); })
       .catch(() => {})
       .finally(() => { loaded.current = true; });
   }, [date, mine, source]);
@@ -67,7 +68,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   };
   const removeSlip = (id: number) => {
     setSlips((s) => s.filter((x) => x.id !== id));   // optimistic
-    deleteCashAttachment(id).catch(() => getCashSlips(date).then(setSlips));
+    deleteCashAttachment(id).catch(() => getCashSlips(date, source).then(setSlips));
   };
 
   const openingN = Number(opening) || 0;
@@ -78,12 +79,12 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
 
   // on /my: autosave the drawer figures (debounced) so they persist + carry forward
   useEffect(() => {
-    if (!mine || readOnly || !loaded.current) return;
+    if (!mine || readOnly || locked || !loaded.current) return;   // don't churn an admin-confirmed day
     const t = setTimeout(() => {
       saveMyCashFloat(date, source, openingN, seedN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [mine, date, source, openingN, seedN, depositN, closing]);
+  }, [mine, date, source, openingN, seedN, depositN, closing, locked]);
 
   const text = useMemo(() => {
     if (!data) return "";
@@ -145,6 +146,9 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       </div>
       )}
 
+      {!readOnly && locked && (
+        <div className="mb-3 text-[11px] text-muted bg-canvas border border-line rounded-lg px-3 py-2">🔒 แอดมินยืนยันเงินสดของวันนี้แล้ว — แก้ไขไม่ได้</div>
+      )}
       {/* controls — hidden in the verify view */}
       {!readOnly && (
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -166,18 +170,18 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
           <span className="text-xs text-muted mb-1 block">เงินสดที่เอาไปสาขา</span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
-            <input inputMode="numeric" value={seed} onFocus={(e) => e.target.select()} readOnly={readOnly}
+            <input inputMode="numeric" value={seed} onFocus={(e) => e.target.select()} readOnly={readOnly || locked}
               onChange={(e) => setSeed(e.target.value.replace(/[^\d]/g, ""))} placeholder="0"
-              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
+              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly || locked ? " bg-canvas text-muted" : "")} />
           </div>
         </label>
         <label className="block col-span-2">
           <span className="text-xs text-muted mb-1 block">ฝากเข้าธนาคาร</span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
-            <input inputMode="numeric" value={deposit} onFocus={(e) => e.target.select()} readOnly={readOnly}
+            <input inputMode="numeric" value={deposit} onFocus={(e) => e.target.select()} readOnly={readOnly || locked}
               onChange={(e) => setDeposit(e.target.value.replace(/[^\d]/g, ""))} placeholder="0"
-              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
+              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly || locked ? " bg-canvas text-muted" : "")} />
           </div>
         </label>
         {/* bank-deposit slip photos — attached right under ฝากเข้าธนาคาร */}

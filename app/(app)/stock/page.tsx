@@ -18,7 +18,6 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const [rows, s, user] = await Promise.all([stockLive(branch), stockSummary(branch), getCurrentUser()]);
   const lowCount = (s.low ?? 0) + (s.out ?? 0);
   const canRequisition = !!user && can(user, "requisitions");
-  const canStock = !!user && can(user, "stock");
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
@@ -26,7 +25,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         subtitle={`คำนวณสดจาก ส่งไป − ขาย · ${branch ? branchName(branch) : "ทุกสาขา"}`}
         action={<div className="flex items-center gap-2">
           <BranchTabs withAll />
-          {canStock && (
+          {canRequisition && (
             <Link href="/stock/allocate" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark whitespace-nowrap">
               <PackagePlus className="w-4 h-4" /> จัดสต๊อกเข้าสาขา
             </Link>
