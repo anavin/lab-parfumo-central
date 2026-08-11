@@ -20,7 +20,8 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const setDate = onDateChange ?? setDateI;
   const source = defaultSource;   // branch (สาขา) this report is for — chosen on /my, or CTW default
   const [data, setData] = useState<ReportData | null>(null);
-  const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (opening float carried from the previous day)
+  const [opening, setOpening] = useState("");   // เงินสดหน้าร้านยกมา (auto: carried from the previous day)
+  const [seed, setSeed] = useState("");         // เงินสดที่เอาไปสาขา (float brought to the branch today)
   const [deposit, setDeposit] = useState("");
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);   // brief "จำแล้ว" flash on autosave (mine only)
@@ -42,7 +43,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   useEffect(() => {
     loaded.current = false;
     getMyCashFloat(date, source)
-      .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); })
+      .then((r) => { setOpening(r.opening ? String(Math.round(r.opening)) : ""); setSeed(r.seed ? String(Math.round(r.seed)) : ""); setDeposit(r.deposit ? String(Math.round(r.deposit)) : ""); })
       .catch(() => {})
       .finally(() => { loaded.current = true; });
   }, [date, mine, source]);
@@ -70,18 +71,19 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   };
 
   const openingN = Number(opening) || 0;
+  const seedN = Number(seed) || 0;
   const depositN = Number(deposit) || 0;
-  const cashOnHand = openingN + (data?.cash ?? 0);   // เงินสดหน้าร้าน = ยกมา + เงินสดรับ (ก่อนฝาก)
+  const cashOnHand = openingN + seedN + (data?.cash ?? 0);   // เงินสดหน้าร้าน = ยกมา + เอาไป + เงินสดรับ (ก่อนฝาก)
   const closing = Math.max(0, cashOnHand - depositN); // คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร → ยกไปวันถัดไป
 
   // on /my: autosave the drawer figures (debounced) so they persist + carry forward
   useEffect(() => {
     if (!mine || readOnly || !loaded.current) return;
     const t = setTimeout(() => {
-      saveMyCashFloat(date, source, openingN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
+      saveMyCashFloat(date, source, openingN, seedN, depositN, closing).then((r) => { if (r?.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); } }).catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [mine, date, source, openingN, depositN, closing]);
+  }, [mine, date, source, openingN, seedN, depositN, closing]);
 
   const text = useMemo(() => {
     if (!data) return "";
@@ -98,13 +100,14 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       `คนต่างชาติ ${data.foreignCount} ราย เป็นเงิน ${nf(data.foreignAmt)} บาท`,
       ...(data.otherCount > 0 ? [`อื่นๆ/ไม่ระบุ ${data.otherCount} ราย เป็นเงิน ${nf(data.otherAmt)} บาท`] : []),
       ``,
-      `เงินสดหน้าร้านยกมา ${nf(openingN)} บาท`,
+      `เงินสดยกมา ${nf(openingN)} บาท`,
+      ...(seedN ? [`เงินสดที่เอาไปสาขา ${nf(seedN)} บาท`] : []),
       `เงินสดหน้าร้าน ${nf(cashOnHand)} บาท`,
       `🏦 เข้าธนาคาร ${nf(depositN)} บาท`,
       `💵 เงินสดหน้าร้านคงเหลือ ${nf(closing)} บาท`,
     ];
     return lines.join("\n");
-  }, [data, source, date, cashOnHand, closing, depositN, openingN]);
+  }, [data, source, date, cashOnHand, closing, depositN, openingN, seedN]);
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
@@ -150,15 +153,25 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} max={bkkToday()} className={inp} />
         </label>
         <label className="block">
-          <span className="text-xs text-muted mb-1 block">เงินสดหน้าร้านยกมา</span>
+          <span className="text-xs text-muted mb-1 block">เงินสดยกมา <span className="text-muted-soft">(อัตโนมัติ)</span></span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
-            <input inputMode="numeric" value={opening} onFocus={(e) => e.target.select()} readOnly={readOnly}
-              onChange={(e) => setOpening(e.target.value.replace(/[^\d]/g, ""))} placeholder="0"
-              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
+            {/* ยกมา is always the carried-forward closing of the previous day (0 for a new
+                branch) — read-only; brought cash goes in "เงินสดที่เอาไปสาขา" below. */}
+            <input inputMode="numeric" value={opening} readOnly title="ยกจากคงเหลือเมื่อวาน (สาขาใหม่ = 0)"
+              placeholder="0" className={inp + " pl-7 text-right tabular-nums font-medium bg-canvas text-muted"} />
           </div>
         </label>
         <label className="block">
+          <span className="text-xs text-muted mb-1 block">เงินสดที่เอาไปสาขา</span>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
+            <input inputMode="numeric" value={seed} onFocus={(e) => e.target.select()} readOnly={readOnly}
+              onChange={(e) => setSeed(e.target.value.replace(/[^\d]/g, ""))} placeholder="0"
+              className={inp + " pl-7 text-right tabular-nums font-medium" + (readOnly ? " bg-canvas text-muted" : "")} />
+          </div>
+        </label>
+        <label className="block col-span-2">
           <span className="text-xs text-muted mb-1 block">ฝากเข้าธนาคาร</span>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">฿</span>
@@ -216,18 +229,19 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
             </div>
             <Rule />
             <div className="space-y-1.5">
-              <Line label="เงินสดหน้าร้านยกมา" value={`${nf(openingN)} บาท`} />
+              <Line label="เงินสดยกมา" value={`${nf(openingN)} บาท`} />
+              {seedN > 0 && <Line label="เงินสดที่เอาไปสาขา" value={`${nf(seedN)} บาท`} />}
               <Line label="เงินสดหน้าร้าน" value={`${nf(cashOnHand)} บาท`} />
               <Line label="🏦 เข้าธนาคาร" value={`${nf(depositN)} บาท`} strong />
               <Line label="💵 เงินสดหน้าร้านคงเหลือ" value={`${nf(closing)} บาท`} strong />
             </div>
-            <p className="text-[11px] text-muted mt-1.5 text-center">คงเหลือ {nf(closing)} → ยกไปเป็น &quot;เงินสดหน้าร้านยกมา&quot; ของวันพรุ่งนี้</p>
+            <p className="text-[11px] text-muted mt-1.5 text-center">คงเหลือ {nf(closing)} → ยกไปเป็น &quot;เงินสดยกมา&quot; ของวันพรุ่งนี้</p>
           </>
         )}
       </div>
 
       {!readOnly && (
-        <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = ยกมา + เงินสดรับ · คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
+        <p className="text-[11px] text-muted mt-2 text-center">เงินสดหน้าร้าน = ยกมา + เอาไปสาขา + เงินสดรับ · คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร · โอน/เครดิต = ทุกช่องทางที่ไม่ใช่เงินสด</p>
       )}
 
       {!readOnly && (

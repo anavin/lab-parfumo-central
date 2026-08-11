@@ -29,7 +29,7 @@ export async function getMyCashFloat(date: string, branch: string = DEFAULT_BRAN
 }
 
 /** Autosave a branch's shop drawer for a day (records who last edited). */
-export async function saveMyCashFloat(date: string, branch: string, opening: number, deposit: number, closing: number) {
+export async function saveMyCashFloat(date: string, branch: string, opening: number, seed: number, deposit: number, closing: number) {
   const user = await requireUser();
-  return saveDailyCash(date, normalizeBranch(branch), opening, deposit, closing, user.id);
+  return saveDailyCash(date, normalizeBranch(branch), opening, seed, deposit, closing, user.id);
 }

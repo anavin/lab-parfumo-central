@@ -8,19 +8,20 @@ import { PhotoStrip } from "@/components/BillPhotos";
 import { baht } from "@/lib/format";
 import type { CashAttachment } from "@/lib/queries";
 
-type Row = { entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
+type Row = { entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
 const fmtDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "2-digit" });
 
 function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; branch: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [opening, setOpening] = useState(String(Math.round(r.opening)));
+  const [seed, setSeed] = useState(String(Math.round(r.seed)));
   const [deposit, setDeposit] = useState(String(Math.round(r.deposit)));
   const [viewDate, setViewDate] = useState<string | null>(null);   // report expanded for this day
   const inp = "w-24 border border-line rounded-md px-2 py-1 text-sm text-right tabular-nums bg-surface text-ink focus:outline-none focus:border-brand disabled:bg-canvas disabled:text-muted";
 
   const save = () => start(async () => {
-    const res = await confirmDrawer(r.entry_date, branch, Number(opening) || 0, Number(deposit) || 0);
+    const res = await confirmDrawer(r.entry_date, branch, Number(opening) || 0, Number(seed) || 0, Number(deposit) || 0);
     if (res?.ok) router.refresh(); else alert(res?.error ?? "บันทึกไม่สำเร็จ");
   });
 
@@ -31,6 +32,10 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
         <td className="px-3 py-2.5 text-right">
           <input value={opening} disabled={r.confirmed || pending} inputMode="numeric"
             onChange={(e) => setOpening(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
+        </td>
+        <td className="px-3 py-2.5 text-right">
+          <input value={seed} disabled={r.confirmed || pending} inputMode="numeric"
+            onChange={(e) => setSeed(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
         </td>
         <td className="px-3 py-2.5 text-right align-top">
           <input value={deposit} disabled={r.confirmed || pending} inputMode="numeric"
@@ -56,7 +61,7 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
       </tr>
       {viewDate && (
         <tr className="border-b border-line-soft bg-canvas/40">
-          <td colSpan={5} className="px-4 py-3">
+          <td colSpan={6} className="px-4 py-3">
             <div className="max-w-md mx-auto">
               <DailyReport date={viewDate} onDateChange={setViewDate} defaultSource={branch} readOnly />
             </div>
@@ -75,6 +80,7 @@ export function DrawerAdmin({ rows, attachments = {}, branch = "CTW" }: { rows: 
         <thead className="bg-canvas"><tr className="th border-b border-line-soft">
           <th className="px-5 py-2.5 text-left">วันที่</th>
           <th className="px-3 py-2.5 text-right">ยกมา</th>
+          <th className="px-3 py-2.5 text-right">เอาไปสาขา</th>
           <th className="px-3 py-2.5 text-right">🏦 เข้าธนาคาร / สลิป (จากพนักงาน)</th>
           <th className="px-3 py-2.5 text-right">คงเหลือหน้าร้าน</th>
           <th className="px-5 py-2.5 text-right">จัดการ</th>
@@ -82,7 +88,7 @@ export function DrawerAdmin({ rows, attachments = {}, branch = "CTW" }: { rows: 
         <tbody>{rows.map((r) => <DrawerRow key={r.entry_date} r={r} slips={attachments[r.entry_date] ?? []} branch={branch} />)}</tbody>
       </table>
       <p className="text-[11px] text-muted px-5 py-2">
-        กด “ดูรายงาน” เพื่อตรวจยอดขายของวันนั้น · ตรวจ/แก้ ยกมา–เข้าธนาคาร แล้ว “ยืนยัน & บันทึกเข้าระบบ” → ยอดเข้าธนาคารลงบัญชีเงินสด (โพสต์ครั้งเดียว แล้วล็อกแถว) · คงเหลือ = ยกมา + เงินสดขาย − เข้าธนาคาร
+        กด “ดูรายงาน” เพื่อตรวจยอดขายของวันนั้น · ตรวจ/แก้ ยกมา–เอาไปสาขา–เข้าธนาคาร แล้ว “ยืนยัน & บันทึกเข้าระบบ” → ยอดเข้าธนาคารลงบัญชีเงินสด (โพสต์ครั้งเดียว แล้วล็อกแถว) · คงเหลือ = ยกมา + เอาไปสาขา + เงินสดขาย − เข้าธนาคาร · สาขาใหม่ ยกมา = 0
       </p>
     </>
   );

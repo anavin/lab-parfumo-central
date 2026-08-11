@@ -637,28 +637,27 @@ const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_ca
  *  latest prior day's closing when not yet saved. Zeros gracefully if the table is absent. */
 export async function getDailyCash(date: string, branch: string = DEFAULT_BRANCH) {
   try {
-    const [row] = await q<{ opening: number; deposit: number; confirmed: boolean }>(
-      `select opening::float, deposit::float, confirmed from daily_cash where entry_date=$1 and branch=$2`, [date, branch]);
+    const [row] = await q<{ opening: number; seed: number; deposit: number; confirmed: boolean }>(
+      `select opening::float, coalesce(seed,0)::float seed, deposit::float, confirmed from daily_cash where entry_date=$1 and branch=$2`, [date, branch]);
     // A confirmed (admin-reviewed) day keeps its own opening. Otherwise "ยกมา" = the prior
-    // day's LIVE closing (opening + เงินสดขาย − เข้าธนาคาร), so it always equals the admin
-    // table and carries the true คงเหลือ forward — not the stale stored closing.
-    if (row?.confirmed) return { opening: row.opening, deposit: row.deposit, saved: true };
-    const [prev] = await q<{ entry_date: string; opening: number; deposit: number }>(
-      `select entry_date::text entry_date, opening::float, deposit::float
+    // day's LIVE closing (ยกมา + เอาไป + เงินสดขาย − เข้าธนาคาร). A brand-new branch has no
+    // prior day → ยกมา = 0 (money brought to the branch goes in `seed`, not opening).
+    if (row?.confirmed) return { opening: row.opening, seed: row.seed, deposit: row.deposit, saved: true };
+    const [prev] = await q<{ entry_date: string; opening: number; seed: number; deposit: number }>(
+      `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float
        from daily_cash where entry_date<$1 and branch=$2 order by entry_date desc limit 1`, [date, branch]);
-    if (!prev) return { opening: row?.opening ?? 0, deposit: row?.deposit ?? 0, saved: !!row };
-    const prevClosing = Math.max(0, prev.opening + (await dailyReport(prev.entry_date, branch)).cash - prev.deposit);
-    return { opening: prevClosing, deposit: row?.deposit ?? 0, saved: !!row };
-  } catch (e) { if (missingDailyCash(e)) return { opening: 0, deposit: 0, saved: false }; throw e; }
+    const opening = prev ? Math.max(0, prev.opening + prev.seed + (await dailyReport(prev.entry_date, branch)).cash - prev.deposit) : 0;
+    return { opening, seed: row?.seed ?? 0, deposit: row?.deposit ?? 0, saved: !!row };
+  } catch (e) { if (missingDailyCash(e)) return { opening: 0, seed: 0, deposit: 0, saved: false }; throw e; }
 }
 
-export async function saveDailyCash(date: string, branch: string, opening: number, deposit: number, closing: number, updatedBy: number | null = null) {
+export async function saveDailyCash(date: string, branch: string, opening: number, seed: number, deposit: number, closing: number, updatedBy: number | null = null) {
   try {
-    await q(`insert into daily_cash (entry_date, branch, opening, deposit, closing, updated_by, updated_at)
-             values ($1,$2,$3,$4,$5,$6, now())
+    await q(`insert into daily_cash (entry_date, branch, opening, seed, deposit, closing, updated_by, updated_at)
+             values ($1,$2,$3,$4,$5,$6,$7, now())
              on conflict (entry_date, branch)
-             do update set opening=$3, deposit=$4, closing=$5, updated_by=$6, updated_at=now()`,
-      [date, branch, opening, deposit, closing, updatedBy]);
+             do update set opening=$3, seed=$4, deposit=$5, closing=$6, updated_by=$7, updated_at=now()`,
+      [date, branch, opening, seed, deposit, closing, updatedBy]);
     return { ok: true };
   } catch (e) { if (missingDailyCash(e)) return { ok: false, missing: true }; throw e; }
 }
@@ -666,19 +665,18 @@ export async function saveDailyCash(date: string, branch: string, opening: numbe
 /** Per-day shop drawer figures for the admin cash page (review + confirm + post), one branch. */
 export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) {
   try {
-    const rows = await q<{ entry_date: string; opening: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
-      `select entry_date::text entry_date, opening::float, deposit::float, closing::float,
+    const rows = await q<{ entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
+      `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
        from daily_cash where branch=$2 order by entry_date desc limit $1`, [limit, branch]);
-    // "คงเหลือ" is computed LIVE = ยกมา + เงินสดขายวันนั้น − เข้าธนาคาร, exactly like the
-    // daily report's "เงินสดหน้าร้านคงเหลือ" — that live value is what carries to the next
-    // day. (The stored closing gets frozen at confirm time and can go stale.)
+    // "คงเหลือ" is computed LIVE = ยกมา + เอาไป + เงินสดขายวันนั้น − เข้าธนาคาร; that live value
+    // carries to the next day. The oldest un-reviewed day starts at ยกมา = 0 (new branch).
     const cashByDate = new Map<string, number>();
     await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, branch)).cash)));
-    let prevClosing: number | null = null;
+    let prevClosing = 0;
     for (const r of [...rows].reverse()) {   // oldest → newest
-      if (prevClosing !== null && !r.confirmed) r.opening = prevClosing;   // un-reviewed day: ยกมา = คงเหลือเมื่อวาน
-      r.closing = Math.max(0, r.opening + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
+      if (!r.confirmed) r.opening = prevClosing;   // un-reviewed day: ยกมา = คงเหลือเมื่อวาน (0 for the first day)
+      r.closing = Math.max(0, r.opening + r.seed + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
       prevClosing = r.closing;
     }
     return rows;

@@ -8,17 +8,17 @@ import { DEFAULT_BRANCH, normalizeBranch, branchName } from "@/lib/branches";
 
 /** Admin: save the day's opening/deposit, recompute closing from that day's cash sales,
  *  mark it confirmed, and post the bank deposit into the cash ledger — once. */
-export async function confirmDrawer(date: string, branch: string, opening: number, deposit: number): Promise<{ ok: boolean; error?: string }> {
+export async function confirmDrawer(date: string, branch: string, opening: number, seed: number, deposit: number): Promise<{ ok: boolean; error?: string }> {
   const me = await requirePermission("cash");
   const br = normalizeBranch(branch);
   try {
     const rep = await dailyReport(date, br);                    // that day's cash sales for this branch
-    const closing = Math.max(0, opening + rep.cash - deposit);
-    await q(`insert into daily_cash (entry_date, branch, opening, deposit, closing, updated_by, updated_at, confirmed)
-             values ($1,$2,$3,$4,$5,$6, now(), true)
+    const closing = Math.max(0, opening + seed + rep.cash - deposit);
+    await q(`insert into daily_cash (entry_date, branch, opening, seed, deposit, closing, updated_by, updated_at, confirmed)
+             values ($1,$2,$3,$4,$5,$6,$7, now(), true)
              on conflict (entry_date, branch) do update
-               set opening=$3, deposit=$4, closing=$5, updated_by=$6, updated_at=now(), confirmed=true`,
-      [date, br, opening, deposit, closing, me.id]);
+               set opening=$3, seed=$4, deposit=$5, closing=$6, updated_by=$7, updated_at=now(), confirmed=true`,
+      [date, br, opening, seed, deposit, closing, me.id]);
 
     // post the bank deposit into the cash ledger once (posted_cash_id guards against dupes)
     const [row] = await q<{ posted: number | null }>(`select posted_cash_id posted from daily_cash where entry_date=$1 and branch=$2`, [date, br]);
