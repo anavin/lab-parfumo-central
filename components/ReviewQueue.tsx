@@ -10,8 +10,9 @@ import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/paymen
 import { SplitTenders } from "@/components/SplitTenders";
 import { Select } from "@/components/ui/Select";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
+import { branchOptions } from "@/lib/branches";
 
-const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
+const SOURCE_OPTIONS = branchOptions();
 const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
 const payEditOptions = (cur?: string) => {
   const base = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));

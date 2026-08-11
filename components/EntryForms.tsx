@@ -5,11 +5,12 @@ import { searchProducts } from "@/lib/actions/lookups";
 import { createSale, createCashEntry, createCustomerDay } from "@/lib/actions/entries";
 import { Select } from "@/components/ui/Select";
 import { PAYMENTS } from "@/lib/payments";
+import { branchOptions } from "@/lib/branches";
 
 const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
 const today = () => new Date().toISOString().slice(0, 10);
 
-const SOURCE_OPTS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
+const SOURCE_OPTS = branchOptions();
 const NATION_OPTS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
 const PAY_OPTS = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
 

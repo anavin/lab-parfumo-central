@@ -5,8 +5,7 @@
  */
 import type { DailyReport as ReportData, DaySaleRow } from "@/lib/queries";
 import { PAYMENTS } from "@/lib/payments";
-
-const SRC_LABEL: Record<string, string> = { CTW: "Central World (CTW)", EVENT_SCS: "Event" };
+import { branchName } from "@/lib/branches";
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 const thaiDate = (iso: string) =>
   new Date(iso + "T00:00:00").toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -42,7 +41,7 @@ export function DailyReportSheet({ date, source, data, rows, showDetail = true, 
   date: string; source: string; data: ReportData | null; rows: DaySaleRow[]; showDetail?: boolean; generatedAt: string;
 }) {
   const bills = groupBills(rows);
-  const srcLabel = SRC_LABEL[source] ?? source;
+  const srcLabel = branchName(source);
   const ready = !!data && data.orders > 0;
   const aov = ready ? data!.total / data!.orders : 0;
   const totalQty = bills.reduce((s, b) => s + b.rows.reduce((x, r) => x + (r.qty ?? 0), 0), 0);

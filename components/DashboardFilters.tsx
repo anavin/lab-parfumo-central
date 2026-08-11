@@ -2,6 +2,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { Select } from "@/components/ui/Select";
+import { branchOptions } from "@/lib/branches";
 
 const PERIODS = [
   { k: "all", label: "ทั้งหมด" },
@@ -9,11 +10,7 @@ const PERIODS = [
   { k: "6m", label: "6 เดือน" },
   { k: "3m", label: "3 เดือน" },
 ];
-const SOURCES = [
-  { value: "all", label: "ทุกช่องทาง" },
-  { value: "CTW", label: "CTW" },
-  { value: "EVENT_SCS", label: "Event SCS" },
-];
+const SOURCES = [{ value: "all", label: "ทุกสาขา" }, ...branchOptions()];
 
 export function DashboardFilters({ months }: { months: string[] }) {
   const router = useRouter();

@@ -28,6 +28,7 @@ import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
 import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
+import { branchOptions, DEFAULT_BRANCH } from "@/lib/branches";
 import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
@@ -61,7 +62,7 @@ const qtyOptions = (cur?: any) => {
   const c = Number(cur) || 0;
   return c > 20 ? [{ value: String(c), label: String(c) }, ...QTY_OPTS] : QTY_OPTS;
 };
-const SOURCE_OPTIONS = [{ value: "CTW", label: "Central World" }, { value: "EVENT_SCS", label: "Event" }];
+const SOURCE_OPTIONS = branchOptions();
 // K Shop channels share the shop's static QR (shown for the customer to scan)
 const isKShop = (v?: string) => v === "K Shop" || v === "K Shop Credit Card";
 

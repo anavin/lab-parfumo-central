@@ -6,8 +6,7 @@ import { getCashSlips, addCashAttachments, deleteCashAttachment } from "@/lib/ac
 import { PhotoStrip } from "@/components/BillPhotos";
 import { compressImage } from "@/lib/img";
 import type { DailyReport as ReportData, CashAttachment } from "@/lib/queries";
-
-const SRC_SHORT: Record<string, string> = { CTW: "CTW", EVENT_SCS: "Event" };
+import { branchName } from "@/lib/branches";
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 const ddmmyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y.slice(2)}`; };
@@ -87,7 +86,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const text = useMemo(() => {
     if (!data) return "";
     const lines = [
-      `สรุปยอดขาย ${SRC_SHORT[source] ?? source} ${ddmmyy(date)}`,
+      `สรุปยอดขาย ${branchName(source)} ${ddmmyy(date)}`,
       ``,
       `จำนวนออเดอร์ ${data.orders} รายการ`,
       `- เงินสด ${nf(data.cash)} บาท`,
@@ -114,7 +113,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
 
   const inp = "w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
   const ready = !!data && data.orders > 0;
-  const srcLabel = SRC_SHORT[source] ?? source;
+  const srcLabel = branchName(source);
 
   // one aligned "receipt" line: label left, amount right
   const Line = ({ label, value, strong = false }: { label: React.ReactNode; value: string; strong?: boolean }) => (

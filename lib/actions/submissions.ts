@@ -5,6 +5,7 @@ import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
+import { branchPrefix } from "@/lib/branches";
 import { requirePermission } from "@/lib/auth/require-user";
 import { pushLine, siteBaseUrl } from "@/lib/line";
 
@@ -47,7 +48,7 @@ export async function submitSale(input: unknown) {
 //   {BRANCH}-{YYMMDD}-{running}  e.g. CTW-260806-001  (sortable, self-explanatory)
 async function genBillRef(saleDate: string, source: string): Promise<string> {
   const [y, m, dd] = saleDate.split("-");
-  const src = source === "EVENT_SCS" ? "EVT" : (source || "CTW").slice(0, 3).toUpperCase();
+  const src = branchPrefix(source);
   const prefix = `${src}-${(y || "").slice(2)}${(m || "").padStart(2, "0")}${(dd || "").padStart(2, "0")}-`;
   // max running number already used for this branch+day (only our generated refs)
   const [mx] = await q<{ n: number }>(
