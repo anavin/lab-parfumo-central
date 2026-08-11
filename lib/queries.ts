@@ -683,7 +683,27 @@ export async function getDailyCash(date: string, branch: string = DEFAULT_BRANCH
        from daily_cash where entry_date<$1 and branch=$2 order by entry_date desc limit 1`, [date, branch]);
     const opening = prev ? Math.max(0, prev.opening + prev.seed + (await dailyReport(prev.entry_date, branch)).cash - prev.deposit) : 0;
     return { opening, seed: row?.seed ?? 0, deposit: row?.deposit ?? 0, saved: !!row, locked: false };
-  } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return { opening: 0, seed: 0, deposit: 0, saved: false, locked: false }; throw e; }
+  } catch (e) {
+    if (missingDailyCash(e)) return { opening: 0, seed: 0, deposit: 0, saved: false, locked: false };
+    // branch/seed columns not migrated yet (0018/0020) → still carry the shared drawer
+    // forward instead of silently showing 0, until the migrations are run.
+    if ((e as any)?.code === "42703") return getDailyCashLegacy(date);
+    throw e;
+  }
+}
+
+/** Pre-multi-branch fallback: single shared drawer, no seed column (schema before 0018/0020). */
+async function getDailyCashLegacy(date: string) {
+  try {
+    const [row] = await q<{ opening: number; deposit: number; confirmed: boolean }>(
+      `select opening::float, deposit::float, confirmed from daily_cash where entry_date=$1`, [date]);
+    if (row?.confirmed) return { opening: row.opening, seed: 0, deposit: row.deposit, saved: true, locked: true };
+    const [prev] = await q<{ entry_date: string; opening: number; deposit: number }>(
+      `select entry_date::text entry_date, opening::float, deposit::float
+       from daily_cash where entry_date<$1 order by entry_date desc limit 1`, [date]);
+    const opening = prev ? Math.max(0, prev.opening + (await dailyReport(prev.entry_date, DEFAULT_BRANCH)).cash - prev.deposit) : 0;
+    return { opening, seed: 0, deposit: row?.deposit ?? 0, saved: !!row, locked: false };
+  } catch { return { opening: 0, seed: 0, deposit: 0, saved: false, locked: false }; }
 }
 
 export async function saveDailyCash(date: string, branch: string, opening: number, seed: number, deposit: number, closing: number, updatedBy: number | null = null) {
