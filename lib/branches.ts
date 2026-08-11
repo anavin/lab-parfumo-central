@@ -5,11 +5,13 @@
  * prefix, and the cash + stock branch filters. `code` is the canonical value
  * stored in sales.source / submissions.source and used everywhere as the key.
  */
-export type Branch = { code: string; name: string; prefix: string; active: boolean };
+export type Branch = { code: string; name: string; prefix: string; storeCode: string; active: boolean };
 
 export const BRANCHES: Branch[] = [
-  { code: "CTW", name: "Central World", prefix: "CTW", active: true },
-  { code: "SCS", name: "Seacon Square", prefix: "SCS", active: true },
+  // storeCode is written as a PO's branch_label when allocating stock to a branch;
+  // the stock engine derives the branch from the "NN_XXX" token, so it must contain it.
+  { code: "CTW", name: "Central World", prefix: "CTW", storeCode: "01_CTW", active: true },
+  { code: "SCS", name: "Seacon Square", prefix: "SCS", storeCode: "02_SCS", active: true },
 ];
 
 /** Default branch when none is chosen (first active branch). */
@@ -30,6 +32,11 @@ export function branchName(code: string | null | undefined): string {
 /** Bill-ref prefix for a branch code, e.g. "CTW-260806-001". */
 export function branchPrefix(code: string | null | undefined): string {
   return byCode.get(normalizeBranch(code))?.prefix || DEFAULT_BRANCH;
+}
+
+/** PO branch_label for a branch code (so allocated stock counts for that branch). */
+export function branchStoreCode(code: string | null | undefined): string {
+  return byCode.get(normalizeBranch(code))?.storeCode || normalizeBranch(code);
 }
 
 /** True when `code` is a known, active branch. */

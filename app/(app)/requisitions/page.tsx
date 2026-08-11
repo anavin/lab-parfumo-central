@@ -2,6 +2,7 @@ import { PageHeader, LinkBtn } from "@/components/ui";
 import { ClipboardList } from "lucide-react";
 import { RequisitionsTable } from "@/components/RequisitionsTable";
 import { q } from "@/lib/db";
+import { ALLOC_STATUS } from "@/lib/stock-alloc";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,9 @@ export default async function Requisitions() {
            count(i.id)::int lines, coalesce(sum(i.qty),0)::float qty
     from purchase_orders po
     left join po_items i on i.po_id = po.id
-    where po.deleted_at is null
+    where po.deleted_at is null and coalesce(po.status,'') <> $1
     group by po.id
-    order by po.order_date desc nulls last, po.po_number desc`);
+    order by po.order_date desc nulls last, po.po_number desc`, [ALLOC_STATUS]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">

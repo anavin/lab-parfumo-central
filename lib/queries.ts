@@ -1,6 +1,7 @@
 import { q } from "./db";
 import { SPLIT2 } from "@/lib/payments";
-import { DEFAULT_BRANCH } from "@/lib/branches";
+import { DEFAULT_BRANCH, normalizeBranch } from "@/lib/branches";
+import { ALLOC_STATUS } from "@/lib/stock-alloc";
 
 // ---- filters --------------------------------------------------------------
 // months: subset of month labels ('Nov-25') to include, or null = all.
@@ -257,6 +258,23 @@ export async function stockSummary(branch: string | null = null) {
      from (${inner}) x`,
     branch ? [branch] : []);
   return r;
+}
+
+/** Stock allocations recorded for a branch (the mini-POs tagged ALLOC_STATUS). */
+export async function branchAllocations(branch: string) {
+  try {
+    return await q<{ id: number; po_number: string; order_date: string; units: number; items: { scent: string; size: string; qty: number }[] }>(`
+      select po.id, po.po_number, po.order_date::text order_date,
+             coalesce(sum(i.qty),0)::float units,
+             coalesce(json_agg(json_build_object('scent', i.scent, 'size', i.size, 'qty', i.qty) order by i.line_no)
+                      filter (where i.id is not null), '[]') items
+      from purchase_orders po
+      left join po_items i on i.po_id = po.id
+      where po.status = $2 and po.deleted_at is null
+        and upper(substring(po.branch_label from '_([A-Za-z]+)')) = $1
+      group by po.id
+      order by po.order_date desc, po.id desc`, [normalizeBranch(branch), ALLOC_STATUS]);
+  } catch (e) { if ((e as any)?.code === "42P01") return []; throw e; }
 }
 
 // ---- audit + trash --------------------------------------------------------
