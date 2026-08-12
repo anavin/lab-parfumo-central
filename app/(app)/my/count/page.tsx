@@ -19,10 +19,10 @@ export default async function MyCountPage() {
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
   const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
 
-  // count against what the branch is expected to have in stock; carry `sold` so the
-  // form can offer a "moved items only" filter (products that have sold out of stock)
+  // items to count: what's in stock (remaining>0) OR anything that has moved (sold>0) —
+  // so a product sold down to 0 (or oversold) still shows under "มีความเคลื่อนไหว".
   const stock = await stockLive(branch);
-  const expected = stock.filter((r) => (Number(r.remaining) || 0) > 0)
+  const expected = stock.filter((r) => (Number(r.remaining) || 0) > 0 || (Number(r.sold) || 0) > 0)
     .map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: r.remaining, sold: r.sold }));
 
   return (
