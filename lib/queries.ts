@@ -1,6 +1,6 @@
 import { q } from "./db";
 import { SPLIT2 } from "@/lib/payments";
-import { DEFAULT_BRANCH, normalizeBranch } from "@/lib/branches";
+import { DEFAULT_BRANCH, normalizeBranch, BRANCHES } from "@/lib/branches";
 import { ALLOC_STATUS } from "@/lib/stock-alloc";
 
 // ---- filters --------------------------------------------------------------
@@ -216,15 +216,22 @@ const SHIP_LEGACY = `
     join purchase_orders po on po.id = i.po_id
     where i.barcode is not null and po.deleted_at is null group by 1, 2`;
 
+// branch a sale belongs to (canonical code)
+const SOLD_BRANCH = `upper(case when source = 'EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end)`;
+// per-branch stock baseline: sales BEFORE a branch's stockFrom are NOT deducted from stock
+// (they remain in sales stats). Built from BRANCHES config; empty when none set.
+const SOLD_STOCK_CUTOFF = (() => {
+  const rules = BRANCHES.filter((b) => b.stockFrom).map((b) => `when '${b.code}' then sale_date >= '${b.stockFrom}'`);
+  return rules.length ? `and (case ${SOLD_BRANCH} ${rules.join(" ")} else true end)` : "";
+})();
+
 // adj = fold in manual per-branch stock adjustments (stock_adjustments table).
 // Skipped (adj=false) as a fallback when that table hasn't been migrated yet (42P01).
 const stockCte = (ship: string, adj: boolean) => `
   with ship as (${ship}),
   sold as (
-    select barcode,
-           upper(case when source = 'EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end) branch,
-           sum(qty)::float q
-    from sales where barcode is not null group by 1, 2),
+    select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
+    from sales where barcode is not null ${SOLD_STOCK_CUTOFF} group by 1, 2),
   ret as (
     select serial as barcode,
            upper(coalesce(substring(branch_label from '_([A-Za-z]+)'), 'CTW')) branch,

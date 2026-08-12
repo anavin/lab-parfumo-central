@@ -5,13 +5,21 @@
  * prefix, and the cash + stock branch filters. `code` is the canonical value
  * stored in sales.source / submissions.source and used everywhere as the key.
  */
-export type Branch = { code: string; name: string; prefix: string; storeCode: string; active: boolean };
+export type Branch = {
+  code: string; name: string; prefix: string; storeCode: string; active: boolean;
+  // Optional "stock baseline" date (YYYY-MM-DD). Sales BEFORE this date at this branch
+  // are NOT deducted from branch stock (they stay in sales stats/reports). Use it for a
+  // branch whose earlier sales were events with their own stock — so branch stock starts
+  // fresh from received requisitions on this date.
+  stockFrom?: string;
+};
 
 export const BRANCHES: Branch[] = [
   // storeCode is written as a PO's branch_label when allocating stock to a branch;
   // the stock engine derives the branch from the "NN_XXX" token, so it must contain it.
   { code: "CTW", name: "Central World", prefix: "CTW", storeCode: "01_CTW", active: true },
-  { code: "SCS", name: "Seacon Square", prefix: "SCS", storeCode: "02_SCS", active: true },
+  // SCS was event-only before 2026-08-12; earlier sales don't count against its new stock.
+  { code: "SCS", name: "Seacon Square", prefix: "SCS", storeCode: "02_SCS", active: true, stockFrom: "2026-08-12" },
 ];
 
 /** Default branch when none is chosen (first active branch). */
