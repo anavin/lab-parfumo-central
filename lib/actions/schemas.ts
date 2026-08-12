@@ -23,7 +23,7 @@ export const requisitionSchema = z.object({
   shipping_name: z.string().trim().max(200).optional(),
   address: z.string().trim().max(400).optional(),
   remark: z.string().trim().max(500).optional(),
-  status: z.enum(["draft", "issued", "delivered", "closed"]).optional(),
+  status: z.enum(["draft", "issued", "delivered", "approved", "received", "closed"]).optional(),
   items: z.array(reqItemSchema).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(200),
 });
 

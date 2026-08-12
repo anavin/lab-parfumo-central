@@ -215,7 +215,10 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // review page uses, so a bill shows the SAME number on both pages.
   const billRank = new Map<string, number>();
   const rankKey = (b: { rows: SubmissionRow[] }) => `${b.rows[0]?.sale_time || "99:99"}|${String(b.rows[0]?.id ?? 0).padStart(12, "0")}`;
-  [...bills].sort((a, b) => (rankKey(a) < rankKey(b) ? -1 : 1)).forEach((b, i) => billRank.set(b.key, i + 1));
+  // rank only non-rejected bills — the admin review queue excludes rejected ones, so
+  // including them here would shift every later bill's number out of sync between pages.
+  [...bills].filter((b) => b.rows.some((r) => r.status !== "rejected"))
+    .sort((a, b) => (rankKey(a) < rankKey(b) ? -1 : 1)).forEach((b, i) => billRank.set(b.key, i + 1));
 
   const addPhotos = (ref: string, imgs: string[]) => start(async () => {
     try { await addBillAttachments(ref, imgs); refresh(); } catch (e: any) { onActionError(e); }

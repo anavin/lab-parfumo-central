@@ -86,9 +86,15 @@ export async function updateRequisition(id: number, input: ReqInput) {
   const parsed = requisitionSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const data = parsed.data;
+  // once received, the lines carry received_qty; editing replaces the lines and would
+  // wipe it (and drop the goods from stock). Block it — ask to un-receive first.
+  const [cur] = await q<{ received_at: string | null }>(`select received_at from purchase_orders where id=$1`, [id]);
+  if (cur?.received_at) throw new Error("ใบเบิกนี้รับของเข้าสต๊อกแล้ว แก้ไขไม่ได้");
   await q(
     `update purchase_orders set order_date=$2, branch_label=$3, store_no=$4,
-       delivery_number=$5, phone=$6, shipping_name=$7, address=$8, remark=$9, status=$10
+       delivery_number=$5, phone=$6, shipping_name=$7, address=$8, remark=$9, status=$10,
+       approved_at = case when $10 in ('draft','issued','delivered') then null else approved_at end,
+       approved_by = case when $10 in ('draft','issued','delivered') then null else approved_by end
      where id=$1`,
     [id, data.order_date, data.branch_label, data.store_no || null,
      data.delivery_number || null, data.phone || null, data.shipping_name || null,
