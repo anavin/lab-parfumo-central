@@ -71,8 +71,6 @@ const qtyOptions = (cur?: any, max?: number | null) => {
 const SOURCE_OPTIONS = branchOptions();
 // K Shop channels share the shop's static QR (shown for the customer to scan)
 const isKShop = (v?: string) => v === "K Shop" || v === "K Shop Credit Card";
-// payment channels that DON'T require a slip photo (cash + K Shop QR); all others do
-const SLIP_EXEMPT = new Set(["Cash", "K Shop"]);
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   // min-w-0 lets the field shrink inside a grid/flex cell — without it iOS native
@@ -449,18 +447,14 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     });
   };
 
-  // Cash + K Shop QR don't REQUIRE a slip; every other channel must have one attached.
-  const slipExempt = (v?: string) => SLIP_EXEMPT.has((v || "").trim());
-  // apply a predicate over whichever channel(s) are active (split tenders / per-item / single)
+  // Slip attach is OPTIONAL for every channel — never blocks saving. The camera/attach
+  // controls simply appear for any non-cash channel so a slip/photo CAN be added if wanted.
   const anyChannel = (pred: (v: string) => boolean) => split
     ? tenders.some((t) => t.channel && pred(t.channel))
     : state.splitPay
       ? lines.some((l) => l.channel && pred(l.channel))
       : (!!String(state.payment_channel || "").trim() && pred(state.payment_channel));
-  const needsSlip = anyChannel((v) => !slipExempt(v));   // required slip
-  // K Shop QR: slip not required, but keep the camera/attach controls available (optional)
-  const kShopAttach = anyChannel((v) => v === "K Shop");
-  const showSlip = needsSlip || kShopAttach;
+  const showSlip = anyChannel((v) => v.trim() !== "Cash");
 
   const submit = () => {
     const m: string[] = [];
@@ -473,7 +467,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     if (!String(state.nation || "").trim()) m.push("สัญชาติ");
     if (state.items.length === 0) m.push("สินค้า");
     else if (state.items.some((it) => !String(it.item || "").trim())) m.push("ชื่อสินค้าให้ครบ");
-    if (needsSlip && state.attachments.length === 0) m.push("สลิป");   // non-cash → slip required
+    // slip is optional now — never blocks saving
     setMissing(m);
     if (m.length > 0) { scrollToMissing(m); return; }
     const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel }));
@@ -609,14 +603,12 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         )}
       </div>
 
-      {/* slip evidence — REQUIRED for non-cash channels; OPTIONAL (camera+file still shown) for
-          K Shop QR so a slip photo can be attached even though it isn't mandatory. Hidden for cash. */}
+      {/* slip evidence — OPTIONAL for every non-cash channel: the camera + file controls are
+          shown so a slip/photo can be attached, but it never blocks saving. Hidden for cash. */}
       {showSlip && (
-        <div className={"mb-4 border-t pt-3" + (missing.includes("สลิป") ? " border-danger" : " border-line/60")}>
-          {needsSlip
-            ? <div className="text-xs font-medium mb-1.5 text-danger">* แนบสลิป (จำเป็นสำหรับช่องทางที่ไม่ใช่เงินสด/K Shop QR)</div>
-            : <div className="text-xs font-medium mb-1.5 text-muted">แนบสลิป/รูป (ถ้ามี) — K Shop QR ไม่บังคับ</div>}
-          <PhotoPicker value={state.attachments} onChange={(a) => { set({ attachments: a }); if (a.length) clearMiss("สลิป"); }} />
+        <div className="mb-4 border-t border-line/60 pt-3">
+          <div className="text-xs font-medium mb-1.5 text-muted">แนบสลิป/รูป (ถ้ามี · ไม่บังคับ)</div>
+          <PhotoPicker value={state.attachments} onChange={(a) => set({ attachments: a })} />
         </div>
       )}
 
