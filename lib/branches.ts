@@ -12,6 +12,9 @@ export type Branch = {
   // branch whose earlier sales were events with their own stock — so branch stock starts
   // fresh from received requisitions on this date.
   stockFrom?: string;
+  // When true, selling at this branch only lets you search products that are in stock
+  // here (the branch checks its shelf stock). Off = search the whole catalog.
+  stockGated?: boolean;
 };
 
 export const BRANCHES: Branch[] = [
@@ -19,7 +22,8 @@ export const BRANCHES: Branch[] = [
   // the stock engine derives the branch from the "NN_XXX" token, so it must contain it.
   { code: "CTW", name: "Central World", prefix: "CTW", storeCode: "01_CTW", active: true },
   // SCS was event-only before 2026-08-12; earlier sales don't count against its new stock.
-  { code: "SCS", name: "Seacon Square", prefix: "SCS", storeCode: "02_SCS", active: true, stockFrom: "2026-08-12" },
+  // stockGated: selling here only searches products in stock at SCS.
+  { code: "SCS", name: "Seacon Square", prefix: "SCS", storeCode: "02_SCS", active: true, stockFrom: "2026-08-12", stockGated: true },
 ];
 
 /** Default branch when none is chosen (first active branch). */
@@ -50,6 +54,11 @@ export function branchStoreCode(code: string | null | undefined): string {
 /** True when `code` is a known, active branch. */
 export function isBranch(code: string | null | undefined): boolean {
   return !!code && byCode.has(code);
+}
+
+/** True when selling at this branch should be limited to in-stock products. */
+export function isStockGated(code: string | null | undefined): boolean {
+  return !!byCode.get(normalizeBranch(code))?.stockGated;
 }
 
 /**

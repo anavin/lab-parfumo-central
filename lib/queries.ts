@@ -1,6 +1,7 @@
 import { q } from "./db";
 import { SPLIT2 } from "@/lib/payments";
-import { DEFAULT_BRANCH, normalizeBranch, BRANCHES } from "@/lib/branches";
+import { DEFAULT_BRANCH, normalizeBranch, BRANCHES, isStockGated } from "@/lib/branches";
+import { PRODUCT_SEARCH_ORDER } from "@/lib/product-order";
 import { ALLOC_STATUS } from "@/lib/stock-alloc";
 
 // ---- filters --------------------------------------------------------------
@@ -279,6 +280,26 @@ export async function stockLive(branch: string | null = null) {
   catch (e: any) {
     if (e?.code === "42P01") return q<Row>(sel(STOCK_CTE_NOADJ), args);   // stock_adjustments table not migrated yet
     if (e?.code === "42703") return q<Row>(sel(STOCK_CTE_LEGACY), args);  // received_qty not migrated yet
+    throw e;
+  }
+}
+
+type ProdRow = { id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number };
+/** Product search for the sale form. A stock-gated branch (isStockGated) only returns
+ *  products in stock at that branch; any other branch searches the whole catalog. */
+export async function searchProductsForSale(term: string, branch: string | null): Promise<ProdRow[]> {
+  const t = `${(term ?? "").trim()}%`;
+  const base = `select id, barcode, scent, grade, size, sku, price::float from products`;
+  if (!branch || !isStockGated(branch)) {
+    return q<ProdRow>(`${base} where scent ilike $1 or barcode ilike $1 or sku ilike $1 ${PRODUCT_SEARCH_ORDER}`, [t]);
+  }
+  const b = normalizeBranch(branch);
+  const tail = `${base} p where (scent ilike $1 or barcode ilike $1 or sku ilike $1)
+     and p.barcode in (select barcode from stock where branch = $2 and remaining > 0) ${PRODUCT_SEARCH_ORDER}`;
+  try { return await q<ProdRow>(`${STOCK_CTE} ${tail}`, [t, b]); }
+  catch (e: any) {
+    if (e?.code === "42P01") return q<ProdRow>(`${STOCK_CTE_NOADJ} ${tail}`, [t, b]);
+    if (e?.code === "42703") return q<ProdRow>(`${STOCK_CTE_LEGACY} ${tail}`, [t, b]);
     throw e;
   }
 }
