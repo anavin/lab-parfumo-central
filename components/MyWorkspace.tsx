@@ -58,9 +58,14 @@ const payOptions = (cur?: string) => {
 // quantity picker — 1–20 covers virtually every perfume line; a value outside that
 // range (e.g. legacy data) is prepended so it stays selectable.
 const QTY_OPTS = Array.from({ length: 20 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
-const qtyOptions = (cur?: any) => {
+// max = available stock (stock-gated branch) → the picker can't go over it; null = no cap
+const qtyOptions = (cur?: any, max?: number | null) => {
   const c = Number(cur) || 0;
-  return c > 20 ? [{ value: String(c), label: String(c) }, ...QTY_OPTS] : QTY_OPTS;
+  const cap = max == null ? Infinity : Math.max(1, Math.round(max));
+  let base = QTY_OPTS.filter((o) => Number(o.value) <= cap);
+  if (!base.length) base = [{ value: "1", label: "1" }];
+  if (c > 0 && !base.some((o) => Number(o.value) === c)) base = [{ value: String(c), label: String(c) }, ...base];
+  return base;
 };
 const SOURCE_OPTIONS = branchOptions();
 // K Shop channels share the shop's static QR (shown for the customer to scan)
@@ -77,7 +82,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ---- bill (multi-item) types ----
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
-type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean };
+type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean; stock?: number | null };
 type Tender = { channel: string; amount: any };
 type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[]; attachments: string[]; splitPay: boolean; tenders: Tender[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number; payment_channel: string };
@@ -661,7 +666,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     setTimeout(() => nameRef.current?.focus({ preventScroll: true }), 120);
   }, [autoFocus]);
   // qty is a dropdown now (no keyboard) — just fill the product and close the list
-  const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }); setAcOpen(false); };
+  const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price, stock: p.remaining ?? null }); setAcOpen(false); };
   const onName = (v: string) => {
     onChange({ item: v, barcode: "" });
     setSearchErr(null);
@@ -710,8 +715,8 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       </div>
       {/* qty · price · discount — wider now that size moved up */}
       <div className="grid grid-cols-3 gap-2.5 pl-7">
-        <Cell label="จำนวน">
-          <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty)} className="py-2.5 justify-center min-h-[44px]" />
+        <Cell label={it.stock != null ? `จำนวน · เหลือ ${it.stock}` : "จำนวน"}>
+          <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty, it.stock)} className="py-2.5 justify-center min-h-[44px]" />
         </Cell>
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
         <Cell label="ส่วนลด" active={it.gift || Number(it.discount) > 0}>

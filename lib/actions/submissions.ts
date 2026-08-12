@@ -5,8 +5,7 @@ import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
-import { branchPrefix, resolveBranch, isStockGated } from "@/lib/branches";
-import { stockForBarcodes } from "@/lib/queries";
+import { branchPrefix, resolveBranch } from "@/lib/branches";
 import { requirePermission } from "@/lib/auth/require-user";
 import { pushLine, siteBaseUrl } from "@/lib/line";
 
@@ -76,25 +75,6 @@ export async function submitBill(input: unknown) {
     if (tenders.length < 2) throw new Error("จ่าย 2 ทาง: เลือกช่องทางและใส่ยอดให้ครบอย่างน้อย 2 ช่องทาง");
     const tsum = Math.round(tenders.reduce((s, t) => s + t.amount, 0));
     if (tsum !== Math.round(billTotal)) throw new Error(`ยอดชำระรวม ฿${tsum.toLocaleString()} ไม่เท่ากับยอดบิล ฿${Math.round(billTotal).toLocaleString()}`);
-  }
-
-  // stock-gated branch (e.g. SCS): can't sell more than what's in stock (pending sales
-  // already reserve stock, so this also blocks overselling across multiple bills)
-  const branchCode = resolveBranch(d.source);
-  if (isStockGated(branchCode)) {
-    const need = new Map<string, { qty: number; name: string }>();
-    for (const it of d.items) {
-      if (!it.barcode) continue;
-      const cur = need.get(it.barcode) ?? { qty: 0, name: it.item };
-      cur.qty += it.qty; need.set(it.barcode, cur);
-    }
-    if (need.size) {
-      const avail = await stockForBarcodes(branchCode, [...need.keys()]);
-      for (const [bc, info] of need) {
-        const have = avail.get(bc) ?? 0;
-        if (info.qty > have) throw new Error(`สต๊อกไม่พอ: ${info.name} เหลือ ${have} ชิ้น (ขาย ${info.qty})`);
-      }
-    }
   }
 
   const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, resolveBranch(d.source)));

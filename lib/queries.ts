@@ -308,18 +308,21 @@ export async function stockForBarcodes(branch: string, barcodes: string[]): Prom
   return new Map(rows.map((r) => [r.barcode, Number(r.remaining) || 0]));
 }
 
-type ProdRow = { id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number };
+type ProdRow = { id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number; remaining: number | null };
 /** Product search for the sale form. A stock-gated branch (isStockGated) only returns
- *  products in stock at that branch; any other branch searches the whole catalog. */
+ *  products in stock at that branch and includes `remaining` (so the qty picker can cap
+ *  it); any other branch searches the whole catalog with remaining = null (no limit). */
 export async function searchProductsForSale(term: string, branch: string | null): Promise<ProdRow[]> {
   const t = `${(term ?? "").trim()}%`;
-  const base = `select id, barcode, scent, grade, size, sku, price::float from products`;
   if (!branch || !isStockGated(branch)) {
-    return q<ProdRow>(`${base} where scent ilike $1 or barcode ilike $1 or sku ilike $1 ${PRODUCT_SEARCH_ORDER}`, [t]);
+    return q<ProdRow>(`select id, barcode, scent, grade, size, sku, price::float, null::float remaining
+      from products where scent ilike $1 or barcode ilike $1 or sku ilike $1 ${PRODUCT_SEARCH_ORDER}`, [t]);
   }
   const b = normalizeBranch(branch);
-  const tail = `${base} p where (scent ilike $1 or barcode ilike $1 or sku ilike $1)
-     and p.barcode in (select barcode from stock where branch = $2 and remaining > 0) ${PRODUCT_SEARCH_ORDER}`;
+  const tail = `select p.id, p.barcode, p.scent, p.grade, p.size, p.sku, p.price::float,
+       (select remaining from stock where barcode = p.barcode and branch = $2) remaining
+     from products p where (scent ilike $1 or barcode ilike $1 or sku ilike $1)
+       and p.barcode in (select barcode from stock where branch = $2 and remaining > 0) ${PRODUCT_SEARCH_ORDER}`;
   try { return await q<ProdRow>(`${STOCK_CTE} ${tail}`, [t, b]); }
   catch (e: any) {
     if (e?.code === "42P01") return q<ProdRow>(`${STOCK_CTE_NOADJ} ${tail}`, [t, b]);
