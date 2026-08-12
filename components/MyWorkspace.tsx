@@ -607,7 +607,9 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
           shown so a slip/photo can be attached, but it never blocks saving. Hidden for cash. */}
       {showSlip && (
         <div className="mb-4 border-t border-line/60 pt-3">
-          <div className="text-xs font-medium mb-1.5 text-muted">แนบสลิป/รูป (ถ้ามี · ไม่บังคับ)</div>
+          {state.attachments.length === 0
+            ? <div className="text-[11px] text-warn-dark bg-warn-soft border border-warn/30 rounded-lg px-2.5 py-1.5 mb-2 leading-snug">ช่องทางนี้ไม่ใช่เงินสด — อย่าลืมแนบหลักฐานการชำระเงิน (สลิป/รูป) · ไม่บังคับ</div>
+            : <div className="text-xs font-medium mb-1.5 text-muted">แนบสลิป/รูป (ถ้ามี · ไม่บังคับ)</div>}
           <PhotoPicker value={state.attachments} onChange={(a) => set({ attachments: a })} />
         </div>
       )}
@@ -873,6 +875,12 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       {status === "pending" && ref && <AddToBill refId={ref} disabled={pending} />}
       {(photos.length > 0 || canEditPhotos) && (
         <div className="mt-2 pt-2 border-t border-line/60">
+          {/* non-cash bill with no evidence yet → gentle reminder (not enforced) */}
+          {canEditPhotos && photos.length === 0 && (first.payment_channel || "").trim() !== "" && (first.payment_channel || "").trim() !== "Cash" && (
+            <div className="mb-2 text-[11px] text-warn-dark bg-warn-soft border border-warn/30 rounded-lg px-2.5 py-1.5 leading-snug">
+              ช่องทางนี้ไม่ใช่เงินสด — อย่าลืมแนบหลักฐานการชำระเงิน (สลิป/รูป)
+            </div>
+          )}
           <PhotoStrip photos={photos} onDelete={canEditPhotos ? onDeletePhoto : undefined} size={52} />
           {canEditPhotos && onAddPhotos && <AddPhotoInline refId={ref} count={photos.length} pending={pending} onAdd={onAddPhotos} />}
         </div>
