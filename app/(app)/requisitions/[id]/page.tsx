@@ -31,22 +31,29 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
 
   return (
-    <div className="req-wrap p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
-      <div className="no-print flex items-center justify-between mb-5">
-        <Link href="/requisitions" className="text-sm text-black/50 hover:text-ink">← กลับ</Link>
-        <div className="flex gap-2 items-center">
-          <RequisitionActions id={po.id} status={po.status} />
-          <a href={`/print/requisition/${po.id}`} target="_blank" rel="noopener"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-gold text-white hover:bg-gold-dark transition-colors">
-            <FileText className="w-4 h-4" /> พิมพ์ / PDF
-          </a>
+    // clean document canvas — same as the /print page, just with an action bar on top
+    <div className="min-h-screen bg-neutral-100 text-black">
+      <div className="req-wrap mx-auto w-full max-w-[840px] px-4 py-6">
+        {/* slim toolbar — never part of the printed document */}
+        <div className="no-print mb-5 flex items-center justify-between gap-3 flex-wrap">
+          <Link href="/requisitions" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-black">← กลับ</Link>
+          <div className="flex gap-2 items-center flex-wrap">
+            <RequisitionActions id={po.id} status={po.status} />
+            <a href={`/print/requisition/${po.id}`} target="_blank" rel="noopener"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-gold text-white hover:bg-gold-dark transition-colors">
+              <FileText className="w-4 h-4" /> พิมพ์ / PDF
+            </a>
+          </div>
         </div>
+
+        {/* attachments — kept accessible but out of the document itself */}
+        <div className="no-print mb-6">
+          <RequisitionAttachments poId={po.id} initial={attachments} editable={canAttach} />
+        </div>
+
+        {/* ใบเบิกสินค้า — เอกสารจริง (ต้นฉบับ + สำเนา) */}
+        <RequisitionSheet po={po} items={items} />
       </div>
-
-      <RequisitionAttachments poId={po.id} initial={attachments} editable={canAttach} />
-
-      {/* ใบเบิกสินค้า — พิมพ์ 2 ใบ layout เดียวกัน: ต้นฉบับ + สำเนา */}
-      <RequisitionSheet po={po} items={items} />
     </div>
   );
 }
