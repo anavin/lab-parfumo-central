@@ -291,7 +291,7 @@ export async function pendingReceipts(branch: string) {
              coalesce(json_agg(json_build_object('id', i.id, 'scent', i.scent, 'size', i.size, 'qty', i.qty, 'barcode', i.barcode) order by i.line_no)
                       filter (where i.id is not null), '[]') lines
       from purchase_orders po left join po_items i on i.po_id = po.id
-      where po.status = 'approved' and po.deleted_at is null
+      where po.status in ('delivered', 'approved') and po.deleted_at is null
         and upper(substring(po.branch_label from '_([A-Za-z]+)')) = $1
       group by po.id order by po.order_date desc, po.id desc`, [normalizeBranch(branch)]);
   } catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }

@@ -20,7 +20,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
   const [editing, setEditing] = useState(false);
   const router = useRouter();
   const run = (fn: () => Promise<any>) => start(async () => { const r = await fn(); if (r && !r.ok) alert(r.error ?? "ทำรายการไม่สำเร็จ"); router.refresh(); });
-  const preApprove = ["draft", "issued", "delivered"].includes(status);
+  const preApprove = ["draft", "issued"].includes(status);
 
   const changeStatus = (v: string) => {
     if (v === status) { setEditing(false); return; }
@@ -36,6 +36,8 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
       {/* workflow indicator + primary action */}
       {status === "received" ? (
         <span className="px-3 py-1.5 rounded-lg bg-success-soft text-success text-sm font-semibold">✓ รับของแล้ว</span>
+      ) : status === "delivered" ? (
+        <span className="px-3 py-1.5 rounded-lg bg-brand-soft text-brand-dark text-sm font-semibold">ส่งแล้ว · รอสาขารับของ</span>
       ) : status === "approved" ? (
         <>
           <span className="px-3 py-1.5 rounded-lg bg-brand-soft text-brand-dark text-sm font-semibold">อนุมัติแล้ว · รอสาขารับของ</span>

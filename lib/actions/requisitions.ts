@@ -153,7 +153,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
   try {
     const [po] = await q<{ status: string }>(`select status from purchase_orders where id=$1 and deleted_at is null`, [id]);
     if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
-    if (po.status !== "approved") return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่อนุมัติ หรือรับแล้ว)" };
+    if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
     for (const l of lines || []) {
       await q(`update po_items set received_qty=$2, line_remark=$3 where id=$1 and po_id=$4`,
         [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
