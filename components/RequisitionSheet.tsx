@@ -70,7 +70,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 const diff = received && it.received_qty != null && Number(it.received_qty) !== Number(it.qty);
                 return (
                   <tr key={i} className="border-t border-neutral-200 align-middle">
-                    <td className="py-2 pr-3 text-center text-neutral-400 tabular-nums">{i + 1}</td>
+                    <td className="py-2 pr-3 text-center text-black tabular-nums">{i + 1}</td>
                     <td className="py-2 pr-3"><Barcode value={it.barcode ?? ""} height={46} width={1.8} fontSize={12} margin={2} /></td>
                     <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
