@@ -242,8 +242,9 @@ const stockCte = (ship: string, adj: boolean) => `
     select p.barcode, p.scent, p.size, k.branch,
            coalesce(ship.q,0) shipped, coalesce(sold.q,0) sold, coalesce(ret.q,0) returned,
            ${adj ? "coalesce(adj.q,0)" : "0"} adjusted,
-           -- returns go back to HQ (leave the branch), so subtract them from stock
-           coalesce(ship.q,0) ${adj ? "+ coalesce(adj.q,0) " : ""}- coalesce(sold.q,0) - coalesce(ret.q,0) remaining
+           -- returns go back to HQ (leave the branch), so subtract them; floor at 0 so a
+           -- branch that sold before its stock was received/entered reads 0, not negative
+           greatest(0, coalesce(ship.q,0) ${adj ? "+ coalesce(adj.q,0) " : ""}- coalesce(sold.q,0) - coalesce(ret.q,0)) remaining
     from keys k
     join products p on p.barcode = k.barcode
     left join ship on ship.barcode = k.barcode and ship.branch = k.branch
