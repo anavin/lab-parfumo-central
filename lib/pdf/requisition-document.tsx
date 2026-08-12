@@ -90,85 +90,59 @@ function Barcode({ value, width, height = 20 }: { value: string; width: number; 
 export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[] }) {
   registerFontOnce();
   const total = items.reduce((a, i) => a + (Number(i.qty) || 0), 0);
-  // column widths (requisition): # code barcode name grade size qty unit
+  // column widths: # code barcode name grade size qty unit
   const rq = [20, 52, 132, 118, 34, 40, 36, 30];
-  const dv = [22, 130, 168, 62, 42];
+
+  // One requisition page; printed twice — ต้นฉบับ (original) + สำเนา (copy) — identical layout.
+  const ReqPage = ({ copyLabel }: { copyLabel: string }) => (
+    <Page size="A4" style={s.page}>
+      <View style={s.head}>
+        <View><Text style={s.company}>{T(COMPANY)}</Text><Text style={s.addr}>{T(COMPANY_ADDR)}</Text></View>
+        <View>
+          <Text style={[s.docTitle, { color: C.gold }]}>{T("ใบเบิกสินค้า")}</Text>
+          <Text style={s.docSub}>Requisition · {T(copyLabel)}</Text>
+        </View>
+      </View>
+      <View style={s.grid}>
+        <Field label="PO Order No." value={po.po_number} />
+        <Field label="วันที่" value={fmtDate(po.order_date)} />
+        <Field label="PO Version" value={po.version} />
+        <Field label="Branch" value={po.branch_label} />
+        <Field label="รหัสสาขา" value={po.store_no} />
+        <Field label="Delivery No." value={po.delivery_number} />
+      </View>
+      <View style={s.th}>
+        {["#", "รหัสสินค้า", "Barcode", "ชื่อสินค้า", "ประเภท", "ขนาด", "จำนวน", "หน่วย"].map((h, i) => (
+          <Text key={i} style={[s.cell, i === 0 ? s.cellL : {}, s.hCell, { width: rq[i], textAlign: i === 6 ? "right" : "left" }]}>{T(h)}</Text>
+        ))}
+      </View>
+      {items.map((it, i) => (
+        <View key={i} style={[s.tr, i === items.length - 1 ? s.trLast : {}]}>
+          <Text style={[s.cell, s.cellL, { width: rq[0], color: C.faint }]}>{i + 1}</Text>
+          <Text style={[s.cell, { width: rq[1] }]}>{T(it.sku || "-")}</Text>
+          <View style={[s.cell, { width: rq[2], justifyContent: "center" }]}><Barcode value={it.barcode || ""} width={rq[2] - 10} height={20} /></View>
+          <Text style={[s.cell, { width: rq[3] }]}>{T(it.scent || "-")}</Text>
+          <Text style={[s.cell, { width: rq[4] }]}>{T(it.grade || "-")}</Text>
+          <Text style={[s.cell, { width: rq[5] }]}>{T(it.size || "-")}</Text>
+          <Text style={[s.cell, { width: rq[6], textAlign: "right", fontWeight: "bold" }]}>{Number(it.qty) || 0}</Text>
+          <Text style={[s.cell, { width: rq[7] }]}>{T("ขวด")}</Text>
+        </View>
+      ))}
+      <View style={s.foot}>
+        <Text style={[s.cell, s.cellL, { width: rq[0] + rq[1] + rq[2] + rq[3] + rq[4] + rq[5], textAlign: "right", fontWeight: "bold" }]}>{T("รวมทั้งสิ้น")}</Text>
+        <Text style={[s.cell, { width: rq[6], textAlign: "right", fontWeight: "bold" }]}>{total}</Text>
+        <Text style={[s.cell, { width: rq[7] }]}>{T("ขวด")}</Text>
+      </View>
+      {/* signatures pinned to the bottom → equal top/bottom margins even for short lists */}
+      <View style={{ flexGrow: 1 }} />
+      <View style={s.signRow}><Sign label="ผู้เบิก" /><Sign label="ผู้รับสินค้า" /></View>
+    </Page>
+  );
 
   return (
     <Document>
-      {/* ---------- ใบเบิกสินค้า ---------- */}
-      <Page size="A4" style={s.page}>
-        <View style={s.head}>
-          <View><Text style={s.company}>{T(COMPANY)}</Text><Text style={s.addr}>{T(COMPANY_ADDR)}</Text></View>
-          <View><Text style={[s.docTitle, { color: C.gold }]}>{T("ใบเบิกสินค้า")}</Text><Text style={s.docSub}>Requisition</Text></View>
-        </View>
-        <View style={s.grid}>
-          <Field label="PO Order No." value={po.po_number} />
-          <Field label="วันที่" value={fmtDate(po.order_date)} />
-          <Field label="PO Version" value={po.version} />
-          <Field label="Branch" value={po.branch_label} />
-          <Field label="รหัสสาขา" value={po.store_no} />
-          <Field label="Delivery No." value={po.delivery_number} />
-        </View>
-        <View style={s.th}>
-          {["#", "รหัสสินค้า", "Barcode", "ชื่อสินค้า", "ประเภท", "ขนาด", "จำนวน", "หน่วย"].map((h, i) => (
-            <Text key={i} style={[s.cell, i === 0 ? s.cellL : {}, s.hCell, { width: rq[i], textAlign: i === 6 ? "right" : "left" }]}>{T(h)}</Text>
-          ))}
-        </View>
-        {items.map((it, i) => (
-          <View key={i} style={[s.tr, i === items.length - 1 ? s.trLast : {}]}>
-            <Text style={[s.cell, s.cellL, { width: rq[0], color: C.faint }]}>{i + 1}</Text>
-            <Text style={[s.cell, { width: rq[1] }]}>{T(it.sku || "-")}</Text>
-            <View style={[s.cell, { width: rq[2], justifyContent: "center" }]}><Barcode value={it.barcode || ""} width={rq[2] - 10} height={20} /></View>
-            <Text style={[s.cell, { width: rq[3] }]}>{T(it.scent || "-")}</Text>
-            <Text style={[s.cell, { width: rq[4] }]}>{T(it.grade || "-")}</Text>
-            <Text style={[s.cell, { width: rq[5] }]}>{T(it.size || "-")}</Text>
-            <Text style={[s.cell, { width: rq[6], textAlign: "right", fontWeight: "bold" }]}>{Number(it.qty) || 0}</Text>
-            <Text style={[s.cell, { width: rq[7] }]}>{T("ขวด")}</Text>
-          </View>
-        ))}
-        <View style={s.foot}>
-          <Text style={[s.cell, s.cellL, { width: rq[0] + rq[1] + rq[2] + rq[3] + rq[4] + rq[5], textAlign: "right", fontWeight: "bold" }]}>{T("รวมทั้งสิ้น")}</Text>
-          <Text style={[s.cell, { width: rq[6], textAlign: "right", fontWeight: "bold" }]}>{total}</Text>
-          <Text style={[s.cell, { width: rq[7] }]}>{T("ขวด")}</Text>
-        </View>
-        {/* push the signatures to the bottom so a short list just leaves whitespace,
-            keeping the top and bottom page margins equal */}
-        <View style={{ flexGrow: 1 }} />
-        <View style={s.signRow}><Sign label="ผู้เบิก" /><Sign label="ผู้อนุมัติ" /></View>
-      </Page>
-
-      {/* ---------- ใบส่งของ ---------- */}
-      <Page size="A4" style={s.page}>
-        <View style={s.head}>
-          <View><Text style={s.company}>{T(COMPANY)}</Text><Text style={s.addr}>{T(COMPANY_ADDR)}</Text></View>
-          <View><Text style={[s.docTitle, { color: C.blue }]}>{T("ใบส่งของ")}</Text><Text style={s.docSub}>Delivery Note</Text></View>
-        </View>
-        <View style={s.grid}>
-          <Field label="Delivery No." value={po.delivery_number} />
-          <Field label="Delivery Date" value={fmtDate(po.order_date)} />
-          <Field label="PO Order No." value={po.po_number} />
-          <Field label="Deliver To" value={po.shipping_name || po.branch_label} />
-          <Field label="Phone" value={po.phone} />
-          <Field label="Address" value={po.address} />
-        </View>
-        <View style={s.th}>
-          {["#", "Product Code", "ชื่อสินค้า", "Size", "Qty"].map((h, i) => (
-            <Text key={i} style={[s.cell, i === 0 ? s.cellL : {}, s.hCell, { width: dv[i], textAlign: i === 4 ? "right" : "left" }]}>{T(h)}</Text>
-          ))}
-        </View>
-        {items.map((it, i) => (
-          <View key={i} style={[s.tr, i === items.length - 1 ? s.trLast : {}]}>
-            <Text style={[s.cell, s.cellL, { width: dv[0], color: C.faint }]}>{i + 1}</Text>
-            <View style={[s.cell, { width: dv[1], justifyContent: "center" }]}><Barcode value={it.barcode || ""} width={dv[1] - 10} height={20} /></View>
-            <Text style={[s.cell, { width: dv[2] }]}>{T(it.scent || "-")}</Text>
-            <Text style={[s.cell, { width: dv[3] }]}>{T(it.size || "-")}</Text>
-            <Text style={[s.cell, { width: dv[4], textAlign: "right", fontWeight: "bold" }]}>{Number(it.qty) || 0}</Text>
-          </View>
-        ))}
-        <View style={{ flexGrow: 1 }} />
-        <View style={s.signRow}><Sign label="ผู้ส่งสินค้า" /><Sign label="ผู้รับสินค้า" /></View>
-      </Page>
+      <ReqPage copyLabel="ต้นฉบับ" />
+      <ReqPage copyLabel="สำเนา" />
     </Document>
   );
 }
