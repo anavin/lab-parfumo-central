@@ -33,7 +33,8 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   return (
     // clean document canvas — same as the /print page, just with an action bar on top
     <div className="min-h-screen bg-neutral-100 text-black">
-      <div className="req-wrap mx-auto w-full max-w-[840px] px-4 py-6">
+      {/* everything (toolbar · attachments · document) shares the A4 sheet width so their edges line up */}
+      <div className="req-wrap mx-auto w-[210mm] max-w-full px-4 sm:px-0 py-6">
         {/* slim toolbar — never part of the printed document */}
         <div className="no-print mb-5 flex items-center justify-between gap-3 flex-wrap">
           <Link href="/requisitions" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-black">← กลับ</Link>
