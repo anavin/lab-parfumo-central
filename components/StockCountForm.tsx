@@ -104,16 +104,13 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
   });
 
   return (
-    <div className="space-y-3">
-      {/* scan + progress */}
+    <div className="space-y-3 pb-24">
+      {/* progress + search (scan is the floating button, bottom-right) */}
       <div className="rounded-xl border border-line bg-surface shadow-sm p-3">
         <div className="flex items-center gap-2 mb-2">
-          <button type="button" onClick={() => (scanning ? setScanning(false) : setScanning(true))}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border ${scanning ? "border-brand bg-brand text-white" : "border-line text-muted hover:bg-canvas"}`}>
-            <ScanLine className="w-4 h-4" /> {scanning ? "กำลังสแกน… (แตะเพื่อหยุด)" : "สแกนนับ"}
-          </button>
-          {flash && <span className="text-xs text-brand-dark font-medium">{flash}</span>}
-          <span className="ml-auto text-[11px] text-muted">นับแล้ว {doneCount}/{rows.length}</span>
+          <span className="text-sm font-semibold text-ink">ความคืบหน้า</span>
+          {flash && <span className="text-xs text-brand-dark font-medium truncate">{flash}</span>}
+          <span className="ml-auto text-[11px] text-muted shrink-0">นับแล้ว {doneCount}/{rows.length}</span>
         </div>
         <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
           <div className="h-full bg-brand transition-all" style={{ width: `${rows.length ? (doneCount / rows.length) * 100 : 0}%` }} />
@@ -169,7 +166,15 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
         <p className="text-[11px] text-muted-soft text-center">ระบบจะปรับสต๊อกหลังแอดมินตรวจและอนุมัติ</p>
       </div>
 
-      {/* phone camera scanner (single scan → edit qty on screen → tap สแกนนับ to continue) */}
+      {/* floating scan button — always reachable, so you scan the next item without scrolling up */}
+      {!scanning && (
+        <button type="button" onClick={() => setScanning(true)}
+          className="no-print fixed bottom-6 right-5 z-40 inline-flex items-center gap-2 pl-4 pr-5 py-3.5 rounded-full bg-brand text-white shadow-lg font-semibold hover:bg-brand-dark active:scale-95 transition">
+          <ScanLine className="w-5 h-5" /> สแกน
+        </button>
+      )}
+
+      {/* phone camera scanner (single scan → edit qty on screen → tap the floating button to continue) */}
       {scanning && <BarcodeScanner knownCodes={knownCodes} onDetected={onCameraScan} onClose={() => setScanning(false)} />}
     </div>
   );
