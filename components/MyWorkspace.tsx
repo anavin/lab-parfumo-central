@@ -448,14 +448,18 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     });
   };
 
-  // Channels that need NO slip (cash + K Shop QR): the attach/camera controls are
-  // hidden for them. Every other channel must have a slip attached.
+  // Cash + K Shop QR don't REQUIRE a slip; every other channel must have one attached.
   const slipExempt = (v?: string) => SLIP_EXEMPT.has((v || "").trim());
-  const needsSlip = split
-    ? tenders.some((t) => t.channel && !slipExempt(t.channel))
+  // apply a predicate over whichever channel(s) are active (split tenders / per-item / single)
+  const anyChannel = (pred: (v: string) => boolean) => split
+    ? tenders.some((t) => t.channel && pred(t.channel))
     : state.splitPay
-      ? lines.some((l) => l.channel && !slipExempt(l.channel))
-      : (!!String(state.payment_channel || "").trim() && !slipExempt(state.payment_channel));
+      ? lines.some((l) => l.channel && pred(l.channel))
+      : (!!String(state.payment_channel || "").trim() && pred(state.payment_channel));
+  const needsSlip = anyChannel((v) => !slipExempt(v));   // required slip
+  // K Shop QR: slip not required, but keep the camera/attach controls available (optional)
+  const kShopAttach = anyChannel((v) => v === "K Shop");
+  const showSlip = needsSlip || kShopAttach;
 
   const submit = () => {
     const m: string[] = [];
@@ -604,10 +608,13 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         )}
       </div>
 
-      {/* slip evidence — required for every channel except cash / K Shop QR, hidden for those */}
-      {needsSlip && (
+      {/* slip evidence — REQUIRED for non-cash channels; OPTIONAL (camera+file still shown) for
+          K Shop QR so a slip photo can be attached even though it isn't mandatory. Hidden for cash. */}
+      {showSlip && (
         <div className={"mb-4 border-t pt-3" + (missing.includes("สลิป") ? " border-danger" : " border-line/60")}>
-          <div className="text-xs font-medium mb-1.5 text-danger">* แนบสลิป (จำเป็นสำหรับช่องทางที่ไม่ใช่เงินสด/K Shop QR)</div>
+          {needsSlip
+            ? <div className="text-xs font-medium mb-1.5 text-danger">* แนบสลิป (จำเป็นสำหรับช่องทางที่ไม่ใช่เงินสด/K Shop QR)</div>
+            : <div className="text-xs font-medium mb-1.5 text-muted">แนบสลิป/รูป (ถ้ามี) — K Shop QR ไม่บังคับ</div>}
           <PhotoPicker value={state.attachments} onChange={(a) => { set({ attachments: a }); if (a.length) clearMiss("สลิป"); }} />
         </div>
       )}
