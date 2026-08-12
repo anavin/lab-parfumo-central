@@ -96,7 +96,10 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
             <div key={r.barcode + r.size} className="flex items-center gap-2 px-3 py-2">
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-ink truncate">{r.scent} <span className="text-muted text-xs">{r.size}</span></div>
-                <div className="text-[11px] text-muted-soft">ระบบ {r.expected} {badge && <span className="ml-1">· {badge}</span>}</div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="inline-flex items-center rounded bg-canvas px-1.5 py-0.5 text-[11px] font-medium text-muted tabular-nums">ในระบบ {r.expected}</span>
+                  {badge}
+                </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button type="button" onClick={() => setCount(r.barcode, r.size, (n) => n - 1)} className="p-1.5 rounded-lg border border-line text-muted hover:bg-canvas"><Minus className="w-4 h-4" /></button>
