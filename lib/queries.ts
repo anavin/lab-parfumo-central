@@ -196,14 +196,28 @@ export function monthlyCash() {
 // ---- stock (computed live from requisitions − sales), per branch ----------
 // Each leg is keyed to a canonical branch code (CTW/SCS): shipments + returns
 // derive it from the "0N_XXX …" branch_label token; sales use sales.source.
-const STOCK_CTE = `
-  with ship as (
+// shipped-in leg: goods physically in a branch = requisitions the branch has
+// RECEIVED (counted by received_qty) + admin stock allocations.
+const SHIP_RECEIVED = `
+    select i.barcode,
+           upper(coalesce(substring(po.branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
+           sum(coalesce(i.received_qty, i.qty))::float q
+    from po_items i
+    join purchase_orders po on po.id = i.po_id
+    where i.barcode is not null and po.deleted_at is null
+      and po.status in ('received', '${ALLOC_STATUS}') group by 1, 2`;
+// legacy: every non-deleted PO by ordered qty (pre-receipt-workflow) — used as a
+// fallback when the received_qty column (0021) hasn't been migrated yet.
+const SHIP_LEGACY = `
     select i.barcode,
            upper(coalesce(substring(po.branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
            sum(i.qty)::float q
     from po_items i
     join purchase_orders po on po.id = i.po_id
-    where i.barcode is not null and po.deleted_at is null group by 1, 2),
+    where i.barcode is not null and po.deleted_at is null group by 1, 2`;
+
+const stockCte = (ship: string) => `
+  with ship as (${ship}),
   sold as (
     select barcode,
            upper(case when source = 'EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end) branch,
@@ -229,19 +243,23 @@ const STOCK_CTE = `
     left join sold on sold.barcode = k.barcode and sold.branch = k.branch
     left join ret  on ret.barcode  = k.barcode and ret.branch  = k.branch)
 `;
+const STOCK_CTE = stockCte(SHIP_RECEIVED);
+const STOCK_CTE_LEGACY = stockCte(SHIP_LEGACY);
 
 /** Live stock rows. Pass a branch code for that branch only; null/undefined =
  *  all branches combined (summed per product, i.e. the whole-company view). */
-export function stockLive(branch: string | null = null) {
-  return q<{ barcode: string; scent: string; size: string; shipped: number; sold: number; returned: number; remaining: number }>(
-    branch
-      ? `${STOCK_CTE} select barcode, scent, size, shipped, sold, returned, remaining
-         from stock where branch = $1 order by remaining asc, scent`
-      : `${STOCK_CTE} select barcode, scent, size,
-           sum(shipped)::float shipped, sum(sold)::float sold,
-           sum(returned)::float returned, sum(remaining)::float remaining
-         from stock group by barcode, scent, size order by remaining asc, scent`,
-    branch ? [branch] : []);
+export async function stockLive(branch: string | null = null) {
+  type Row = { barcode: string; scent: string; size: string; shipped: number; sold: number; returned: number; remaining: number };
+  const sel = (cte: string) => branch
+    ? `${cte} select barcode, scent, size, shipped, sold, returned, remaining
+       from stock where branch = $1 order by remaining asc, scent`
+    : `${cte} select barcode, scent, size,
+         sum(shipped)::float shipped, sum(sold)::float sold,
+         sum(returned)::float returned, sum(remaining)::float remaining
+       from stock group by barcode, scent, size order by remaining asc, scent`;
+  const args = branch ? [branch] : [];
+  try { return await q<Row>(sel(STOCK_CTE), args); }
+  catch (e: any) { if (e?.code === "42703") return q<Row>(sel(STOCK_CTE_LEGACY), args); throw e; }   // received_qty not migrated yet
 }
 
 export async function stockSummary(branch: string | null = null) {
@@ -249,16 +267,19 @@ export async function stockSummary(branch: string | null = null) {
     ? `select remaining, shipped, sold from stock where branch = $1`
     : `select sum(remaining)::float remaining, sum(shipped)::float shipped, sum(sold)::float sold
        from stock group by barcode`;
-  const [r] = await q<{ shipped: number; sold: number; remaining: number; skus: number; out: number; low: number }>(
-    `${STOCK_CTE}
+  const sel = (cte: string) => `${cte}
      select coalesce(sum(shipped),0)::float shipped,
             coalesce(sum(sold),0)::float sold,
             coalesce(sum(remaining),0)::float remaining,
             count(*)::int skus,
             count(*) filter (where remaining <= 0)::int out,
             count(*) filter (where remaining > 0 and remaining <= 3)::int low
-     from (${inner}) x`,
-    branch ? [branch] : []);
+     from (${inner}) x`;
+  type Sum = { shipped: number; sold: number; remaining: number; skus: number; out: number; low: number };
+  const args = branch ? [branch] : [];
+  let r: Sum;
+  try { [r] = await q<Sum>(sel(STOCK_CTE), args); }
+  catch (e: any) { if (e?.code === "42703") { [r] = await q<Sum>(sel(STOCK_CTE_LEGACY), args); } else throw e; }
   return r;
 }
 

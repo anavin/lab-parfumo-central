@@ -35,7 +35,7 @@ export function RequisitionForm({
     shipping_name: initial?.shipping_name ?? "",
     address: initial?.address ?? "",
     remark: initial?.remark ?? "",
-    status: initial?.status ?? "issued",
+    status: initial?.status ?? "draft",
   });
   const [items, setItems] = useState<Item[]>(
     initial?.items?.length ? initial.items.map((i) => ({ ...i, key: seq++ })) : [blank()]);

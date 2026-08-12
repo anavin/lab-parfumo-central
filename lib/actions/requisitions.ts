@@ -66,7 +66,7 @@ export async function createRequisition(input: ReqInput) {
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
         [po_number, `${po_number}-1`, data.order_date, data.branch_label, data.store_no || null,
          data.delivery_number || null, data.phone || null, data.shipping_name || null,
-         data.address || null, data.remark || null, data.status || "issued"]);
+         data.address || null, data.remark || null, data.status || "draft"]);
       break;
     } catch (e: any) {
       if (e?.code === "23505" && attempt < 5) continue;   // number taken → try next
