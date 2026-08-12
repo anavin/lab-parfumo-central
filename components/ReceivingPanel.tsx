@@ -1,8 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PackageCheck, ChevronDown, Loader2 } from "lucide-react";
+import { PackageCheck, ChevronDown, Loader2, ScanLine } from "lucide-react";
 import { receiveRequisition } from "@/lib/actions/requisitions";
+import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 
 type Line = { id: number; scent: string; size: string; qty: number; barcode: string };
 type PR = { id: number; po_number: string; order_date: string; units: number; lines: Line[] };
@@ -30,8 +31,23 @@ function ReceiveCard({ po }: { po: PR }) {
   const [remark, setRemark] = useState("");
   const [saving, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
   const setRow = (i: number, patch: Partial<(typeof rows)[number]>) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const anyDiff = rows.some((r) => (Number(r.recv) || 0) !== Math.round(r.qty));
+
+  // scan-to-count: tap "สแกนนับ" to zero the counts, then shoot each item's barcode
+  // to tally what actually arrived (works with the SUNMI laser + hardware scanners).
+  const startScan = () => { setRows((rs) => rs.map((r) => ({ ...r, recv: "0" }))); setScanning(true); };
+  const say = (m: string) => { setFlash(m); setTimeout(() => setFlash((f) => (f === m ? null : f)), 1500); };
+  useBarcodeScanner(open && scanning, (code) => {
+    const c = String(code || "").trim();
+    const idx = rows.findIndex((r) => r.barcode === c);
+    if (idx < 0) { say(`ไม่พบ ${c} ในใบเบิกนี้`); return; }
+    setRows((rs) => rs.map((x, j) => (j === idx ? { ...x, recv: String((Number(x.recv) || 0) + 1) } : x)));
+    say(`+1 · ${rows[idx].scent}`);
+    try { navigator.vibrate?.(30); } catch {}
+  });
 
   const receive = () => start(async () => {
     setErr(null);
@@ -67,6 +83,13 @@ function ReceiveCard({ po }: { po: PR }) {
               </div>
             );
           })}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => (scanning ? setScanning(false) : startScan())}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border ${scanning ? "border-brand bg-brand text-white" : "border-line text-muted hover:bg-canvas"}`}>
+              <ScanLine className="w-4 h-4" /> {scanning ? "กำลังสแกน… (แตะเพื่อหยุด)" : "สแกนนับ"}
+            </button>
+            {flash && <span className="text-xs text-brand-dark font-medium">{flash}</span>}
+          </div>
           <input value={remark} placeholder="หมายเหตุรวม (ถ้ามี)" onChange={(e) => setRemark(e.target.value)} className={inp + " w-full"} />
           {err && <div className="text-xs text-danger">{err}</div>}
           <button onClick={receive} disabled={saving}

@@ -15,7 +15,7 @@ type PO = {
   branch_label: string; store_no: string; delivery_number: string | null;
   phone: string | null; shipping_name: string | null; address: string | null; remark: string | null;
 };
-type Item = { line_no: number; barcode: string; scent: string; size: string; qty: number; grade: string | null; sku: string | null };
+type Item = { line_no: number; barcode: string; scent: string; size: string; qty: number; grade: string | null; sku: string | null; received_qty: number | null; line_remark: string | null };
 
 export default async function RequisitionDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,12 +23,15 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   if (!po) notFound();
 
   const items = await q<Item>(`
-    select i.line_no, i.barcode, i.scent, i.size, i.qty,
+    select i.line_no, i.barcode, i.scent, i.size, i.qty, i.received_qty::float received_qty, i.line_remark,
            p.grade, p.sku
     from po_items i left join products p on p.id = i.product_id
     where i.po_id = $1 order by i.line_no nulls last, i.id`, [Number(id)]);
 
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
+  const received = po.status === "received";
+  const totalRecv = items.reduce((s, i) => s + Number(i.received_qty ?? i.qty ?? 0), 0);
+  const hasDiff = received && items.some((i) => i.received_qty != null && Number(i.received_qty) !== Number(i.qty));
   const attachments = await getPoAttachments(po.id);
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
 
@@ -70,6 +73,14 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
           <Field label="Delivery No." value={po.delivery_number ?? "-"} />
         </div>
 
+        {received && (
+          <div className={`mb-4 rounded-lg px-4 py-2.5 text-sm ${hasDiff ? "bg-warn-soft border border-warn/40 text-ink" : "bg-success-soft border border-success/30 text-success"}`}>
+            {hasDiff
+              ? <>⚠️ รับของแล้ว · <b>มีส่วนต่าง</b> — เบิก {num(totalQty)} · รับจริง {num(totalRecv)} ({totalRecv - totalQty > 0 ? "+" : ""}{num(totalRecv - totalQty)})</>
+              : <>✓ รับของแล้ว · ครบตามเบิก ({num(totalRecv)} ชิ้น)</>}
+          </div>
+        )}
+
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-black/[0.04] text-left text-xs text-black/60">
@@ -79,28 +90,34 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
               <th className="border border-black/10 px-2 py-1.5">รายการ</th>
               <th className="border border-black/10 px-2 py-1.5">ประเภท</th>
               <th className="border border-black/10 px-2 py-1.5">ขนาด</th>
-              <th className="border border-black/10 px-2 py-1.5 text-right">จำนวน</th>
+              <th className="border border-black/10 px-2 py-1.5 text-right">เบิก</th>
+              {received && <th className="border border-black/10 px-2 py-1.5 text-right">รับจริง</th>}
               <th className="border border-black/10 px-2 py-1.5">หน่วย</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((it, i) => (
+            {items.map((it, i) => {
+              const rq = it.received_qty ?? it.qty;
+              const diff = received && it.received_qty != null && Number(it.received_qty) !== Number(it.qty);
+              return (
               <tr key={i}>
                 <td className="border border-black/10 px-2 py-1 text-black/50">{i + 1}</td>
                 <td className="border border-black/10 px-2 py-1">{it.sku ?? "-"}</td>
                 <td className="border border-black/10 px-2 py-1 text-center"><BarcodeSvg value={it.barcode ?? ""} /></td>
-                <td className="border border-black/10 px-2 py-1">{it.scent}</td>
+                <td className="border border-black/10 px-2 py-1">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
                 <td className="border border-black/10 px-2 py-1">{it.grade ?? "-"}</td>
                 <td className="border border-black/10 px-2 py-1">{it.size}</td>
                 <td className="border border-black/10 px-2 py-1 text-right font-medium">{num(it.qty)}</td>
+                {received && <td className={`border border-black/10 px-2 py-1 text-right font-medium ${diff ? "text-warn-dark bg-warn-soft" : ""}`}>{num(rq)}</td>}
                 <td className="border border-black/10 px-2 py-1">ขวด</td>
               </tr>
-            ))}
+            );})}
           </tbody>
           <tfoot>
             <tr className="font-semibold">
               <td colSpan={6} className="border border-black/10 px-2 py-1.5 text-right">รวมทั้งสิ้น</td>
               <td className="border border-black/10 px-2 py-1.5 text-right">{num(totalQty)}</td>
+              {received && <td className="border border-black/10 px-2 py-1.5 text-right">{num(totalRecv)}</td>}
               <td className="border border-black/10 px-2 py-1.5">ขวด</td>
             </tr>
           </tfoot>
