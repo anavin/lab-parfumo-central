@@ -3,7 +3,7 @@
  * แนวเดียวกับ lib/pdf/po-document.tsx ของ lab-parfumo-next
  */
 import path from "path";
-import { Document, Page, Text, View, StyleSheet, Font, Svg, Rect } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Font, Svg, Rect, Path } from "@react-pdf/renderer";
 import { code39 } from "./code39";
 
 const FONTS_DIR = path.join(process.cwd(), "public", "fonts");
@@ -72,7 +72,7 @@ const COMPANY_ADDR = "288/31 หมู่ที่ 12 ต.ราชาเทว�
 const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit" }) : "-");
 
 function Field({ label, value }: { label: string; value?: string }) {
-  return <View style={s.field}><Text style={s.fLabel}>{T(label)}</Text><Text style={s.fVal}>{T(value || "-")}</Text></View>;
+  return <View style={s.field}><Text style={s.fLabel}>{T(label + " :")}</Text><Text style={s.fVal}>{T(value || "-")}</Text></View>;
 }
 function Sign({ label }: { label: string }) {
   return <View style={s.sign}><View style={s.signLine} /><Text style={s.signLabel}>{T("(" + label + ")")}</Text></View>;
@@ -130,10 +130,15 @@ export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[]
       </View>
 
       {received && (
-        <View style={[s.banner, hasDiff ? s.bannerWarn : s.bannerOk]}>
+        <View style={[s.banner, hasDiff ? s.bannerWarn : s.bannerOk, { flexDirection: "row", alignItems: "center" }]}>
+          <Svg width={12} height={12} viewBox="0 0 12 12" style={{ marginRight: 5 }}>
+            {hasDiff
+              ? <Path d="M6 1 L11.5 10.5 L0.5 10.5 Z" fill="#8a5a12" />
+              : <Path d="M1.5 6.2 L4.6 9.3 L10.5 2.8" stroke="#2e7d46" strokeWidth={2} fill="none" />}
+          </Svg>
           {hasDiff
-            ? <Text>{T(`รับของแล้ว · มีส่วนต่าง — เบิก ${total} · รับจริง ${totalRecv} (${totalRecv - total > 0 ? "+" : ""}${totalRecv - total})`)}</Text>
-            : <Text>{T(`รับของแล้ว · ครบตามเบิก (${totalRecv} ขวด)`)}</Text>}
+            ? <Text><Text style={{ fontWeight: "bold" }}>{T("รับของแล้ว · มีส่วนต่าง")}</Text>{T(` — เบิก ${total} · รับจริง ${totalRecv} (${totalRecv - total > 0 ? "+" : ""}${totalRecv - total})`)}</Text>
+            : <Text>{T(`รับของแล้ว · ครบตามเบิก (${totalRecv} ชิ้น)`)}</Text>}
         </View>
       )}
 

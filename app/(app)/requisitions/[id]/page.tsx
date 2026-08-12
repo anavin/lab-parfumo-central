@@ -53,7 +53,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
 
       {/* ใบเบิกสินค้า — พิมพ์ 2 ใบ layout เดียวกัน: ต้นฉบับ + สำเนา */}
       {["ต้นฉบับ", "สำเนา"].map((copyLabel, ci) => (
-        <div key={copyLabel} className="print-area req-sheet card p-8 mb-8 bg-white" style={ci > 0 ? { pageBreakBefore: "always" } : undefined}>
+        <div key={copyLabel} className="print-area req-sheet card bg-white" style={ci > 0 ? { pageBreakBefore: "always" } : undefined}>
           <div className="flex justify-between items-start border-b-2 border-ink pb-4 mb-5">
             <div>
               <div className="text-xl font-bold">บริษัท ทัช ไดเวอร์เจนซ์ จำกัด</div>
@@ -124,7 +124,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
             </tfoot>
           </table>
 
-          <div className="grid grid-cols-2 gap-8 mt-10 text-sm">
+          <div className="req-sign grid grid-cols-2 gap-8 text-sm">
             <Sign label="ผู้เบิก" />
             <Sign label="ผู้รับสินค้า" />
           </div>
