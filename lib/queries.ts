@@ -236,7 +236,8 @@ const stockCte = (ship: string, adj: boolean) => `
     from sales where barcode is not null ${stockCutoff("sale_date")} group by 1, 2),
   subsold as (
     select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
-    from submissions where barcode is not null and kind = 'sale' and status = 'pending' ${stockCutoff("entry_date")} group by 1, 2),
+    from submissions where barcode is not null and kind = 'sale' and status = 'pending'
+      and deleted_at is null ${stockCutoff("entry_date")} group by 1, 2),
   ret as (
     select serial as barcode,
            upper(coalesce(substring(branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
