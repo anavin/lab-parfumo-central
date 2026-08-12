@@ -82,10 +82,16 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
             </div>
           )}
 
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-sm border-collapse table-fixed">
+            <colgroup>
+              {(received
+                ? ["3.8%", "10.6%", "24.5%", "25%", "7.5%", "8.3%", "6.8%", "7.5%", "6%"]
+                : ["4.1%", "11.3%", "26.4%", "27%", "8.3%", "9%", "7.5%", "6.4%"]
+              ).map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
             <thead>
               <tr className="bg-black/[0.04] text-left text-xs text-black/60">
-                <th className="border border-black/10 px-2 py-1.5 w-8">#</th>
+                <th className="border border-black/10 px-2 py-1.5">#</th>
                 <th className="border border-black/10 px-2 py-1.5">รหัสสินค้า</th>
                 <th className="border border-black/10 px-2 py-1.5">Barcode</th>
                 <th className="border border-black/10 px-2 py-1.5">ชื่อสินค้า</th>
