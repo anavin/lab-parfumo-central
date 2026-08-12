@@ -65,6 +65,8 @@ const qtyOptions = (cur?: any) => {
 const SOURCE_OPTIONS = branchOptions();
 // K Shop channels share the shop's static QR (shown for the customer to scan)
 const isKShop = (v?: string) => v === "K Shop" || v === "K Shop Credit Card";
+// payment channels that DON'T require a slip photo (cash + K Shop QR); all others do
+const SLIP_EXEMPT = new Set(["Cash", "K Shop"]);
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   // min-w-0 lets the field shrink inside a grid/flex cell — without it iOS native
@@ -429,6 +431,15 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     });
   };
 
+  // Channels that need NO slip (cash + K Shop QR): the attach/camera controls are
+  // hidden for them. Every other channel must have a slip attached.
+  const slipExempt = (v?: string) => SLIP_EXEMPT.has((v || "").trim());
+  const needsSlip = split
+    ? tenders.some((t) => t.channel && !slipExempt(t.channel))
+    : state.splitPay
+      ? lines.some((l) => l.channel && !slipExempt(l.channel))
+      : (!!String(state.payment_channel || "").trim() && !slipExempt(state.payment_channel));
+
   const submit = () => {
     const m: string[] = [];
     if (split) {
@@ -440,6 +451,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     if (!String(state.nation || "").trim()) m.push("สัญชาติ");
     if (state.items.length === 0) m.push("สินค้า");
     else if (state.items.some((it) => !String(it.item || "").trim())) m.push("ชื่อสินค้าให้ครบ");
+    if (needsSlip && state.attachments.length === 0) m.push("สลิป");   // non-cash → slip required
     setMissing(m);
     if (m.length > 0) { scrollToMissing(m); return; }
     const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel }));
@@ -575,10 +587,13 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         )}
       </div>
 
-      {/* photo evidence for this bill — after payment so the slip can be attached */}
-      <div className="mb-4 border-t border-line/60 pt-3">
-        <PhotoPicker value={state.attachments} onChange={(a) => set({ attachments: a })} />
-      </div>
+      {/* slip evidence — required for every channel except cash / K Shop QR, hidden for those */}
+      {needsSlip && (
+        <div className={"mb-4 border-t pt-3" + (missing.includes("สลิป") ? " border-danger" : " border-line/60")}>
+          <div className="text-xs font-medium mb-1.5 text-danger">* แนบสลิป (จำเป็นสำหรับช่องทางที่ไม่ใช่เงินสด/K Shop QR)</div>
+          <PhotoPicker value={state.attachments} onChange={(a) => { set({ attachments: a }); if (a.length) clearMiss("สลิป"); }} />
+        </div>
+      )}
 
       {/* extra options — least-used, kept collapsed near the end */}
       <details className="mb-4 border-t border-line/60 pt-3">
