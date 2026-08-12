@@ -175,6 +175,12 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* receipt slip: start at the page top, centered, no card chrome */
   .receipt-sheet { margin: 0 auto !important; border-radius: 0 !important; }
 
+  /* requisition (ใบเบิกสินค้า): drop the 900px on-screen frame so each sheet fills
+     the full A4 content box (browser 🖨 print), matching the server PDF exactly. */
+  .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+  .req-sheet { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+  .req-sheet:last-child { page-break-after: avoid; }
+
   /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
   .daily-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
   /* keep a bill's rows together across page breaks */

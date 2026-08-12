@@ -9,7 +9,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [po] = await q<PdfPO>(`select * from purchase_orders where id=$1`, [Number(id)]);
   if (!po) return new Response("Not found", { status: 404 });
   const items = await q<PdfItem>(`
-    select i.barcode, i.scent, i.size, i.qty, p.grade, p.sku
+    select i.barcode, i.scent, i.size, i.qty, i.received_qty::float received_qty, i.line_remark, p.grade, p.sku
     from po_items i left join products p on p.id = i.product_id
     where i.po_id=$1 order by i.line_no nulls last, i.id`, [Number(id)]);
 

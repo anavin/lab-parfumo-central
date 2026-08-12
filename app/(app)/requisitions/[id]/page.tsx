@@ -36,7 +36,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
+    <div className="req-wrap p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
       <div className="no-print flex items-center justify-between mb-5">
         <Link href="/requisitions" className="text-sm text-black/50 hover:text-ink">← กลับ</Link>
         <div className="flex gap-2 items-center">
@@ -53,7 +53,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
 
       {/* ใบเบิกสินค้า — พิมพ์ 2 ใบ layout เดียวกัน: ต้นฉบับ + สำเนา */}
       {["ต้นฉบับ", "สำเนา"].map((copyLabel, ci) => (
-        <div key={copyLabel} className="print-area card p-8 mb-8 bg-white" style={ci > 0 ? { pageBreakBefore: "always" } : undefined}>
+        <div key={copyLabel} className="print-area req-sheet card p-8 mb-8 bg-white" style={ci > 0 ? { pageBreakBefore: "always" } : undefined}>
           <div className="flex justify-between items-start border-b-2 border-ink pb-4 mb-5">
             <div>
               <div className="text-xl font-bold">บริษัท ทัช ไดเวอร์เจนซ์ จำกัด</div>
@@ -88,7 +88,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
                 <th className="border border-black/10 px-2 py-1.5 w-8">#</th>
                 <th className="border border-black/10 px-2 py-1.5">รหัสสินค้า</th>
                 <th className="border border-black/10 px-2 py-1.5">Barcode</th>
-                <th className="border border-black/10 px-2 py-1.5">รายการ</th>
+                <th className="border border-black/10 px-2 py-1.5">ชื่อสินค้า</th>
                 <th className="border border-black/10 px-2 py-1.5">ประเภท</th>
                 <th className="border border-black/10 px-2 py-1.5">ขนาด</th>
                 <th className="border border-black/10 px-2 py-1.5 text-right">เบิก</th>
