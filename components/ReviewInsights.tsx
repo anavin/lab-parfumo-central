@@ -11,7 +11,7 @@ import { DEFAULT_BRANCH } from "@/lib/branches";
  *  between the two so the page order stays chart → queue → report. */
 export function ReviewInsights({ revision, branch = DEFAULT_BRANCH, children }: { revision?: string | number; branch?: string; children: React.ReactNode }) {
   const [date, setDate] = useState<string | undefined>(undefined);   // undefined → report defaults to today
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);   // keep the daily report expanded by default
   const [nonce, setNonce] = useState(0);   // bump on each pick so re-clicking the same day re-fires
   const reportRef = useRef<HTMLDivElement>(null);
 
