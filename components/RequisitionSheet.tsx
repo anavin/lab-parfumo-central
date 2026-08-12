@@ -51,24 +51,18 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </div>
           )}
 
-          <table className="w-full text-sm border-collapse table-fixed">
-            <colgroup>
-              {(received
-                ? ["3.8%", "10.6%", "24.5%", "25%", "7.5%", "8.3%", "6.8%", "7.5%", "6%"]
-                : ["4.1%", "11.3%", "26.4%", "27%", "8.3%", "9%", "7.5%", "6.4%"]
-              ).map((w, i) => <col key={i} style={{ width: w }} />)}
-            </colgroup>
+          <table className="w-full text-[13px] border-collapse">
             <thead>
-              <tr className="bg-black/[0.04] text-left text-xs text-black/60">
-                <th className="border border-black/10 px-2 py-1.5">#</th>
-                <th className="border border-black/10 px-2 py-1.5">รหัสสินค้า</th>
-                <th className="border border-black/10 px-2 py-1.5">Barcode</th>
-                <th className="border border-black/10 px-2 py-1.5">ชื่อสินค้า</th>
-                <th className="border border-black/10 px-2 py-1.5">ประเภท</th>
-                <th className="border border-black/10 px-2 py-1.5">ขนาด</th>
-                <th className="border border-black/10 px-2 py-1.5 text-right">เบิก</th>
-                {received && <th className="border border-black/10 px-2 py-1.5 text-right">รับจริง</th>}
-                <th className="border border-black/10 px-2 py-1.5">หน่วย</th>
+              <tr className="text-left text-neutral-500 text-[11px] uppercase tracking-wide border-b-2 border-black">
+                <th className="pb-1.5 pr-3 font-semibold text-center">#</th>
+                <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">รหัสสินค้า</th>
+                <th className="pb-1.5 pr-3 font-semibold">Barcode</th>
+                <th className="pb-1.5 pr-3 font-semibold">ชื่อสินค้า</th>
+                <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ประเภท</th>
+                <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ขนาด</th>
+                <th className="pb-1.5 pr-3 font-semibold text-right">เบิก</th>
+                {received && <th className="pb-1.5 pr-3 font-semibold text-right">รับจริง</th>}
+                <th className="pb-1.5 font-semibold">หน่วย</th>
               </tr>
             </thead>
             <tbody>
@@ -76,33 +70,33 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 const rq = it.received_qty ?? it.qty;
                 const diff = received && it.received_qty != null && Number(it.received_qty) !== Number(it.qty);
                 return (
-                  <tr key={i}>
-                    <td className="border border-black/10 px-2 py-1 text-black/50">{i + 1}</td>
-                    <td className="border border-black/10 px-2 py-1">{it.sku ?? "-"}</td>
-                    <td className="border border-black/10 px-2 py-1 text-center"><BarcodeSvg value={it.barcode ?? ""} /></td>
-                    <td className="border border-black/10 px-2 py-1">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
-                    <td className="border border-black/10 px-2 py-1">{it.grade ?? "-"}</td>
-                    <td className="border border-black/10 px-2 py-1">{it.size}</td>
-                    <td className="border border-black/10 px-2 py-1 text-right font-medium">{num(it.qty)}</td>
-                    {received && <td className={`border border-black/10 px-2 py-1 text-right font-medium ${diff ? "text-warn-dark bg-warn-soft" : ""}`}>{num(rq)}</td>}
-                    <td className="border border-black/10 px-2 py-1">ขวด</td>
+                  <tr key={i} className="border-t border-neutral-200 align-middle">
+                    <td className="py-2 pr-3 text-center text-neutral-400 tabular-nums">{i + 1}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{it.sku ?? "-"}</td>
+                    <td className="py-2 pr-3"><BarcodeSvg value={it.barcode ?? ""} /></td>
+                    <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
+                    <td className="py-2 pr-3 text-right font-medium tabular-nums">{num(it.qty)}</td>
+                    {received && <td className={`py-2 pr-3 text-right font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
+                    <td className="py-2 whitespace-nowrap">ขวด</td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr className="font-semibold">
-                <td colSpan={6} className="border border-black/10 px-2 py-1.5 text-right">รวมทั้งสิ้น</td>
-                <td className="border border-black/10 px-2 py-1.5 text-right">{num(totalQty)}</td>
-                {received && <td className="border border-black/10 px-2 py-1.5 text-right">{num(totalRecv)}</td>}
-                <td className="border border-black/10 px-2 py-1.5">ขวด</td>
+              <tr className="border-t-2 border-black font-bold">
+                <td colSpan={6} className="py-2 pr-3 text-right">รวมทั้งสิ้น</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{num(totalQty)}</td>
+                {received && <td className="py-2 pr-3 text-right tabular-nums">{num(totalRecv)}</td>}
+                <td className="py-2 whitespace-nowrap">ขวด</td>
               </tr>
             </tfoot>
           </table>
 
-          <div className="req-sign grid grid-cols-2 gap-8 text-sm">
-            <Sign label="ผู้เบิก" />
-            <Sign label="ผู้รับสินค้า" />
+          <div className="req-sign grid grid-cols-2 gap-12 pt-12 text-[13px]">
+            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้เบิก</div></div>
+            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้รับสินค้า</div></div>
           </div>
         </div>
       ))}
@@ -115,14 +109,6 @@ function Field({ label, value }: { label: string; value: string }) {
     <div className="flex gap-2">
       <span className="text-black/45 min-w-[92px]">{label} :</span>
       <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-function Sign({ label }: { label: string }) {
-  return (
-    <div className="text-center">
-      <div className="border-b border-black/40 h-10" />
-      <div className="text-xs text-black/50 mt-1">({label})</div>
     </div>
   );
 }

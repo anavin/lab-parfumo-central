@@ -169,6 +169,8 @@ summary:focus-visible, [tabindex]:focus-visible {
   margin: 0 auto 1.5rem;
   display: flex;
   flex-direction: column;
+  font-family: var(--font-sans);
+  color: #1a1614;
 }
 .req-sign { margin-top: auto; padding-top: 12mm; }
 
