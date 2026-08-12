@@ -101,11 +101,13 @@ export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[]
   const totalRecv = items.reduce((a, i) => a + (Number(i.received_qty ?? i.qty) || 0), 0);
   const hasDiff = received && items.some((i) => i.received_qty != null && Number(i.received_qty) !== Number(i.qty));
 
-  // column widths — an extra "รับจริง" column appears once the goods are received
-  // (mirrors the on-screen preview). # code barcode name type size เบิก [รับจริง] unit
+  // column widths — sum to the full A4 content width (595.28 − 2×32 padding ≈ 531pt)
+  // so the table fills the page edge-to-edge exactly like the on-screen preview's
+  // w-full table. An extra "รับจริง" column appears once the goods are received.
+  // # code barcode name type size เบิก [รับจริง] unit
   const W = received
-    ? { idx: 18, sku: 46, bc: 116, name: 96, grade: 30, size: 34, qty: 32, recv: 36, unit: 28 }
-    : { idx: 20, sku: 52, bc: 132, name: 118, grade: 34, size: 40, qty: 36, recv: 0, unit: 30 };
+    ? { idx: 20, sku: 56, bc: 130, name: 133, grade: 40, size: 44, qty: 36, recv: 40, unit: 32 }
+    : { idx: 22, sku: 60, bc: 140, name: 143, grade: 44, size: 48, qty: 40, recv: 0, unit: 34 };
   const labelW = W.idx + W.sku + W.bc + W.name + W.grade + W.size;
 
   // One requisition page; printed twice — ต้นฉบับ (original) + สำเนา (copy) — identical layout.
