@@ -4,6 +4,7 @@ import { q } from "@/lib/db";
 import { fmtDate, num } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { RequisitionActions } from "@/components/RequisitionActions";
+import { BarcodeSvg } from "@/components/BarcodeSvg";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
               <tr key={i}>
                 <td className="border border-black/10 px-2 py-1 text-black/50">{i + 1}</td>
                 <td className="border border-black/10 px-2 py-1">{it.sku ?? "-"}</td>
-                <td className="border border-black/10 px-2 py-1 font-mono text-xs">{it.barcode ?? "-"}</td>
+                <td className="border border-black/10 px-2 py-1 text-center"><BarcodeSvg value={it.barcode ?? ""} /></td>
                 <td className="border border-black/10 px-2 py-1">{it.scent}</td>
                 <td className="border border-black/10 px-2 py-1">{it.grade ?? "-"}</td>
                 <td className="border border-black/10 px-2 py-1">{it.size}</td>
@@ -139,7 +140,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
             {items.map((it, i) => (
               <tr key={i}>
                 <td className="border border-black/10 px-2 py-1 text-black/50">{i + 1}</td>
-                <td className="border border-black/10 px-2 py-1 font-mono text-xs">{it.barcode ?? "-"}</td>
+                <td className="border border-black/10 px-2 py-1 text-center"><BarcodeSvg value={it.barcode ?? ""} /></td>
                 <td className="border border-black/10 px-2 py-1">{it.scent}</td>
                 <td className="border border-black/10 px-2 py-1">{it.size}</td>
                 <td className="border border-black/10 px-2 py-1 text-right font-medium">{num(it.qty)}</td>
