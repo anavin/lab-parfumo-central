@@ -1,20 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Camera, ImagePlus, X, Trash2, Loader2 } from "lucide-react";
 import { compressImage } from "@/lib/img";
 import { CameraCapture } from "@/components/CameraCapture";
 
 const hasGetUserMedia = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
-
-// Many in-app browsers (LINE, Facebook, etc.) and raw Android WebViews block the
-// camera, so "ถ่ายรูป" silently does nothing. Detect them to guide the user to a
-// real browser / the gallery picker (which can still reach the camera).
-function isInAppBrowser(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /(FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|MicroMessenger|KAKAOTALK|Snapchat|TikTok|musical_ly|Twitter)/i.test(ua)
-    || /; wv\)/.test(ua);   // Android WebView marker
-}
 
 // ---- editable picker (used while entering a bill) --------------------------
 export function PhotoPicker({ value, onChange, max = 6 }:
@@ -24,9 +14,7 @@ export function PhotoPicker({ value, onChange, max = 6 }:
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [inApp, setInApp] = useState(false);
   const [showCam, setShowCam] = useState(false);
-  useEffect(() => { setInApp(isInAppBrowser()); }, []);
 
   const add = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
@@ -81,11 +69,6 @@ export function PhotoPicker({ value, onChange, max = 6 }:
       </div>
       <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => add(e.target.files)} />
       <input ref={libRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => add(e.target.files)} />
-      {inApp && (
-        <div className="mt-2 text-[11px] text-warn bg-warn-soft border border-warn/30 rounded-lg px-2.5 py-2 leading-snug">
-          ถ้ากล้องเปิดไม่ได้ในหน้านี้ ให้กด <b>“เลือกรูป”</b> (เลือกกล้องได้) หรือเปิดลิงก์ใน <b>Chrome / Samsung Internet</b> — หรือกด “เพิ่มลงในหน้าจอหลัก” เพื่อใช้เป็นแอป
-        </div>
-      )}
       {err && <div className="mt-2 text-[11px] text-danger leading-snug">{err}</div>}
       {view && <Lightbox src={view} onClose={() => setView(null)} />}
       {showCam && <CameraCapture onCapture={(f) => { setShowCam(false); add([f]); }} onClose={() => setShowCam(false)} />}
