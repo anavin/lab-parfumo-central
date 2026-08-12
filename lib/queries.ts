@@ -219,12 +219,13 @@ const SHIP_LEGACY = `
 
 // branch a sale belongs to (canonical code)
 const SOLD_BRANCH = `upper(case when source = 'EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end)`;
-// per-branch stock baseline: sales BEFORE a branch's stockFrom are NOT deducted from stock
-// (they remain in sales stats). Built from BRANCHES config; empty when none set.
-const SOLD_STOCK_CUTOFF = (() => {
-  const rules = BRANCHES.filter((b) => b.stockFrom).map((b) => `when '${b.code}' then sale_date >= '${b.stockFrom}'`);
+// per-branch stock baseline: sales BEFORE a branch's stockFrom are NOT deducted from
+// stock (they remain in stats). `dateCol` differs by table (sales.sale_date vs
+// submissions.entry_date). Built from BRANCHES config; empty when none set.
+const stockCutoff = (dateCol: string) => {
+  const rules = BRANCHES.filter((b) => b.stockFrom).map((b) => `when '${b.code}' then ${dateCol} >= '${b.stockFrom}'`);
   return rules.length ? `and (case ${SOLD_BRANCH} ${rules.join(" ")} else true end)` : "";
-})();
+};
 
 // adj = fold in manual per-branch stock adjustments (stock_adjustments table).
 // Skipped (adj=false) as a fallback when that table hasn't been migrated yet (42P01).
@@ -232,7 +233,10 @@ const stockCte = (ship: string, adj: boolean) => `
   with ship as (${ship}),
   sold as (
     select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
-    from sales where barcode is not null ${SOLD_STOCK_CUTOFF} group by 1, 2),
+    from sales where barcode is not null ${stockCutoff("sale_date")} group by 1, 2),
+  subsold as (
+    select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
+    from submissions where barcode is not null and kind = 'sale' and status = 'pending' ${stockCutoff("entry_date")} group by 1, 2),
   ret as (
     select serial as barcode,
            upper(coalesce(substring(branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
@@ -244,19 +248,21 @@ const stockCte = (ship: string, adj: boolean) => `
   keys as (
     select barcode, branch from ship
     union select barcode, branch from sold
+    union select barcode, branch from subsold
     union select barcode, branch from ret${adj ? `
     union select barcode, branch from adj` : ``}),
   stock as (
     select p.barcode, p.scent, p.size, k.branch,
-           coalesce(ship.q,0) shipped, coalesce(sold.q,0) sold, coalesce(ret.q,0) returned,
+           coalesce(ship.q,0) shipped, coalesce(sold.q,0) + coalesce(subsold.q,0) sold, coalesce(ret.q,0) returned,
            ${adj ? "coalesce(adj.q,0)" : "0"} adjusted,
-           -- returns go back to HQ (leave the branch), so subtract them; floor at 0 so a
-           -- branch that sold before its stock was received/entered reads 0, not negative
-           greatest(0, coalesce(ship.q,0) ${adj ? "+ coalesce(adj.q,0) " : ""}- coalesce(sold.q,0) - coalesce(ret.q,0)) remaining
+           -- sold = approved sales + pending sales (reserve stock the moment it's sold);
+           -- returns go back to HQ; floor at 0 so a branch that sold before stock was entered reads 0
+           greatest(0, coalesce(ship.q,0) ${adj ? "+ coalesce(adj.q,0) " : ""}- coalesce(sold.q,0) - coalesce(subsold.q,0) - coalesce(ret.q,0)) remaining
     from keys k
     join products p on p.barcode = k.barcode
     left join ship on ship.barcode = k.barcode and ship.branch = k.branch
     left join sold on sold.barcode = k.barcode and sold.branch = k.branch
+    left join subsold on subsold.barcode = k.barcode and subsold.branch = k.branch
     left join ret  on ret.barcode  = k.barcode and ret.branch  = k.branch${adj ? `
     left join adj  on adj.barcode  = k.barcode and adj.branch  = k.branch` : ""})
 `;
@@ -282,6 +288,24 @@ export async function stockLive(branch: string | null = null) {
     if (e?.code === "42703") return q<Row>(sel(STOCK_CTE_LEGACY), args);  // received_qty not migrated yet
     throw e;
   }
+}
+
+/** Remaining stock per barcode at a branch — for the sale oversell check. Barcodes
+ *  not present read as 0. Includes pending sales (they already reserve stock). */
+export async function stockForBarcodes(branch: string, barcodes: string[]): Promise<Map<string, number>> {
+  const codes = [...new Set((barcodes || []).filter(Boolean))];
+  if (!codes.length) return new Map();
+  const b = normalizeBranch(branch);
+  const sel = (cte: string) => `${cte} select barcode, remaining from stock where branch = $1 and barcode = any($2)`;
+  type R = { barcode: string; remaining: number };
+  let rows: R[];
+  try { rows = await q<R>(sel(STOCK_CTE), [b, codes]); }
+  catch (e: any) {
+    if (e?.code === "42P01") rows = await q<R>(sel(STOCK_CTE_NOADJ), [b, codes]);
+    else if (e?.code === "42703") rows = await q<R>(sel(STOCK_CTE_LEGACY), [b, codes]);
+    else throw e;
+  }
+  return new Map(rows.map((r) => [r.barcode, Number(r.remaining) || 0]));
 }
 
 type ProdRow = { id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number };
