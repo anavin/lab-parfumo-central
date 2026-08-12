@@ -11,8 +11,10 @@ const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-i
 
 export function StockCountForm({ expected, branch }: { expected: { barcode: string; scent: string; size: string; remaining: number }[]; branch: string }) {
   const router = useRouter();
+  // counted is PRE-FILLED with the system stock quantity — the salesperson edits only
+  // the items whose physical count differs.
   const [rows, setRows] = useState<Item[]>(() =>
-    expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: "" })));
+    expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)) })));
   const [scanning, setScanning] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [term, setTerm] = useState("");
@@ -37,44 +39,25 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
   useEffect(() => { rowsRef.current = rows; });
   const knownCodes = useMemo(() => new Set(catalog.keys()), [catalog]);
 
-  const applyScan = (code: string): ScanResult => {
+  // locate a scanned item and jump to it (highlight + focus its box below). It does NOT
+  // change the count — quantities are pre-filled from the system stock; you edit only the
+  // ones that differ. Off-list items found while scanning are added (start at 1).
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const locate = (code: string): ScanResult => {
     const c = String(code || "").trim();
     if (!c) return { ok: false, label: "-" };
     try { navigator.vibrate?.(30); } catch {}
-    const cur = rowsRef.current;
-    const idx = cur.findIndex((r) => r.barcode === c);
-    if (idx >= 0) {
-      const now = (Number(cur[idx].counted) || 0) + 1;
-      setCount(cur[idx].barcode, cur[idx].size, (n) => n + 1);
-      say(`+1 · ${cur[idx].scent} ${cur[idx].size}`);
-      return { ok: true, label: `${cur[idx].scent} ${cur[idx].size}`, sub: `นับได้ ${now}` };
-    }
+    const it = rowsRef.current.find((r) => r.barcode === c);
+    if (it) { setActiveKey(`${it.barcode}__${it.size}`); say(`${it.scent} ${it.size}`); return { ok: true, label: `${it.scent} ${it.size}`, sub: `ในระบบ ${it.expected}` }; }
     const p = catalog.get(c);
-    if (p) {
-      setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1" }]);
-      say(`+1 · ${p.scent} ${p.size} (นอกรายการ)`);
-      return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ · นับได้ 1" };
-    }
-    say(`ไม่พบ ${c}`);
-    return { ok: false, label: `ไม่พบ ${c}` };
+    if (p) { setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1" }]); setActiveKey(`${c}__${p.size || ""}`); say(`${p.scent} ${p.size} (นอกรายการ)`); return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ" }; }
+    say(`ไม่พบ ${c}`); return { ok: false, label: `ไม่พบ ${c}` };
   };
+  // hardware keyboard-wedge + SUNMI laser jump to the item; the phone camera is below
+  useBarcodeScanner(scanning, locate);
+  const onCameraScan = (code: string) => { locate(code); setScanning(false); };
 
-  // hardware keyboard-wedge + SUNMI laser; the phone camera is the <BarcodeScanner> below
-  useBarcodeScanner(scanning, applyScan);
-
-  // camera flow: each scan identifies the item (+1 default) then the camera closes so
-  // you can edit that item's quantity on screen; tap สแกนนับ again to continue.
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const onCameraScan = (code: string) => {
-    const c = String(code || "").trim();
-    const inList = rowsRef.current.find((r) => r.barcode === c);
-    const p = inList ? null : catalog.get(c);
-    applyScan(c);   // +1 by default — you can overwrite it below
-    if (inList) setActiveKey(`${inList.barcode}__${inList.size}`);
-    else if (p) setActiveKey(`${c}__${p.size || ""}`);
-    setScanning(false);   // close the camera so you can edit the quantity on screen
-  };
-  // after a scan closes the camera, scroll to + focus the scanned item's quantity box
+  // after the camera closes, scroll to + focus (select) the scanned item's quantity box
   useEffect(() => {
     if (!activeKey || scanning) return;
     const el = document.getElementById(`cnt-${activeKey}`) as HTMLInputElement | null;
@@ -90,8 +73,9 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
     const t = term.trim().toLowerCase();
     return rows.filter((r) => !t || r.scent?.toLowerCase().includes(t) || r.barcode?.toLowerCase().includes(t));
   }, [rows, term]);
-  const doneRows = rows.filter(isCounted);   // only items the salesperson actually counted
+  const doneRows = rows.filter(isCounted);   // pre-filled → every row counts
   const doneCount = doneRows.length;
+  const edited = rows.filter((r) => counted(r) !== r.expected).length;   // differs from system
   const short = doneRows.reduce((s, r) => s + Math.max(0, r.expected - counted(r)), 0);
   const over = doneRows.reduce((s, r) => s + Math.max(0, counted(r) - r.expected), 0);
 
@@ -108,14 +92,12 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
       {/* progress + search (scan is the floating button, bottom-right) */}
       <div className="rounded-xl border border-line bg-surface shadow-sm p-3">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold text-ink">ความคืบหน้า</span>
+          <span className="text-sm font-semibold text-ink shrink-0">รายการ {rows.length}</span>
+          {edited > 0 && <span className="inline-flex items-center rounded bg-warn-soft px-1.5 py-0.5 text-[11px] font-medium text-warn-dark shrink-0">แก้ไข {edited}</span>}
           {flash && <span className="text-xs text-brand-dark font-medium truncate">{flash}</span>}
-          <span className="ml-auto text-[11px] text-muted shrink-0">นับแล้ว {doneCount}/{rows.length}</span>
         </div>
-        <div className="h-1.5 rounded-full bg-canvas overflow-hidden">
-          <div className="h-full bg-brand transition-all" style={{ width: `${rows.length ? (doneCount / rows.length) * 100 : 0}%` }} />
-        </div>
-        <div className="relative mt-2">
+        <p className="text-[11px] text-muted-soft mb-2">ช่องจำนวนดึงจากสต๊อกในระบบให้แล้ว — แก้เฉพาะตัวที่นับได้ไม่ตรง</p>
+        <div className="relative">
           <Search className="w-4 h-4 text-muted-soft absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด…" className={inp + " w-full pl-8"} />
         </div>
@@ -127,7 +109,8 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
           <div className="py-6 text-center text-sm text-muted">{rows.length ? "ไม่พบสินค้าที่ค้นหา" : "ยังไม่มีสต๊อกให้นับ"}</div>
         ) : list.map((r) => {
           const c = counted(r), diff = c - r.expected, done = isCounted(r);
-          const badge = !done ? null : diff === 0 ? <span className="text-success text-[11px] font-medium">✓ ตรง</span>
+          // only flag variances (pre-filled rows match by default → no ✓ noise)
+          const badge = !done || diff === 0 ? null
             : diff < 0 ? <span className="text-danger text-[11px] font-medium">ขาด {Math.abs(diff)}</span>
             : <span className="text-warn-dark text-[11px] font-medium">เกิน {diff}</span>;
           return (
