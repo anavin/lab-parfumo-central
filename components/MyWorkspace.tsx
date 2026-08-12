@@ -94,8 +94,8 @@ const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRA
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
-export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH }:
-  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null }) {
   const router = useRouter();
   const viewingPast = date !== today;   // browsing an older day; new sales still go to today
   // Which shop the salesperson is working at today (Central World / Seacon …).
@@ -293,7 +293,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         </div>
       )}
       {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan} laserMode={laserMode}
-        onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
+        stockMap={stockMap} onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
 
       {edit && <SaleForm state={edit} setState={setEdit} pending={pending} fullName={fullName}
         onSave={() => start(async () => {
@@ -332,10 +332,19 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
 }
 
 // ---------------------------------------------------------------- bill builder
-function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean;
+function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false, stockMap = null }: {
+  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null;
 }) {
   const [scanning, setScanning] = useState(!!autoScan && !laserMode);
+  // per-item quantity cap at a stock-gated branch: available stock minus what other
+  // lines in THIS bill already use for the same barcode (covers scan + search + splits).
+  const capFor = (it: BillItem): number | null => {
+    if (!stockMap) return it.stock ?? null;          // non-gated branch → no cap
+    if (!it.barcode) return null;                     // manual line without a barcode
+    const stk = stockMap[it.barcode] ?? 0;            // gated: not in branch stock → 0
+    const used = state.items.filter((o) => o.key !== it.key && o.barcode === it.barcode).reduce((s, o) => s + (Number(o.qty) || 0), 0);
+    return Math.max(0, stk - used);
+  };
   const knownCodes = useKnownBarcodes();
   const [missing, setMissing] = useState<string[]>([]);
   const [qrKey, setQrKey] = useState(0);   // bump to re-pop the K Shop QR (even on same-value pick)
@@ -484,7 +493,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
       {/* items */}
       <div className="space-y-2 mb-3">
-        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} />)}
+        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} max={capFor(it)} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} />)}
         {state.items.length === 0 && <div className="text-center text-sm text-muted py-6 border border-dashed border-line rounded-xl">ยังไม่มีสินค้า — กด “สแกนเพิ่ม” หรือ “เพิ่มเอง”</div>}
       </div>
 
@@ -655,7 +664,7 @@ const Cell = ({ label, children, active = false }: { label: string; children: Re
   <div><span className={`block text-[10px] text-center mb-0.5 ${active ? "text-danger font-semibold" : "text-muted"}`}>{label}</span>{children}</div>
 );
 
-function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean }) {
+function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false, max = null }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean; max?: number | null }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);   // surfaced so WebView issues are visible
@@ -718,8 +727,8 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       </div>
       {/* qty · price · discount — wider now that size moved up */}
       <div className="grid grid-cols-3 gap-2.5 pl-7">
-        <Cell label={it.stock != null ? `จำนวน · เหลือ ${it.stock}` : "จำนวน"}>
-          <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty, it.stock)} className="py-2.5 justify-center min-h-[44px]" />
+        <Cell label={max != null ? `จำนวน · เหลือ ${max}` : "จำนวน"}>
+          <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty, max)} className="py-2.5 justify-center min-h-[44px]" />
         </Cell>
         <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
         <Cell label="ส่วนลด" active={it.gift || Number(it.discount) > 0}>
