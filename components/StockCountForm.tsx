@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, Check } from "lucide-react";
+import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search } from "lucide-react";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
+import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 
 type Item = { barcode: string; scent: string; size: string; expected: number; counted: string };
@@ -30,18 +31,36 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
   const setCount = (barcode: string, size: string, fn: (n: number) => number) =>
     setRows((rs) => rs.map((r) => (r.barcode === barcode && r.size === size ? { ...r, counted: String(Math.max(0, fn(Number(r.counted) || 0))) } : r)));
 
-  useBarcodeScanner(scanning, (code) => {
+  // shared increment logic for camera + hardware/laser; returns a ScanResult for the
+  // camera's on-screen confirmation. Reads current rows via a ref (state is async).
+  const rowsRef = useRef(rows);
+  useEffect(() => { rowsRef.current = rows; });
+  const knownCodes = useMemo(() => new Set(catalog.keys()), [catalog]);
+
+  const applyScan = (code: string): ScanResult => {
     const c = String(code || "").trim();
-    setRows((rs) => {
-      const idx = rs.findIndex((r) => r.barcode === c);
-      if (idx >= 0) { say(`+1 · ${rs[idx].scent} ${rs[idx].size}`); try { navigator.vibrate?.(30); } catch {}
-        return rs.map((r, j) => (j === idx ? { ...r, counted: String((Number(r.counted) || 0) + 1) } : r)); }
-      const p = catalog.get(c);
-      if (p) { say(`+1 · ${p.scent} ${p.size} (นอกรายการ)`); try { navigator.vibrate?.(30); } catch {}
-        return [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1" }]; }
-      say(`ไม่พบ ${c}`); return rs;
-    });
-  });
+    if (!c) return { ok: false, label: "-" };
+    try { navigator.vibrate?.(30); } catch {}
+    const cur = rowsRef.current;
+    const idx = cur.findIndex((r) => r.barcode === c);
+    if (idx >= 0) {
+      const now = (Number(cur[idx].counted) || 0) + 1;
+      setCount(cur[idx].barcode, cur[idx].size, (n) => n + 1);
+      say(`+1 · ${cur[idx].scent} ${cur[idx].size}`);
+      return { ok: true, label: `${cur[idx].scent} ${cur[idx].size}`, sub: `นับได้ ${now}` };
+    }
+    const p = catalog.get(c);
+    if (p) {
+      setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1" }]);
+      say(`+1 · ${p.scent} ${p.size} (นอกรายการ)`);
+      return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ · นับได้ 1" };
+    }
+    say(`ไม่พบ ${c}`);
+    return { ok: false, label: `ไม่พบ ${c}` };
+  };
+
+  // hardware keyboard-wedge + SUNMI laser; the phone camera is the <BarcodeScanner> below
+  useBarcodeScanner(scanning, applyScan);
 
   const counted = (r: Item) => Number(r.counted) || 0;
   const isCounted = (r: Item) => r.counted !== "";
@@ -127,6 +146,9 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
         </button>
         <p className="text-[11px] text-muted-soft text-center">ระบบจะปรับสต๊อกหลังแอดมินตรวจและอนุมัติ</p>
       </div>
+
+      {/* phone camera scanner (continuous) — SUNMI/hardware handled by useBarcodeScanner */}
+      {scanning && <BarcodeScanner continuous knownCodes={knownCodes} onDetected={async (code) => applyScan(code)} onClose={() => setScanning(false)} />}
     </div>
   );
 }
