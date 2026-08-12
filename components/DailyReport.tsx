@@ -74,7 +74,9 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const openingN = Number(opening) || 0;
   const seedN = Number(seed) || 0;
   const depositN = Number(deposit) || 0;
-  const cashOnHand = openingN + seedN + (data?.cash ?? 0);   // เงินสดหน้าร้าน = ยกมา + เอาไป + เงินสดรับ (ก่อนฝาก)
+  // the shop drawer is shared per (day, branch), so it uses BRANCH-WIDE cash — not just
+  // this salesperson's — otherwise two people at one branch see/overwrite wrong closings.
+  const cashOnHand = openingN + seedN + (data?.branchCash ?? data?.cash ?? 0);   // เงินสดหน้าร้าน = ยกมา + เอาไป + เงินสดรับทั้งสาขา (ก่อนฝาก)
   const closing = Math.max(0, cashOnHand - depositN); // คงเหลือ = เงินสดหน้าร้าน − เข้าธนาคาร → ยกไปวันถัดไป
 
   // on /my: autosave the drawer figures (debounced) so they persist + carry forward

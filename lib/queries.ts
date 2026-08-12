@@ -752,6 +752,23 @@ export async function dailyReport(date: string, source: string, userId: number |
   const cash = cashLine + cashSplit;
   const nonCash = Math.max(0, total - cash);
 
+  // branchCash = cash for the WHOLE branch that day (shared shop drawer), independent of
+  // the per-salesperson `userId` filter. Same as `cash` for an admin (userId null).
+  let branchCash = cash;
+  if (userId != null) {
+    const all = await dailySaleRows(date, source, null);
+    const bLine = all.filter((r) => r.payment_channel === "Cash").reduce((s, r) => s + (r.total || 0), 0);
+    const bRefs = [...new Set(all.filter((r) => r.payment_channel === SPLIT2 && r.receipt_no).map((r) => r.receipt_no as string))];
+    let bSplit = 0;
+    if (bRefs.length) {
+      try {
+        const [r] = await q<{ c: number }>(`select coalesce(sum(amount),0)::float c from bill_payments where channel='Cash' and bill_ref = any($1)`, [bRefs]);
+        bSplit = r?.c ?? 0;
+      } catch (e) { if (!missingTable(e)) throw e; }
+    }
+    branchCash = bLine + bSplit;
+  }
+
   // nationality — distinct bills + amount per nation
   const nat = new Map<string, { bills: Set<string>; amt: number }>();
   for (const r of rows) {
@@ -765,7 +782,7 @@ export async function dailyReport(date: string, source: string, userId: number |
   for (const [k, e] of nat) if (k !== "Thai" && k !== "Foreign") { otherCount += e.bills.size; otherAmt += e.amt; }
 
   return {
-    orders, total, cash, nonCash,
+    orders, total, cash, nonCash, branchCash,
     thaiCount: thai?.bills.size ?? 0, thaiAmt: thai?.amt ?? 0,
     foreignCount: foreign?.bills.size ?? 0, foreignAmt: foreign?.amt ?? 0,
     otherCount, otherAmt,
