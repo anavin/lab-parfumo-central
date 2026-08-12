@@ -499,8 +499,12 @@ export async function trashMany(ids: number[]): Promise<{ ok: boolean; error?: s
     console.error("[trashMany] failed", e);
     return { ok: false, error: "ลบไม่สำเร็จ ลองใหม่อีกครั้ง" };
   }
-  // a trashed split bill's per-channel amounts must stop counting toward cash
-  try { for (const ref of refs) await q(`delete from bill_payments where bill_ref = $1`, [ref]); } catch {}
+  // NOTE: do NOT delete bill_payments here — a trashed bill's lines are soft-deleted so
+  // it's already excluded from every cash/paymentMix reader (they only sum tenders for
+  // alive split bills). Deleting them here made a trash→restore permanently lose the
+  // split amounts. Keep them so restore is lossless; purgeSubmission cleans them on
+  // permanent delete.
+  void refs;
   await logAudit("delete", "submission", null, `ลบบิลลงถังขยะ ${ok} รายการ`);
   revalidatePath("/review"); revalidatePath("/my"); revalidatePath("/trash");
   return { ok: true, count: ok };

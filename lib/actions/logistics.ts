@@ -3,11 +3,13 @@ import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { shipmentSchema, returnSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
+import { requirePermission } from "@/lib/auth/require-user";
 
 export type ShipLine = { barcode: string; name: string; grade: string; size: string; skus: string[] };
 export type ShipInput = { po_number: string; ship_date: string; branch_label: string; lines: ShipLine[] };
 
 export async function createShipment(input: ShipInput) {
+  await requirePermission("shipments");
   const parsed = shipmentSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const data = parsed.data;
@@ -32,12 +34,14 @@ export async function createShipment(input: ShipInput) {
 }
 
 export async function setReceiveStatus(id: number, status: string) {
+  await requirePermission("shipments");
   await q(`update shipment_items set receive_status=$2 where id=$1`, [id, status]);
   revalidatePath("/shipments");
 }
 
 /** Record returns: move given SKUs (of a PO) into return_items. */
 export async function createReturn(input: { po_number: string; return_date: string; branch_label: string; skus: string[] }) {
+  await requirePermission("shipments");
   const parsed = returnSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const data = parsed.data;

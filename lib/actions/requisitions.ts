@@ -49,6 +49,7 @@ async function replaceItems(poId: number, items: ReqItemInput[]) {
 }
 
 export async function createRequisition(input: ReqInput) {
+  await requirePermission("requisitions");
   const parsed = requisitionSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const data = parsed.data;
@@ -81,6 +82,7 @@ export async function createRequisition(input: ReqInput) {
 }
 
 export async function updateRequisition(id: number, input: ReqInput) {
+  await requirePermission("requisitions");
   const parsed = requisitionSchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const data = parsed.data;
@@ -168,6 +170,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
 
 /** Soft delete → moves the requisition to ถังขยะ (restorable). */
 export async function deleteRequisition(id: number) {
+  await requirePermission("requisitions");
   const [po] = await q<{ po_number: string }>(`select po_number from purchase_orders where id=$1`, [id]);
   await q(`update purchase_orders set deleted_at = now() where id=$1`, [id]);
   await logAudit("delete", "requisition", id, po?.po_number);
@@ -177,6 +180,7 @@ export async function deleteRequisition(id: number) {
 }
 
 export async function restoreRequisition(id: number) {
+  await requirePermission("requisitions");
   const [po] = await q<{ po_number: string }>(`select po_number from purchase_orders where id=$1`, [id]);
   await q(`update purchase_orders set deleted_at = null where id=$1`, [id]);
   await logAudit("restore", "requisition", id, po?.po_number);
@@ -186,6 +190,7 @@ export async function restoreRequisition(id: number) {
 
 /** Permanent delete from ถังขยะ. */
 export async function purgeRequisition(id: number) {
+  await requirePermission("requisitions");
   const [po] = await q<{ po_number: string }>(`select po_number from purchase_orders where id=$1`, [id]);
   await q(`delete from purchase_orders where id=$1`, [id]);
   await logAudit("purge", "requisition", id, po?.po_number);

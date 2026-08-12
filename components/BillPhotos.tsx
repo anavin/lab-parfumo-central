@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, X, Trash2, Loader2 } from "lucide-react";
 import { compressImage } from "@/lib/img";
+import { CameraCapture } from "@/components/CameraCapture";
+
+const hasGetUserMedia = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 
 // Many in-app browsers (LINE, Facebook, etc.) and raw Android WebViews block the
 // camera, so "ถ่ายรูป" silently does nothing. Detect them to guide the user to a
@@ -22,9 +25,10 @@ export function PhotoPicker({ value, onChange, max = 6 }:
   const [view, setView] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [inApp, setInApp] = useState(false);
+  const [showCam, setShowCam] = useState(false);
   useEffect(() => { setInApp(isInAppBrowser()); }, []);
 
-  const add = async (files: FileList | null) => {
+  const add = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setBusy(true); setErr(null);
     try {
@@ -62,7 +66,7 @@ export function PhotoPicker({ value, onChange, max = 6 }:
         ))}
         {!full && (
           <>
-            <button type="button" onClick={() => camRef.current?.click()} disabled={busy}
+            <button type="button" onClick={() => (hasGetUserMedia() ? setShowCam(true) : camRef.current?.click())} disabled={busy}
               className="w-16 h-16 rounded-lg border border-dashed border-line flex flex-col items-center justify-center gap-0.5 text-muted hover:bg-canvas disabled:opacity-50">
               {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
               <span className="text-[10px]">ถ่ายรูป</span>
@@ -84,6 +88,7 @@ export function PhotoPicker({ value, onChange, max = 6 }:
       )}
       {err && <div className="mt-2 text-[11px] text-danger leading-snug">{err}</div>}
       {view && <Lightbox src={view} onClose={() => setView(null)} />}
+      {showCam && <CameraCapture onCapture={(f) => { setShowCam(false); add([f]); }} onClose={() => setShowCam(false)} />}
     </div>
   );
 }
