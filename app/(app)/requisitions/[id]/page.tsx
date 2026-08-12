@@ -22,8 +22,8 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   if (!po) notFound();
 
   const items = await q<Item>(`
-    select i.line_no, i.barcode, i.scent, i.size, i.qty, i.received_qty::float received_qty, i.line_remark,
-           p.grade, p.sku
+    select i.line_no, coalesce(p.barcode, i.barcode) barcode, i.scent, i.size, i.qty,
+           i.received_qty::float received_qty, i.line_remark, p.grade, p.sku
     from po_items i left join products p on p.id = i.product_id
     where i.po_id = $1 order by i.line_no nulls last, i.id`, [Number(id)]);
 

@@ -23,7 +23,8 @@ export default async function RequisitionPrintPage({ params }: { params: Promise
                                  from purchase_orders where id=$1`, [Number(id)]);
   if (!po) notFound();
   const items = await q<SheetItem>(`
-    select i.barcode, i.scent, i.size, i.qty, i.received_qty::float received_qty, i.line_remark, p.grade, p.sku
+    select coalesce(p.barcode, i.barcode) barcode, i.scent, i.size, i.qty,
+           i.received_qty::float received_qty, i.line_remark, p.grade, p.sku
     from po_items i left join products p on p.id = i.product_id
     where i.po_id=$1 order by i.line_no nulls last, i.id`, [Number(id)]);
 
