@@ -19,10 +19,11 @@ export default async function MyCountPage() {
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
   const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
 
-  // count against what the branch is expected to have in stock
+  // count against what the branch is expected to have in stock; carry `sold` so the
+  // form can offer a "moved items only" filter (products that have sold out of stock)
   const stock = await stockLive(branch);
   const expected = stock.filter((r) => (Number(r.remaining) || 0) > 0)
-    .map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: r.remaining }));
+    .map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: r.remaining, sold: r.sold }));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">

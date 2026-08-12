@@ -6,18 +6,21 @@ import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 
-type Item = { barcode: string; scent: string; size: string; expected: number; counted: string };
+type Item = { barcode: string; scent: string; size: string; expected: number; counted: string; changed: boolean };
 const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
+const sizeNum = (s: string) => parseInt(String(s).replace(/[^\d]/g, ""), 10) || 0;
+const byName = (a: Item, b: Item) => (a.scent || "").localeCompare(b.scent || "") || sizeNum(a.size) - sizeNum(b.size);
 
-export function StockCountForm({ expected, branch }: { expected: { barcode: string; scent: string; size: string; remaining: number }[]; branch: string }) {
+export function StockCountForm({ expected, branch }: { expected: { barcode: string; scent: string; size: string; remaining: number; sold: number }[]; branch: string }) {
   const router = useRouter();
   // counted is PRE-FILLED with the system stock quantity — the salesperson edits only
-  // the items whose physical count differs.
+  // the items whose physical count differs. `changed` = the item has sold (stock moved).
   const [rows, setRows] = useState<Item[]>(() =>
-    expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)) })));
+    expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)), changed: (Number(e.sold) || 0) > 0 })).sort(byName));
   const [scanning, setScanning] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [term, setTerm] = useState("");
+  const [onlyChanged, setOnlyChanged] = useState(false);   // show only items that have moved
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [saving, start] = useTransition();
@@ -50,7 +53,7 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
     const it = rowsRef.current.find((r) => r.barcode === c);
     if (it) { setActiveKey(`${it.barcode}__${it.size}`); say(`${it.scent} ${it.size}`); return { ok: true, label: `${it.scent} ${it.size}`, sub: `ในระบบ ${it.expected}` }; }
     const p = catalog.get(c);
-    if (p) { setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1" }]); setActiveKey(`${c}__${p.size || ""}`); say(`${p.scent} ${p.size} (นอกรายการ)`); return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ" }; }
+    if (p) { setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1", changed: true }]); setActiveKey(`${c}__${p.size || ""}`); say(`${p.scent} ${p.size} (นอกรายการ)`); return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ" }; }
     say(`ไม่พบ ${c}`); return { ok: false, label: `ไม่พบ ${c}` };
   };
   // hardware keyboard-wedge + SUNMI laser jump to the item; the phone camera is below
@@ -69,10 +72,13 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
 
   const counted = (r: Item) => Number(r.counted) || 0;
   const isCounted = (r: Item) => r.counted !== "";
+  const movedCount = useMemo(() => rows.filter((r) => r.changed).length, [rows]);
   const list = useMemo(() => {
     const t = term.trim().toLowerCase();
-    return rows.filter((r) => !t || r.scent?.toLowerCase().includes(t) || r.barcode?.toLowerCase().includes(t));
-  }, [rows, term]);
+    return rows
+      .filter((r) => (!onlyChanged || r.changed) && (!t || r.scent?.toLowerCase().includes(t) || r.barcode?.toLowerCase().includes(t)))
+      .sort(byName);
+  }, [rows, term, onlyChanged]);
   const doneRows = rows.filter(isCounted);   // pre-filled → every row counts
   const doneCount = doneRows.length;
   const edited = rows.filter((r) => counted(r) !== r.expected).length;   // differs from system
@@ -101,12 +107,18 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
           <Search className="w-4 h-4 text-muted-soft absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด…" className={inp + " w-full pl-8"} />
         </div>
+        <div className="flex gap-2 mt-2">
+          <button type="button" onClick={() => setOnlyChanged(false)}
+            className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${!onlyChanged ? "bg-ink text-surface border-ink" : "bg-surface text-muted border-line hover:bg-canvas"}`}>ทั้งหมด ({rows.length})</button>
+          <button type="button" onClick={() => setOnlyChanged(true)}
+            className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${onlyChanged ? "bg-ink text-surface border-ink" : "bg-surface text-muted border-line hover:bg-canvas"}`}>มีความเคลื่อนไหว ({movedCount})</button>
+        </div>
       </div>
 
       {/* count rows */}
       <div className="rounded-xl border border-line bg-surface shadow-sm divide-y divide-line-soft">
         {list.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted">{rows.length ? "ไม่พบสินค้าที่ค้นหา" : "ยังไม่มีสต๊อกให้นับ"}</div>
+          <div className="py-6 text-center text-sm text-muted">{!rows.length ? "ยังไม่มีสต๊อกให้นับ" : onlyChanged ? "ยังไม่มีสินค้าที่มีความเคลื่อนไหว" : "ไม่พบสินค้าที่ค้นหา"}</div>
         ) : list.map((r) => {
           const c = counted(r), diff = c - r.expected, done = isCounted(r);
           // only flag variances (pre-filled rows match by default → no ✓ noise)
