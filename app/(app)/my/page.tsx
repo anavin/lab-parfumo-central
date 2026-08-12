@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { isBranch, DEFAULT_BRANCH } from "@/lib/branches";
-import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs } from "@/lib/queries";
+import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts } from "@/lib/queries";
+import { ReceivingPanel } from "@/components/ReceivingPanel";
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
 import { DateNav } from "@/components/DateNav";
@@ -40,10 +41,11 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
   const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
 
-  const [kpi, rows, trendRows] = await Promise.all([
+  const [kpi, rows, trendRows, receipts] = await Promise.all([
     myDayKpis(user.id, date),
     mySubmissions(user.id, date),
     myTrend(user.id, 14),
+    pendingReceipts(branch),   // approved requisitions waiting for this branch to receive
   ]);
   // Fill every day in the 14-day window (including zero-sale days) so the chart
   // is a true timeline, not just the scattered days that had sales. UTC math so
@@ -64,6 +66,9 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
       <PageHeader icon={Store} title="ยอดขายของฉัน" subtitle={`สวัสดี ${user.full_name} · ${thaiDay(date)}`}
         action={<DateNav date={date} today={today} />} />
+
+      {/* goods-receipt inbox — approved requisitions this branch needs to accept */}
+      <ReceivingPanel pending={receipts} />
 
       {/* data entry first */}
       <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} />

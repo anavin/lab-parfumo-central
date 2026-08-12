@@ -262,6 +262,20 @@ export async function stockSummary(branch: string | null = null) {
   return r;
 }
 
+/** Approved requisitions waiting for a branch to receive (goods-receipt inbox). */
+export async function pendingReceipts(branch: string) {
+  try {
+    return await q<{ id: number; po_number: string; order_date: string; units: number; lines: { id: number; scent: string; size: string; qty: number; barcode: string }[] }>(`
+      select po.id, po.po_number, po.order_date::text order_date, coalesce(sum(i.qty),0)::float units,
+             coalesce(json_agg(json_build_object('id', i.id, 'scent', i.scent, 'size', i.size, 'qty', i.qty, 'barcode', i.barcode) order by i.line_no)
+                      filter (where i.id is not null), '[]') lines
+      from purchase_orders po left join po_items i on i.po_id = po.id
+      where po.status = 'approved' and po.deleted_at is null
+        and upper(substring(po.branch_label from '_([A-Za-z]+)')) = $1
+      group by po.id order by po.order_date desc, po.id desc`, [normalizeBranch(branch)]);
+  } catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }
+}
+
 /** Stock allocations recorded for a branch (the mini-POs tagged ALLOC_STATUS). */
 export async function branchAllocations(branch: string) {
   try {
