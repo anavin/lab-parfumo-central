@@ -36,7 +36,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     kpis(f), monthlyRevenue(f), monthlyCustomers(f), topScents(f, 500),
     sizeMix(f), paymentMix(f), nationMix(f), byBA(f, 8), stockSummary(source),
     singleMonth ? dailyRevenue(singleMonth, source) : Promise.resolve([]),
-    singleMonth ? dailyCustomers(singleMonth) : Promise.resolve([]),
+    singleMonth ? dailyCustomers(singleMonth, source) : Promise.resolve([]),
     salesStats(f), gradeMix(f), salesByDow(f), salesByHour(f), stockLive(source),
   ]);
 

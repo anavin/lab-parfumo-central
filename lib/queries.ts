@@ -35,10 +35,14 @@ export async function kpis(f: Filter = ALL) {
            coalesce(sum(total) filter (where receipt_no is not null),0)::float "revReceipted",
            coalesce(sum(qty)   filter (where receipt_no is not null),0)::float "qtyReceipted"
     from sales where ${SW}`, [f.months, f.source]);
-  const [cust] = await q<{ customers: number; sell: number }>(`
+  // customers split by branch too (source added in 0025); fall back to months-only pre-migration.
+  const custSel = (srcFilter: string) => `
     select coalesce(sum(customers),0)::int customers,
            coalesce(sum(sell_amount),0)::float sell
-    from daily_customers where ${MW}`, [f.months]);
+    from daily_customers where ${MW}${srcFilter}`;
+  let cust: { customers: number; sell: number };
+  try { [cust] = await q<{ customers: number; sell: number }>(custSel(` and ($2::text is null or coalesce(source,'CTW') = $2)`), [f.months, f.source]); }
+  catch (e: any) { if (e?.code !== "42703") throw e; [cust] = await q<{ customers: number; sell: number }>(custSel(``), [f.months]); }
   const [cash] = await q<{ total: number }>(
     `select coalesce(sum(amount),0)::float total from cash_entries
      where ($1::text[] is null or to_char(cash_date,'Mon-YY') = any($1))`, [f.months]);
@@ -60,11 +64,13 @@ export function monthlyRevenue(f: Filter = ALL) {
     group by month order by min(sale_date)`, [f.months, f.source]);
 }
 
-export function monthlyCustomers(f: Filter = ALL) {
-  return q<{ month: string; customers: number; sell: number }>(`
+export async function monthlyCustomers(f: Filter = ALL) {
+  const sel = (srcFilter: string) => `
     select month, sum(customers)::int customers, sum(sell_amount)::float sell
-    from daily_customers where month is not null and ${MW}
-    group by month order by min(cust_date)`, [f.months]);
+    from daily_customers where month is not null and ${MW}${srcFilter}
+    group by month order by min(cust_date)`;
+  try { return await q<{ month: string; customers: number; sell: number }>(sel(` and ($2::text is null or coalesce(source,'CTW') = $2)`), [f.months, f.source]); }
+  catch (e: any) { if (e?.code !== "42703") throw e; return q<{ month: string; customers: number; sell: number }>(sel(``), [f.months]); }
 }
 
 // ---- daily trend (for a single selected month) ----------------------------
@@ -76,12 +82,14 @@ export function dailyRevenue(month: string, source: string | null) {
     group by sale_date order by sale_date`, [month, source]);
 }
 
-export function dailyCustomers(month: string) {
-  return q<{ label: string; customers: number }>(`
+export async function dailyCustomers(month: string, source: string | null = null) {
+  const sel = (srcFilter: string) => `
     select to_char(cust_date,'FMDD') label, sum(customers)::int customers
     from daily_customers
-    where cust_date is not null and month = $1
-    group by cust_date order by cust_date`, [month]);
+    where cust_date is not null and month = $1${srcFilter}
+    group by cust_date order by cust_date`;
+  try { return await q<{ label: string; customers: number }>(sel(` and ($2::text is null or coalesce(source,'CTW') = $2)`), [month, source]); }
+  catch (e: any) { if (e?.code !== "42703") throw e; return q<{ label: string; customers: number }>(sel(``), [month]); }
 }
 
 // ---- product performance --------------------------------------------------
@@ -128,6 +136,27 @@ export async function paymentMix(f: Filter = ALL) {
     cur.revenue += r.revenue ?? 0; cur.n += r.n ?? 0;
     map.set(r.channel, cur);
   }
+
+  // Reconcile: the whole SPLIT2 revenue should equal what bill_payments accounted for.
+  // Split bills with no receipt_no or no bill_payments rows would otherwise vanish from the
+  // breakdown (so the channels wouldn't sum to total sales) — park that remainder in a
+  // "จ่าย 2 ทาง (ไม่ระบุช่องทาง)" bucket so nothing is silently lost.
+  try {
+    // count only the split bills bill_payments DIDN'T cover (missing receipt_no or no rows)
+    const [splitTot] = await q<{ revenue: number; n: number }>(`
+      select coalesce(sum(total),0)::float revenue,
+             count(distinct coalesce(nullif(receipt_no,''), 'id:'||id)) filter (
+               where coalesce(receipt_no,'') = '' or receipt_no not in (select bill_ref from bill_payments)
+             )::int n
+      from sales where ${SW} and payment_channel = $3`, [f.months, f.source, SPLIT2]);
+    const accounted = split.reduce((s, r) => s + (r.revenue ?? 0), 0);
+    const remainder = (splitTot?.revenue ?? 0) - accounted;
+    if (Math.round(remainder) !== 0) {
+      const cur = map.get("จ่าย 2 ทาง (ไม่ระบุช่องทาง)") ?? { revenue: 0, n: 0 };
+      cur.revenue += remainder; cur.n += splitTot?.n ?? 0;
+      map.set("จ่าย 2 ทาง (ไม่ระบุช่องทาง)", cur);
+    }
+  } catch (e) { if (!missingTable(e)) throw e; }
   return [...map.entries()]
     .map(([channel, v]) => ({ channel, revenue: v.revenue, n: v.n }))
     .filter((c) => Math.round(c.revenue) !== 0)
@@ -197,11 +226,20 @@ export function monthlyCash() {
 // ---- stock (computed live from requisitions − sales), per branch ----------
 // Each leg is keyed to a canonical branch code (CTW/SCS): shipments + returns
 // derive it from the "0N_XXX …" branch_label token; sales use sales.source.
+// Canonical branch code from a PO/return branch_label. Anchored to the "0N_XXX" store-code
+// PREFIX (so a stray underscore later in the label can't be mistaken for the branch token)
+// and validated against known BRANCHES — anything unrecognized falls back to DEFAULT_BRANCH
+// instead of becoming a phantom branch that hides stock.
+const branchFromLabel = (col: string) => {
+  const token = `upper(coalesce(substring(${col} from '^[0-9]+_([A-Za-z]+)'), '${DEFAULT_BRANCH}'))`;
+  const whens = BRANCHES.map((b) => `when '${b.code}' then '${b.code}'`).join(" ");
+  return `(case ${token} ${whens} else '${DEFAULT_BRANCH}' end)`;
+};
 // shipped-in leg: goods physically in a branch = requisitions the branch has
 // RECEIVED (counted by received_qty) + admin stock allocations.
 const SHIP_RECEIVED = `
     select i.barcode,
-           upper(coalesce(substring(po.branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
+           ${branchFromLabel("po.branch_label")} branch,
            sum(coalesce(i.received_qty, i.qty))::float q
     from po_items i
     join purchase_orders po on po.id = i.po_id
@@ -211,7 +249,7 @@ const SHIP_RECEIVED = `
 // fallback when the received_qty column (0021) hasn't been migrated yet.
 const SHIP_LEGACY = `
     select i.barcode,
-           upper(coalesce(substring(po.branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
+           ${branchFromLabel("po.branch_label")} branch,
            sum(i.qty)::float q
     from po_items i
     join purchase_orders po on po.id = i.po_id
@@ -240,7 +278,7 @@ const stockCte = (ship: string, adj: boolean) => `
       and deleted_at is null ${stockCutoff("entry_date")} group by 1, 2),
   ret as (
     select serial as barcode,
-           upper(coalesce(substring(branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
+           ${branchFromLabel("branch_label")} branch,
            count(*)::float q
     from return_items where serial is not null and receive_status='Returned' group by 1, 2),
   ${adj ? `adj as (
@@ -793,6 +831,25 @@ export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;
 // ---- daily cash drawer (opening float carries forward) --------------------
 const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_cash"? does not exist/i.test(String(e?.message || ""));
 
+/** Carry-in ("ยกมา") for `date`: the live closing of the whole prior-day chain, reconstructed
+ *  the SAME way dailyCashLog does (confirmed days anchor their stored opening; unconfirmed days
+ *  carry the running closing). Using one grouped reconstruction — not just the single prior row —
+ *  keeps /my "ยกมา" identical to /cash's คงเหลือ so the two pages never drift. */
+async function carryInFor(date: string, branch: string): Promise<number> {
+  const rows = await q<{ entry_date: string; opening: number; seed: number; deposit: number; confirmed: boolean }>(
+    `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float, confirmed
+     from daily_cash where entry_date < $1 and branch = $2 order by entry_date asc`, [date, branch]);
+  if (!rows.length) return 0;
+  const cashByDate = new Map<string, number>();
+  await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, branch)).cash)));
+  let prevClosing = 0;
+  for (const r of rows) {           // oldest → newest
+    const opening = r.confirmed ? r.opening : prevClosing;
+    prevClosing = Math.max(0, opening + r.seed + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
+  }
+  return prevClosing;
+}
+
 /** Shared shop drawer for a day (same figures for every user). Opening carries from the
  *  latest prior day's closing when not yet saved. Zeros gracefully if the table is absent. */
 export async function getDailyCash(date: string, branch: string = DEFAULT_BRANCH) {
@@ -804,10 +861,7 @@ export async function getDailyCash(date: string, branch: string = DEFAULT_BRANCH
     // prior day → ยกมา = 0 (money brought to the branch goes in `seed`, not opening).
     // `locked` = admin-confirmed → the /my UI must not edit/overwrite it.
     if (row?.confirmed) return { opening: row.opening, seed: row.seed, deposit: row.deposit, saved: true, locked: true };
-    const [prev] = await q<{ entry_date: string; opening: number; seed: number; deposit: number }>(
-      `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float
-       from daily_cash where entry_date<$1 and branch=$2 order by entry_date desc limit 1`, [date, branch]);
-    const opening = prev ? Math.max(0, prev.opening + prev.seed + (await dailyReport(prev.entry_date, branch)).cash - prev.deposit) : 0;
+    const opening = await carryInFor(date, branch);
     return { opening, seed: row?.seed ?? 0, deposit: row?.deposit ?? 0, saved: !!row, locked: false };
   } catch (e) {
     if (missingDailyCash(e)) return { opening: 0, seed: 0, deposit: 0, saved: false, locked: false };

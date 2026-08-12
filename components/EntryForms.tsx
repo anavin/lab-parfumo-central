@@ -109,7 +109,7 @@ export function AddCustomerDay() {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState<any>({ cust_date: today(), ba: "", customers: 0, sell_amount: 0, thai: 0, foreign: 0 });
+  const [f, setF] = useState<any>({ cust_date: today(), source: "CTW", ba: "", customers: 0, sell_amount: 0, thai: 0, foreign: 0 });
   const s = (k: string, v: any) => setF((o: any) => ({ ...o, [k]: v }));
   const save = () => start(async () => {
     try { await createCustomerDay(f); setOpen(false); router.refresh(); } catch (e: any) { alert(e?.message ?? "บันทึกไม่สำเร็จ"); }
@@ -119,6 +119,7 @@ export function AddCustomerDay() {
     <Panel open={open} onToggle={() => setOpen((o) => !o)} title="+ บันทึกลูกค้ารายวัน">
       <div className="grid md:grid-cols-6 gap-3">
         <Field label="วันที่"><input type="date" className={inp} value={f.cust_date} onChange={(e) => s("cust_date", e.target.value)} /></Field>
+        <Field label="สาขา"><Select value={f.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTS} /></Field>
         <Field label="BA"><input className={inp} value={f.ba} onChange={(e) => s("ba", e.target.value)} /></Field>
         <Field label="ลูกค้า"><input inputMode="numeric" className={inp} value={f.customers} onFocus={(e) => e.target.select()} onChange={(e) => s("customers", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <Field label="ยอดขาย"><input inputMode="numeric" className={inp} value={f.sell_amount} onFocus={(e) => e.target.select()} onChange={(e) => s("sell_amount", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>

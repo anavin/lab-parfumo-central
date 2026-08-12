@@ -31,10 +31,17 @@ export async function createCustomerDay(input: unknown) {
   const parsed = customerDaySchema.safeParse(input);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
   const d = parsed.data;
-  await q(
-    `insert into daily_customers (month, cust_date, ba, customers, sell_amount, thai, foreign_cnt, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [monthLabel(d.cust_date), d.cust_date, d.ba || null, d.customers, d.sell_amount ?? 0, d.thai ?? null, d.foreign ?? null, user.id]);
+  const base = [monthLabel(d.cust_date), d.cust_date, d.ba || null, d.customers, d.sell_amount ?? 0, d.thai ?? null, d.foreign ?? null, user.id];
+  try {
+    await q(
+      `insert into daily_customers (month, cust_date, ba, customers, sell_amount, thai, foreign_cnt, created_by, source)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [...base, resolveBranch(d.source)]);
+  } catch (e: any) {
+    if (e?.code !== "42703") throw e;   // `source` (0025) not migrated yet → pre-0025 insert
+    await q(
+      `insert into daily_customers (month, cust_date, ba, customers, sell_amount, thai, foreign_cnt, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`, base);
+  }
   await logAudit("create", "customer", null, `${d.cust_date} · ${d.customers} ราย`);
   revalidatePath("/sales"); revalidatePath("/");
 }

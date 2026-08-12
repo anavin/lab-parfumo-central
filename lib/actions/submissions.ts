@@ -376,12 +376,22 @@ async function copyToLive(id: number) {
        s.payment_channel, s.nation, s.note, s.created_by, s.id]);
     approvedId = ins?.id ?? (await q<{ id: number }>(`select id from sales where submission_id = $1`, [s.id]))[0]?.id ?? null;
   } else {
-    const [ins] = await q<{ id: number }>(
-      `insert into daily_customers (month, cust_date, ba, customers, sell_amount, thai, foreign_cnt, created_by, submission_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       on conflict (submission_id) do nothing
-       returning id`,
-      [monthLabel(s.entry_date), s.entry_date, s.ba, s.customers, s.sell_amount, s.thai, s.foreign_cnt, s.created_by, s.id]);
+    // `source` (branch) added in 0025; fall back to the pre-0025 insert if prod
+    // hasn't run the migration yet so approving a customer-day never fails.
+    const base = [monthLabel(s.entry_date), s.entry_date, s.ba, s.customers, s.sell_amount, s.thai, s.foreign_cnt, s.created_by, s.id];
+    let ins: { id: number } | undefined;
+    try {
+      [ins] = await q<{ id: number }>(
+        `insert into daily_customers (month, cust_date, ba, customers, sell_amount, thai, foreign_cnt, created_by, submission_id, source)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         on conflict (submission_id) do nothing returning id`, [...base, s.source]);
+    } catch (e: any) {
+      if (e?.code !== "42703") throw e;
+      [ins] = await q<{ id: number }>(
+        `insert into daily_customers (month, cust_date, ba, customers, sell_amount, thai, foreign_cnt, created_by, submission_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         on conflict (submission_id) do nothing returning id`, base);
+    }
     approvedId = ins?.id ?? (await q<{ id: number }>(`select id from daily_customers where submission_id = $1`, [s.id]))[0]?.id ?? null;
   }
   return { s, approvedId };

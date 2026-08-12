@@ -15,16 +15,19 @@ export const dynamic = "force-dynamic";
 export default async function CashPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH;
-  const drawer = await dailyCashLog(90, branch);
-  const cashSlips = await cashAttachmentsByDate(branch);
-  const rows = await q<{ cash_date: string; description: string; amount: number; type: string }>(`
-    select cash_date, description, amount::float, type
-    from cash_entries order by cash_date desc nulls last, id desc`);
-  const [agg] = await q<{ total: number; n: number }>(
-    `select coalesce(sum(amount),0)::float total, count(*)::int n from cash_entries`);
-  const byType = await q<{ type: string; total: number }>(`
-    select coalesce(type,'ไม่ระบุ') type, sum(amount)::float total
-    from cash_entries group by 1 order by total desc`);
+  // independent reads — run them together instead of five sequential round-trips
+  const [drawer, cashSlips, rows, [agg], byType] = await Promise.all([
+    dailyCashLog(90, branch),
+    cashAttachmentsByDate(branch),
+    q<{ cash_date: string; description: string; amount: number; type: string }>(`
+      select cash_date, description, amount::float, type
+      from cash_entries order by cash_date desc nulls last, id desc`),
+    q<{ total: number; n: number }>(
+      `select coalesce(sum(amount),0)::float total, count(*)::int n from cash_entries`),
+    q<{ type: string; total: number }>(`
+      select coalesce(type,'ไม่ระบุ') type, sum(amount)::float total
+      from cash_entries group by 1 order by total desc`),
+  ]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">

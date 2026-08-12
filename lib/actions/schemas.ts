@@ -70,6 +70,7 @@ export const saleSchema = z.object({
 
 export const customerDaySchema = z.object({
   cust_date: dateStr,
+  source: z.string().trim().max(40).optional(),
   ba: z.string().trim().max(120).optional(),
   customers: z.coerce.number().int().min(0).max(999999),
   sell_amount: z.coerce.number().min(0).max(99999999).optional(),
