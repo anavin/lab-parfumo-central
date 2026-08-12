@@ -27,9 +27,7 @@ export default async function Requisitions() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <PageHeader icon={ClipboardList} title="ใบเบิกสินค้า" subtitle={`${rows.length} รายการ`}
         action={<LinkBtn href="/requisitions/new">+ สร้างใบเบิกใหม่</LinkBtn>} />
-      <div className="card overflow-hidden">
-        <RequisitionsTable rows={rows} />
-      </div>
+      <RequisitionsTable rows={rows} />
     </div>
   );
 }
