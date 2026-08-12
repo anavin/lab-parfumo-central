@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -29,6 +29,7 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
   ]},
   { title: "คลัง & การเงิน", items: [
     { key: "stock", href: "/stock", label: "สต๊อกคงเหลือ" },
+    { key: "requisitions", href: "/stock/counts", label: "ตรวจนับสต๊อก", icon: ListChecks },
     { key: "products", href: "/products", label: "สินค้า" },
     { key: "products", href: "/products/barcodes", label: "พิมพ์บาร์โค้ด", icon: Barcode },
     { key: "cash", href: "/cash", label: "เงินสด" },
@@ -42,6 +43,7 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
   { title: "พนักงานขาย", items: [
     { key: "my_sales", href: "/my", label: "ยอดขายของฉัน" },
     { key: "my_sales", href: "/my/stock", label: "สตอกสาขา", icon: Boxes },
+    { key: "my_sales", href: "/my/count", label: "นับสต๊อก", icon: ClipboardCheck },
   ]},
 ];
 
