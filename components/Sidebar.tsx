@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -39,7 +39,10 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
     { key: "audit", href: "/audit", label: "บันทึกกิจกรรม" },
     { key: "trash", href: "/trash", label: "ถังขยะ" },
   ]},
-  { title: "พนักงานขาย", items: [{ key: "my_sales", href: "/my", label: "ยอดขายของฉัน" }] },
+  { title: "พนักงานขาย", items: [
+    { key: "my_sales", href: "/my", label: "ยอดขายของฉัน" },
+    { key: "my_sales", href: "/my/stock", label: "สตอกสาขา", icon: Boxes },
+  ]},
 ];
 
 function groupsFor(user: User, pending: number): Group[] {

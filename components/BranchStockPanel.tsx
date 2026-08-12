@@ -9,8 +9,8 @@ const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-i
 
 /** Read-only branch stock for the salesperson on /my — what's left at the branch
  *  they're working at today. Sorted low-stock-first so near-empty items stand out. */
-export function BranchStockPanel({ rows, branchName }: { rows: Row[]; branchName: string }) {
-  const [open, setOpen] = useState(false);
+export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { rows: Row[]; branchName: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [term, setTerm] = useState("");
 
   const list = useMemo(() => {

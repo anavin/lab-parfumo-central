@@ -2,10 +2,9 @@ import type { Viewport } from "next";
 import { cookies } from "next/headers";
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
-import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
-import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts, stockLive } from "@/lib/queries";
+import { isBranch, DEFAULT_BRANCH } from "@/lib/branches";
+import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts } from "@/lib/queries";
 import { ReceivingPanel } from "@/components/ReceivingPanel";
-import { BranchStockPanel } from "@/components/BranchStockPanel";
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
 import { DateNav } from "@/components/DateNav";
@@ -42,12 +41,11 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
   const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
 
-  const [kpi, rows, trendRows, receipts, stock] = await Promise.all([
+  const [kpi, rows, trendRows, receipts] = await Promise.all([
     myDayKpis(user.id, date),
     mySubmissions(user.id, date),
     myTrend(user.id, 14),
     pendingReceipts(branch),   // approved requisitions waiting for this branch to receive
-    stockLive(branch),         // current stock at the branch the salesperson picked today
   ]);
   // Fill every day in the 14-day window (including zero-sale days) so the chart
   // is a true timeline, not just the scattered days that had sales. UTC math so
@@ -71,9 +69,6 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
       {/* goods-receipt inbox — approved requisitions this branch needs to accept */}
       <ReceivingPanel pending={receipts} />
-
-      {/* branch stock — what's left at the branch the salesperson is working at */}
-      <BranchStockPanel rows={stock} branchName={branchName(branch)} />
 
       {/* data entry first */}
       <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} />
