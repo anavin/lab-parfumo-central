@@ -216,7 +216,9 @@ const SHIP_LEGACY = `
     join purchase_orders po on po.id = i.po_id
     where i.barcode is not null and po.deleted_at is null group by 1, 2`;
 
-const stockCte = (ship: string) => `
+// adj = fold in manual per-branch stock adjustments (stock_adjustments table).
+// Skipped (adj=false) as a fallback when that table hasn't been migrated yet (42P01).
+const stockCte = (ship: string, adj: boolean) => `
   with ship as (${ship}),
   sold as (
     select barcode,
@@ -228,23 +230,30 @@ const stockCte = (ship: string) => `
            upper(coalesce(substring(branch_label from '_([A-Za-z]+)'), 'CTW')) branch,
            count(*)::float q
     from return_items where serial is not null and receive_status='Returned' group by 1, 2),
+  ${adj ? `adj as (
+    select barcode, upper(branch) branch, sum(qty)::float q
+    from stock_adjustments where barcode is not null group by 1, 2),` : ``}
   keys as (
     select barcode, branch from ship
     union select barcode, branch from sold
-    union select barcode, branch from ret),
+    union select barcode, branch from ret${adj ? `
+    union select barcode, branch from adj` : ``}),
   stock as (
     select p.barcode, p.scent, p.size, k.branch,
            coalesce(ship.q,0) shipped, coalesce(sold.q,0) sold, coalesce(ret.q,0) returned,
+           ${adj ? "coalesce(adj.q,0)" : "0"} adjusted,
            -- returns go back to HQ (leave the branch), so subtract them from stock
-           coalesce(ship.q,0) - coalesce(sold.q,0) - coalesce(ret.q,0) remaining
+           coalesce(ship.q,0) ${adj ? "+ coalesce(adj.q,0) " : ""}- coalesce(sold.q,0) - coalesce(ret.q,0) remaining
     from keys k
     join products p on p.barcode = k.barcode
     left join ship on ship.barcode = k.barcode and ship.branch = k.branch
     left join sold on sold.barcode = k.barcode and sold.branch = k.branch
-    left join ret  on ret.barcode  = k.barcode and ret.branch  = k.branch)
+    left join ret  on ret.barcode  = k.barcode and ret.branch  = k.branch${adj ? `
+    left join adj  on adj.barcode  = k.barcode and adj.branch  = k.branch` : ""})
 `;
-const STOCK_CTE = stockCte(SHIP_RECEIVED);
-const STOCK_CTE_LEGACY = stockCte(SHIP_LEGACY);
+const STOCK_CTE = stockCte(SHIP_RECEIVED, true);
+const STOCK_CTE_LEGACY = stockCte(SHIP_LEGACY, true);
+const STOCK_CTE_NOADJ = stockCte(SHIP_RECEIVED, false);   // stock_adjustments table missing (pre-0023)
 
 /** Live stock rows. Pass a branch code for that branch only; null/undefined =
  *  all branches combined (summed per product, i.e. the whole-company view). */
@@ -259,7 +268,11 @@ export async function stockLive(branch: string | null = null) {
        from stock group by barcode, scent, size order by remaining asc, scent`;
   const args = branch ? [branch] : [];
   try { return await q<Row>(sel(STOCK_CTE), args); }
-  catch (e: any) { if (e?.code === "42703") return q<Row>(sel(STOCK_CTE_LEGACY), args); throw e; }   // received_qty not migrated yet
+  catch (e: any) {
+    if (e?.code === "42P01") return q<Row>(sel(STOCK_CTE_NOADJ), args);   // stock_adjustments table not migrated yet
+    if (e?.code === "42703") return q<Row>(sel(STOCK_CTE_LEGACY), args);  // received_qty not migrated yet
+    throw e;
+  }
 }
 
 export async function stockSummary(branch: string | null = null) {
@@ -279,7 +292,11 @@ export async function stockSummary(branch: string | null = null) {
   const args = branch ? [branch] : [];
   let r: Sum;
   try { [r] = await q<Sum>(sel(STOCK_CTE), args); }
-  catch (e: any) { if (e?.code === "42703") { [r] = await q<Sum>(sel(STOCK_CTE_LEGACY), args); } else throw e; }
+  catch (e: any) {
+    if (e?.code === "42P01") { [r] = await q<Sum>(sel(STOCK_CTE_NOADJ), args); }
+    else if (e?.code === "42703") { [r] = await q<Sum>(sel(STOCK_CTE_LEGACY), args); }
+    else throw e;
+  }
   return r;
 }
 

@@ -1,8 +1,10 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num } from "@/lib/format";
 import { stockLive, stockSummary } from "@/lib/queries";
+import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockTable } from "@/components/StockTable";
+import { StockAdjust } from "@/components/StockAdjust";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { BranchTabs } from "@/components/BranchTabs";
@@ -15,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
-  const [rows, s, user] = await Promise.all([stockLive(branch), stockSummary(branch), getCurrentUser()]);
+  const [rows, s, user, adjustments] = await Promise.all([stockLive(branch), stockSummary(branch), getCurrentUser(), listStockAdjustments(branch)]);
   const lowCount = (s.low ?? 0) + (s.out ?? 0);
   const canRequisition = !!user && can(user, "requisitions");
 
@@ -54,6 +56,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           )}
         </div>
       )}
+      {canRequisition && <StockAdjust defaultBranch={branch} adjustments={adjustments} />}
+
       <Card title={`รายการสินค้า (${rows.length} SKU) · คลิกหัวคอลัมน์เพื่อเรียง`}>
         <StockTable rows={rows} />
       </Card>
