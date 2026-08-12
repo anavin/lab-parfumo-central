@@ -161,7 +161,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     await q(`update purchase_orders set status='received', received_at=now(), received_by=$2,
              remark = coalesce(nullif($3,''), remark) where id=$1`, [id, me.id, (remark || "").trim()]);
     await logAudit("update", "requisition", id, `รับของเข้าสาขา (${(lines || []).length} รายการ)`);
-    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/stock");
+    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/my/stock"); revalidatePath("/stock");
     return { ok: true };
   } catch (e: any) { if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" }; console.error("[receiveRequisition]", e); return { ok: false, error: "รับของไม่สำเร็จ ลองใหม่" }; }
 }
