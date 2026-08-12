@@ -3,7 +3,8 @@
  * แนวเดียวกับ lib/pdf/po-document.tsx ของ lab-parfumo-next
  */
 import path from "path";
-import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Font, Svg, Rect } from "@react-pdf/renderer";
+import { code39 } from "./code39";
 
 const FONTS_DIR = path.join(process.cwd(), "public", "fonts");
 let fontRegistered = false;
@@ -70,12 +71,28 @@ function Sign({ label }: { label: string }) {
   return <View style={s.sign}><View style={s.signLine} /><Text style={s.signLabel}>{T("(" + label + ")")}</Text></View>;
 }
 
+/** Real, scannable Code 39 barcode drawn as vector bars (no canvas needed). */
+function Barcode({ value, width, height = 20 }: { value: string; width: number; height?: number }) {
+  const v = (value || "").trim();
+  if (!v) return <Text style={{ fontSize: 7.5, color: C.faint }}>-</Text>;
+  const bc = code39(v);
+  const scale = width / bc.totalModules;
+  return (
+    <View>
+      <Svg width={width} height={height}>
+        {bc.bars.map((b, i) => <Rect key={i} x={b.x * scale} y={0} width={b.w * scale} height={height} fill="#000" />)}
+      </Svg>
+      <Text style={{ fontSize: 6, textAlign: "center", color: C.muted, marginTop: 1, letterSpacing: 0.3 }}>{v}</Text>
+    </View>
+  );
+}
+
 export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[] }) {
   registerFontOnce();
   const total = items.reduce((a, i) => a + (Number(i.qty) || 0), 0);
   // column widths (requisition): # code barcode name grade size qty unit
-  const rq = [22, 60, 92, 130, 40, 42, 40, 34];
-  const dv = [22, 110, 180, 70, 50];
+  const rq = [20, 52, 132, 118, 34, 40, 36, 30];
+  const dv = [22, 130, 168, 62, 42];
 
   return (
     <Document>
@@ -102,7 +119,7 @@ export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[]
           <View key={i} style={[s.tr, i === items.length - 1 ? s.trLast : {}]}>
             <Text style={[s.cell, s.cellL, { width: rq[0], color: C.faint }]}>{i + 1}</Text>
             <Text style={[s.cell, { width: rq[1] }]}>{T(it.sku || "-")}</Text>
-            <Text style={[s.cell, { width: rq[2], fontSize: 7.5 }]}>{it.barcode || "-"}</Text>
+            <View style={[s.cell, { width: rq[2], justifyContent: "center" }]}><Barcode value={it.barcode || ""} width={rq[2] - 10} height={20} /></View>
             <Text style={[s.cell, { width: rq[3] }]}>{T(it.scent || "-")}</Text>
             <Text style={[s.cell, { width: rq[4] }]}>{T(it.grade || "-")}</Text>
             <Text style={[s.cell, { width: rq[5] }]}>{T(it.size || "-")}</Text>
@@ -115,6 +132,9 @@ export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[]
           <Text style={[s.cell, { width: rq[6], textAlign: "right", fontWeight: "bold" }]}>{total}</Text>
           <Text style={[s.cell, { width: rq[7] }]}>{T("ขวด")}</Text>
         </View>
+        {/* push the signatures to the bottom so a short list just leaves whitespace,
+            keeping the top and bottom page margins equal */}
+        <View style={{ flexGrow: 1 }} />
         <View style={s.signRow}><Sign label="ผู้เบิก" /><Sign label="ผู้อนุมัติ" /></View>
       </Page>
 
@@ -140,12 +160,13 @@ export function RequisitionDocument({ po, items }: { po: PdfPO; items: PdfItem[]
         {items.map((it, i) => (
           <View key={i} style={[s.tr, i === items.length - 1 ? s.trLast : {}]}>
             <Text style={[s.cell, s.cellL, { width: dv[0], color: C.faint }]}>{i + 1}</Text>
-            <Text style={[s.cell, { width: dv[1], fontSize: 7.5 }]}>{it.barcode || "-"}</Text>
+            <View style={[s.cell, { width: dv[1], justifyContent: "center" }]}><Barcode value={it.barcode || ""} width={dv[1] - 10} height={20} /></View>
             <Text style={[s.cell, { width: dv[2] }]}>{T(it.scent || "-")}</Text>
             <Text style={[s.cell, { width: dv[3] }]}>{T(it.size || "-")}</Text>
             <Text style={[s.cell, { width: dv[4], textAlign: "right", fontWeight: "bold" }]}>{Number(it.qty) || 0}</Text>
           </View>
         ))}
+        <View style={{ flexGrow: 1 }} />
         <View style={s.signRow}><Sign label="ผู้ส่งสินค้า" /><Sign label="ผู้รับสินค้า" /></View>
       </Page>
     </Document>
