@@ -30,10 +30,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-gold-dark">ใบเบิกสินค้า</div>
-              <div className="text-xs text-black/50 mb-2">Requisition</div>
-              <div className={`inline-block rounded-md border-2 px-4 py-1 text-lg font-extrabold tracking-[0.2em] ${ci === 0 ? "border-gold-dark text-gold-dark bg-gold/10" : "border-neutral-400 text-neutral-500 bg-neutral-100"}`}>
-                {copyLabel}
-              </div>
+              <div className="text-xs text-black/50">Requisition</div>
+              <div className={`text-base font-bold mt-0.5 ${ci === 0 ? "text-ink" : "text-neutral-400"}`}>{copyLabel}</div>
             </div>
           </div>
 
