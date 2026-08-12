@@ -5,6 +5,8 @@ import { fmtDate, num } from "@/lib/format";
 import { PrintButton } from "@/components/PrintButton";
 import { RequisitionActions } from "@/components/RequisitionActions";
 import { BarcodeSvg } from "@/components/BarcodeSvg";
+import { RequisitionAttachments } from "@/components/RequisitionAttachments";
+import { getPoAttachments } from "@/lib/actions/po-attachments";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,8 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
     where i.po_id = $1 order by i.line_no nulls last, i.id`, [Number(id)]);
 
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
+  const attachments = await getPoAttachments(po.id);
+  const canAttach = po.status !== "received";   // lock attachments once the goods are received
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
@@ -41,6 +45,8 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
           <PrintButton />
         </div>
       </div>
+
+      <RequisitionAttachments poId={po.id} initial={attachments} editable={canAttach} />
 
       {/* ---------------- ใบเบิกสินค้า ---------------- */}
       <div className="print-area card p-8 mb-8 bg-white">
