@@ -99,11 +99,26 @@ export async function updateRequisition(id: number, input: ReqInput) {
   redirect(`/requisitions/${id}`);
 }
 
-export async function setRequisitionStatus(id: number, status: string) {
-  await q(`update purchase_orders set status=$2 where id=$1`, [id, status]);
-  await logAudit("update", "requisition", id, `สถานะ → ${status}`);
-  revalidatePath(`/requisitions/${id}`);
-  revalidatePath("/requisitions");
+/** Admin override: force a requisition to any status. Stamps approved/received
+ *  timestamps so downstream logic (stock, sync) stays consistent. */
+export async function setRequisitionStatus(id: number, status: string): Promise<{ ok: boolean; error?: string }> {
+  const me = await requirePermission("requisitions");
+  try {
+    // keep the lifecycle timestamps in sync with the forced status
+    const stamp =
+      status === "approved" ? `, approved_at = coalesce(approved_at, now()), approved_by = coalesce(approved_by, ${me.id})`
+      : status === "received" ? `, received_at = coalesce(received_at, now()), received_by = coalesce(received_by, ${me.id})`
+      : "";
+    await q(`update purchase_orders set status=$2 ${stamp} where id=$1`, [id, status]);
+    await logAudit("update", "requisition", id, `สถานะ → ${status}`);
+    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions");
+    revalidatePath("/my"); revalidatePath("/stock");   // received affects branch stock
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" };
+    console.error("[setRequisitionStatus]", e);
+    return { ok: false, error: "เปลี่ยนสถานะไม่สำเร็จ" };
+  }
 }
 
 /** Admin approves a requisition → status 'approved', sent to the branch to receive. */
