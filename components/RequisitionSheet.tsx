@@ -1,5 +1,5 @@
 import { fmtDate, num } from "@/lib/format";
-import { BarcodeSvg } from "@/components/BarcodeSvg";
+import { Barcode } from "@/components/Barcode";
 
 // Shared requisition document — rendered identically in the on-screen preview
 // (requisitions/[id]) AND the standalone print page (print/requisition/[id]), so
@@ -71,7 +71,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 return (
                   <tr key={i} className="border-t border-neutral-200 align-middle">
                     <td className="py-2 pr-3 text-center text-neutral-400 tabular-nums">{i + 1}</td>
-                    <td className="py-2 pr-3"><BarcodeSvg value={it.barcode ?? ""} width={200} height={46} /></td>
+                    <td className="py-2 pr-3"><Barcode value={it.barcode ?? ""} height={46} width={1.8} fontSize={12} margin={2} /></td>
                     <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
