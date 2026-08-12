@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus } from "lucide-react";
 // The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
 // don't run on the SUNMI WebView) and cached, so barcode scans resolve instantly
 // instead of hitting the network per scan (slow on LTE).
@@ -25,6 +25,7 @@ import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { KShopQr } from "@/components/KShopQr";
 import { PhotoPicker, PhotoStrip } from "@/components/BillPhotos";
+import { CameraCapture } from "@/components/CameraCapture";
 import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -899,12 +900,16 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
 }
 
 // small "add photo" control for a pending bill in the list
+const hasGetUserMedia = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+
 function AddPhotoInline({ refId, count, pending, onAdd }: { refId: string; count: number; pending: boolean; onAdd: (ref: string, imgs: string[]) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const camRef = useRef<HTMLInputElement>(null);
+  const libRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [showCam, setShowCam] = useState(false);
   const max = 6 - count;
   if (max <= 0) return null;
-  const pick = async (files: FileList | null) => {
+  const pick = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setBusy(true);
     try {
@@ -913,15 +918,23 @@ function AddPhotoInline({ refId, count, pending, onAdd }: { refId: string; count
       for (const f of Array.from(files).slice(0, max)) { try { out.push(await compressImage(f)); } catch { failed++; } }
       if (out.length) onAdd(refId, out);
       if (failed) alert(`แนบไม่สำเร็จ ${failed} รูป — รองรับ JPG/PNG (รูป HEIC จาก iPhone บางเครื่องแปลงไม่ได้ ลอง “ถ่ายรูป” แทน)`);
-    } finally { setBusy(false); if (ref.current) ref.current.value = ""; }
+    } finally { setBusy(false); if (camRef.current) camRef.current.value = ""; if (libRef.current) libRef.current.value = ""; }
   };
   return (
     <>
-      <button type="button" onClick={() => ref.current?.click()} disabled={pending || busy}
-        className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-brand-dark hover:underline disabled:opacity-50">
-        <Plus className="w-3 h-3" /> {busy ? "กำลังแนบ…" : "แนบรูป"}
-      </button>
-      <input ref={ref} type="file" accept="image/*" multiple className="hidden" onChange={(e) => pick(e.target.files)} />
+      <div className="mt-1.5 flex items-center gap-3">
+        <button type="button" onClick={() => (hasGetUserMedia() ? setShowCam(true) : camRef.current?.click())} disabled={pending || busy}
+          className="inline-flex items-center gap-1 text-[11px] text-brand-dark hover:underline disabled:opacity-50">
+          <Camera className="w-3.5 h-3.5" /> {busy ? "กำลังแนบ…" : "ถ่ายรูป"}
+        </button>
+        <button type="button" onClick={() => libRef.current?.click()} disabled={pending || busy}
+          className="inline-flex items-center gap-1 text-[11px] text-brand-dark hover:underline disabled:opacity-50">
+          <ImagePlus className="w-3.5 h-3.5" /> เลือกรูป
+        </button>
+      </div>
+      <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pick(e.target.files)} />
+      <input ref={libRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => pick(e.target.files)} />
+      {showCam && <CameraCapture onCapture={(f) => { setShowCam(false); pick([f]); }} onClose={() => setShowCam(false)} />}
     </>
   );
 }
