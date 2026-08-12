@@ -62,6 +62,28 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
   // hardware keyboard-wedge + SUNMI laser; the phone camera is the <BarcodeScanner> below
   useBarcodeScanner(scanning, applyScan);
 
+  // camera flow: each scan identifies the item (+1 default) then the camera closes so
+  // you can edit that item's quantity on screen; tap สแกนนับ again to continue.
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const onCameraScan = (code: string) => {
+    const c = String(code || "").trim();
+    const inList = rowsRef.current.find((r) => r.barcode === c);
+    const p = inList ? null : catalog.get(c);
+    applyScan(c);   // +1 by default — you can overwrite it below
+    if (inList) setActiveKey(`${inList.barcode}__${inList.size}`);
+    else if (p) setActiveKey(`${c}__${p.size || ""}`);
+    setScanning(false);   // close the camera so you can edit the quantity on screen
+  };
+  // after a scan closes the camera, scroll to + focus the scanned item's quantity box
+  useEffect(() => {
+    if (!activeKey || scanning) return;
+    const el = document.getElementById(`cnt-${activeKey}`) as HTMLInputElement | null;
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => { el.focus(); el.select(); }, 220);
+    return () => clearTimeout(t);
+  }, [activeKey, scanning]);
+
   const counted = (r: Item) => Number(r.counted) || 0;
   const isCounted = (r: Item) => r.counted !== "";
   const list = useMemo(() => {
@@ -112,7 +134,7 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
             : diff < 0 ? <span className="text-danger text-[11px] font-medium">ขาด {Math.abs(diff)}</span>
             : <span className="text-warn-dark text-[11px] font-medium">เกิน {diff}</span>;
           return (
-            <div key={r.barcode + r.size} className="flex items-center gap-2 px-3 py-2">
+            <div key={r.barcode + r.size} className={`flex items-center gap-2 px-3 py-2 transition-colors ${activeKey === `${r.barcode}__${r.size}` ? "bg-brand-soft/50" : ""}`}>
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-ink truncate">{r.scent} <span className="text-muted text-xs">{r.size}</span></div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -122,7 +144,7 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button type="button" onClick={() => setCount(r.barcode, r.size, (n) => n - 1)} className="p-1.5 rounded-lg border border-line text-muted hover:bg-canvas"><Minus className="w-4 h-4" /></button>
-                <input value={r.counted} inputMode="numeric" placeholder="—" onFocus={(e) => e.target.select()}
+                <input id={`cnt-${r.barcode}__${r.size}`} value={r.counted} inputMode="numeric" placeholder="—" onFocus={(e) => e.target.select()}
                   onChange={(e) => setRows((rs) => rs.map((x) => (x.barcode === r.barcode && x.size === r.size ? { ...x, counted: e.target.value.replace(/[^\d]/g, "") } : x)))}
                   className={inp + ` w-12 text-center tabular-nums ${done && diff !== 0 ? (diff < 0 ? "border-danger text-danger" : "border-warn text-warn-dark") : ""}`} />
                 <button type="button" onClick={() => setCount(r.barcode, r.size, (n) => n + 1)} className="p-1.5 rounded-lg border border-line text-muted hover:bg-canvas"><Plus className="w-4 h-4" /></button>
@@ -147,8 +169,8 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
         <p className="text-[11px] text-muted-soft text-center">ระบบจะปรับสต๊อกหลังแอดมินตรวจและอนุมัติ</p>
       </div>
 
-      {/* phone camera scanner (continuous) — SUNMI/hardware handled by useBarcodeScanner */}
-      {scanning && <BarcodeScanner continuous knownCodes={knownCodes} onDetected={async (code) => applyScan(code)} onClose={() => setScanning(false)} />}
+      {/* phone camera scanner (single scan → edit qty on screen → tap สแกนนับ to continue) */}
+      {scanning && <BarcodeScanner knownCodes={knownCodes} onDetected={onCameraScan} onClose={() => setScanning(false)} />}
     </div>
   );
 }
