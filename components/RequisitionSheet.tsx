@@ -55,7 +55,6 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             <thead>
               <tr className="text-left text-neutral-500 text-[11px] uppercase tracking-wide border-b-2 border-black">
                 <th className="pb-1.5 pr-3 font-semibold text-center">#</th>
-                <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">รหัสสินค้า</th>
                 <th className="pb-1.5 pr-3 font-semibold">Barcode</th>
                 <th className="pb-1.5 pr-3 font-semibold">ชื่อสินค้า</th>
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ประเภท</th>
@@ -72,8 +71,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 return (
                   <tr key={i} className="border-t border-neutral-200 align-middle">
                     <td className="py-2 pr-3 text-center text-neutral-400 tabular-nums">{i + 1}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{it.sku ?? "-"}</td>
-                    <td className="py-2 pr-3"><BarcodeSvg value={it.barcode ?? ""} /></td>
+                    <td className="py-2 pr-3"><BarcodeSvg value={it.barcode ?? ""} width={200} height={46} /></td>
                     <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
@@ -86,7 +84,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-black font-bold">
-                <td colSpan={6} className="py-2 pr-3 text-right">รวมทั้งสิ้น</td>
+                <td colSpan={5} className="py-2 pr-3 text-right">รวมทั้งสิ้น</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{num(totalQty)}</td>
                 {received && <td className="py-2 pr-3 text-right tabular-nums">{num(totalRecv)}</td>}
                 <td className="py-2 whitespace-nowrap">ขวด</td>
