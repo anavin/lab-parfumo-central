@@ -253,14 +253,14 @@ const stockCte = (ship: string, adj: boolean) => `
     union select barcode, branch from ret${adj ? `
     union select barcode, branch from adj` : ``}),
   stock as (
-    select p.barcode, p.scent, p.size, k.branch,
+    select k.barcode, coalesce(p.scent, k.barcode) scent, coalesce(p.size, '') size, k.branch,
            coalesce(ship.q,0) shipped, coalesce(sold.q,0) + coalesce(subsold.q,0) sold, coalesce(ret.q,0) returned,
            ${adj ? "coalesce(adj.q,0)" : "0"} adjusted,
            -- sold = approved sales + pending sales (reserve stock the moment it's sold);
            -- returns go back to HQ; floor at 0 so a branch that sold before stock was entered reads 0
            greatest(0, coalesce(ship.q,0) ${adj ? "+ coalesce(adj.q,0) " : ""}- coalesce(sold.q,0) - coalesce(subsold.q,0) - coalesce(ret.q,0)) remaining
     from keys k
-    join products p on p.barcode = k.barcode
+    left join products p on p.barcode = k.barcode
     left join ship on ship.barcode = k.barcode and ship.branch = k.branch
     left join sold on sold.barcode = k.barcode and sold.branch = k.branch
     left join subsold on subsold.barcode = k.barcode and subsold.branch = k.branch
