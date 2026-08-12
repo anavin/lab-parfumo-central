@@ -30,8 +30,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-gold-dark">ใบเบิกสินค้า</div>
-              <div className="text-xs text-black/50">Requisition</div>
-              <div className={`text-base font-bold mt-0.5 ${ci === 0 ? "text-ink" : "text-neutral-400"}`}>{copyLabel}</div>
+              <div className="text-base font-bold text-ink mt-1">{copyLabel}</div>
             </div>
           </div>
 
