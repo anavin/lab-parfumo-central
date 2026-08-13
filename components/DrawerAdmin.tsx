@@ -85,7 +85,9 @@ export function DrawerAdmin({ rows, attachments = {}, branch = "CTW" }: { rows: 
           <th className="px-3 py-2.5 text-right">คงเหลือหน้าร้าน</th>
           <th className="px-5 py-2.5 text-right">จัดการ</th>
         </tr></thead>
-        <tbody>{rows.map((r) => <DrawerRow key={r.entry_date} r={r} slips={attachments[r.entry_date] ?? []} branch={branch} />)}</tbody>
+        {/* key includes branch (+ its figures) so switching สาขา remounts each row and its
+            input state resets to the new branch — otherwise old numbers linger until refresh */}
+        <tbody>{rows.map((r) => <DrawerRow key={`${branch}-${r.entry_date}`} r={r} slips={attachments[r.entry_date] ?? []} branch={branch} />)}</tbody>
       </table>
       <p className="text-[11px] text-muted px-5 py-2">
         กด “ดูรายงาน” เพื่อตรวจยอดขายของวันนั้น · ตรวจ/แก้ ยกมา–เอาไปสาขา–เข้าธนาคาร แล้ว “ยืนยัน & บันทึกเข้าระบบ” → ยอดเข้าธนาคารลงบัญชีเงินสด (โพสต์ครั้งเดียว แล้วล็อกแถว) · คงเหลือ = ยกมา + เอาไปสาขา + เงินสดขาย − เข้าธนาคาร · สาขาใหม่ ยกมา = 0
