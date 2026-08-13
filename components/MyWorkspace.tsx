@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus, ChevronDown } from "lucide-react";
 // The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
 // don't run on the SUNMI WebView) and cached, so barcode scans resolve instantly
 // instead of hitting the network per scan (slow on LTE).
@@ -351,6 +351,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
+  const [showDisc, setShowDisc] = useState(false);                 // end-of-bill discount is hidden until asked for
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
@@ -529,26 +530,31 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* bill-level extra discount (%) — default 0%, adjustable. Comes before payment
           so the net total is final when choosing how it's paid (esp. split tenders). */}
       <div className="mb-4 border-t border-line/60 pt-3">
-        <div className="flex items-baseline justify-between gap-2 mb-2">
-          <span className="text-sm font-medium text-ink">ส่วนลดเพิ่มท้ายบิล</span>
+        <button type="button" onClick={() => setShowDisc((v) => !v)} className="w-full flex items-baseline justify-between gap-2">
+          <span className="text-sm font-medium text-ink flex items-center gap-1">
+            ส่วนลดเพิ่มท้ายบิล
+            <ChevronDown className={"w-4 h-4 text-muted transition-transform " + ((showDisc || pct > 0) ? "rotate-180" : "")} />
+          </span>
           {pct > 0
             ? <span className="text-sm font-semibold text-brand-dark shrink-0">{pct}% · −{baht(billDiscTotal)}</span>
-            : <span className="text-xs text-muted shrink-0">ไม่มีส่วนลด</span>}
-        </div>
-        <div className="flex items-stretch gap-2">
-          {[0, 5, 10].map((v) => (
-            <button key={v} onClick={() => set({ discount_pct: v })}
-              className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors " +
-                (pct === v ? "bg-brand text-white border-brand" : "border-line text-muted hover:bg-canvas")}>
-              {v}%
-            </button>
-          ))}
-          <div className={"flex items-center rounded-lg border overflow-hidden shrink-0 " + (![0, 5, 10].includes(pct) ? "border-brand" : "border-line")}>
-            <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-            <input inputMode="numeric" className="w-9 text-center py-2 text-sm outline-none tabular-nums" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value.replace(/^0+(?=\d)/, "") })} onFocus={(e) => e.target.select()} />
-            <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+            : <span className="text-xs text-muted shrink-0">{(showDisc ? "แตะเพื่อซ่อน" : "ไม่มีส่วนลด · แตะเพื่อใส่")}</span>}
+        </button>
+        {(showDisc || pct > 0) && (
+          <div className="flex items-stretch gap-2 mt-2">
+            {[0, 5, 10].map((v) => (
+              <button key={v} onClick={() => set({ discount_pct: v })}
+                className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors " +
+                  (pct === v ? "bg-brand text-white border-brand" : "border-line text-muted hover:bg-canvas")}>
+                {v}%
+              </button>
+            ))}
+            <div className={"flex items-center rounded-lg border overflow-hidden shrink-0 " + (![0, 5, 10].includes(pct) ? "border-brand" : "border-line")}>
+              <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
+              <input inputMode="numeric" className="w-9 text-center py-2 text-sm outline-none tabular-nums" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value.replace(/^0+(?=\d)/, "") })} onFocus={(e) => e.target.select()} />
+              <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* payment — last major step, once items + discount give a final net total */}
