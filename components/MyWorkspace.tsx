@@ -566,12 +566,16 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
                 </button>
               ))}
             </div>
-            {/* custom baht amount — adjustable, overrides the % when set */}
-            <div className={"flex items-center rounded-lg border overflow-hidden " + (discountBaht > 0 ? "border-brand" : "border-line")}>
+            {/* custom baht amount — adjustable, overrides the % when set. Collapses once you
+                finish typing (blur / Enter), unless focus moves to its own +/- buttons. */}
+            <div data-disc-box className={"flex items-center rounded-lg border overflow-hidden " + (discountBaht > 0 ? "border-brand" : "border-line")}>
               <span className="pl-3 pr-2 text-sm text-muted shrink-0">กำหนดเอง (บาท)</span>
               <button onClick={() => set({ discount_baht: Math.max(0, discountBaht - 10), discount_pct: 0 })} className="ml-auto px-3 py-2.5 text-muted hover:bg-canvas shrink-0" aria-label="ลด"><Minus className="w-5 h-5" /></button>
               <input inputMode="numeric" className="flex-1 min-w-0 w-24 text-center py-2.5 text-lg font-semibold outline-none tabular-nums" value={state.discount_baht}
-                onChange={(e) => set({ discount_baht: e.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, ""), discount_pct: 0 })} onFocus={(e) => e.target.select()} />
+                onChange={(e) => set({ discount_baht: e.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, ""), discount_pct: 0 })}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                onBlur={(e) => { const box = e.currentTarget.closest("[data-disc-box]"); if (box && box.contains(e.relatedTarget as Node)) return; if ((Number(state.discount_baht) || 0) > 0) setShowDisc(false); }} />
               <button onClick={() => set({ discount_baht: discountBaht + 10, discount_pct: 0 })} className="px-3 py-2.5 text-muted hover:bg-canvas shrink-0" aria-label="เพิ่ม"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
