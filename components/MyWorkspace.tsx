@@ -351,7 +351,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
-  const [showDisc, setShowDisc] = useState(false);                 // end-of-bill discount is hidden until asked for
+  const [showDisc, setShowDisc] = useState(true);                  // discount open at first; collapses once a preset is picked
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
@@ -533,16 +533,16 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         <button type="button" onClick={() => setShowDisc((v) => !v)} className="w-full flex items-baseline justify-between gap-2">
           <span className="text-sm font-medium text-ink flex items-center gap-1">
             ส่วนลดเพิ่มท้ายบิล
-            <ChevronDown className={"w-4 h-4 text-muted transition-transform " + ((showDisc || pct > 0) ? "rotate-180" : "")} />
+            <ChevronDown className={"w-4 h-4 text-muted transition-transform " + (showDisc ? "rotate-180" : "")} />
           </span>
           {pct > 0
             ? <span className="text-sm font-semibold text-brand-dark shrink-0">{pct}% · −{baht(billDiscTotal)}</span>
             : <span className="text-xs text-muted shrink-0">{(showDisc ? "แตะเพื่อซ่อน" : "ไม่มีส่วนลด · แตะเพื่อใส่")}</span>}
         </button>
-        {(showDisc || pct > 0) && (
+        {showDisc && (
           <div className="flex items-stretch gap-2 mt-2">
             {[0, 5, 10].map((v) => (
-              <button key={v} onClick={() => set({ discount_pct: v })}
+              <button key={v} onClick={() => { set({ discount_pct: v }); setShowDisc(false); }}
                 className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors " +
                   (pct === v ? "bg-brand text-white border-brand" : "border-line text-muted hover:bg-canvas")}>
                 {v}%
