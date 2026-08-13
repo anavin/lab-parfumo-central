@@ -838,16 +838,31 @@ const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_ca
  *  carry the running closing). Using one grouped reconstruction — not just the single prior row —
  *  keeps /my "ยกมา" identical to /cash's คงเหลือ so the two pages never drift. */
 async function carryInFor(date: string, branch: string): Promise<number> {
-  const rows = await q<{ entry_date: string; opening: number; seed: number; deposit: number; confirmed: boolean }>(
+  const drawerRows = await q<{ entry_date: string; opening: number; seed: number; deposit: number; confirmed: boolean }>(
     `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float, confirmed
-     from daily_cash where entry_date < $1 and branch = $2 order by entry_date asc`, [date, branch]);
-  if (!rows.length) return 0;
+     from daily_cash where entry_date < $1 and branch = $2`, [date, branch]);
+  const drawer = new Map(drawerRows.map((r) => [r.entry_date, r]));
+  // Include days that had CASH activity but no drawer row (sold cash without opening the
+  // drawer) — that cash still carries forward. Without this, a day's 3,037฿ vanishes.
+  const alive = await aliveAnd("");
+  const cashDates = await q<{ d: string }>(
+    `select distinct d from (
+       select sale_date::text d from sales
+         where source = $2 and payment_channel in ('Cash', $3) and sale_date is not null and sale_date < $1
+       union
+       select entry_date::text d from submissions
+         where kind = 'sale' and status = 'pending' and payment_channel in ('Cash', $3)
+           and source = $2 and entry_date is not null and entry_date < $1${alive}
+     ) t`, [date, branch, SPLIT2]);
+  const dates = [...new Set([...drawer.keys(), ...cashDates.map((r) => r.d)])].sort();
+  if (!dates.length) return 0;
   const cashByDate = new Map<string, number>();
-  await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, branch)).cash)));
+  await Promise.all(dates.map(async (d) => cashByDate.set(d, (await dailyReport(d, branch)).cash)));
   let prevClosing = 0;
-  for (const r of rows) {           // oldest → newest
-    const opening = r.confirmed ? r.opening : prevClosing;
-    prevClosing = Math.max(0, opening + r.seed + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
+  for (const d of dates) {           // oldest → newest
+    const r = drawer.get(d);
+    const opening = r?.confirmed ? r.opening : prevClosing;
+    prevClosing = Math.max(0, opening + (r?.seed ?? 0) + (cashByDate.get(d) ?? 0) - (r?.deposit ?? 0));
   }
   return prevClosing;
 }
@@ -903,22 +918,40 @@ export async function saveDailyCash(date: string, branch: string, opening: numbe
 
 /** Per-day shop drawer figures for the admin cash page (review + confirm + post), one branch. */
 export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) {
+  type Row = { entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
   try {
-    const rows = await q<{ entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean }>(
+    const drawerRows = await q<Row>(
       `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
-       from daily_cash where branch=$2 order by entry_date desc limit $1`, [limit, branch]);
-    // "คงเหลือ" is computed LIVE = ยกมา + เอาไป + เงินสดขายวันนั้น − เข้าธนาคาร; that live value
-    // carries to the next day. The oldest un-reviewed day starts at ยกมา = 0 (new branch).
+       from daily_cash where branch=$1`, [branch]);
+    const drawer = new Map(drawerRows.map((r) => [r.entry_date, r]));
+    // Days that had CASH activity but no drawer row still hold cash — show them too, so the
+    // chain (and each ยกมา) is correct even when a day sold cash without opening the drawer.
+    const alive = await aliveAnd("");
+    const cashDates = await q<{ d: string }>(
+      `select distinct d from (
+         select sale_date::text d from sales
+           where source = $1 and payment_channel in ('Cash', $2) and sale_date is not null
+         union
+         select entry_date::text d from submissions
+           where kind = 'sale' and status = 'pending' and payment_channel in ('Cash', $2)
+             and source = $1 and entry_date is not null${alive}
+       ) t`, [branch, SPLIT2]);
+    const allDates = [...new Set([...drawer.keys(), ...cashDates.map((r) => r.d)])].sort();   // oldest → newest
+    if (!allDates.length) return [];
+    // "คงเหลือ" is computed LIVE = ยกมา + เอาไป + เงินสดขายวันนั้น − เข้าธนาคาร; carries to the next day.
     const cashByDate = new Map<string, number>();
-    await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, branch)).cash)));
+    await Promise.all(allDates.map(async (d) => cashByDate.set(d, (await dailyReport(d, branch)).cash)));
     let prevClosing = 0;
-    for (const r of [...rows].reverse()) {   // oldest → newest
-      if (!r.confirmed) r.opening = prevClosing;   // un-reviewed day: ยกมา = คงเหลือเมื่อวาน (0 for the first day)
-      r.closing = Math.max(0, r.opening + r.seed + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
-      prevClosing = r.closing;
-    }
-    return rows;
+    const built: Row[] = allDates.map((d) => {
+      const r = drawer.get(d);
+      const opening = r?.confirmed ? r.opening : prevClosing;   // confirmed day anchors its own opening
+      const seed = r?.seed ?? 0, deposit = r?.deposit ?? 0;
+      const closing = Math.max(0, opening + seed + (cashByDate.get(d) ?? 0) - deposit);
+      prevClosing = closing;
+      return { entry_date: d, opening, seed, deposit, closing, confirmed: r?.confirmed ?? false, posted: r?.posted ?? false };
+    });
+    return built.reverse().slice(0, limit);   // most recent first, capped
   } catch (e) {
     if (missingDailyCash(e)) return [];
     if ((e as any)?.code === "42703") return dailyCashLogLegacy(limit);   // branch/seed not migrated yet
