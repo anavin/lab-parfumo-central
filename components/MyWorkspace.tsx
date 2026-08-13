@@ -569,10 +569,10 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
             {/* custom baht amount — adjustable, overrides the % when set */}
             <div className={"flex items-center rounded-lg border overflow-hidden " + (discountBaht > 0 ? "border-brand" : "border-line")}>
               <span className="pl-3 pr-2 text-sm text-muted shrink-0">กำหนดเอง (บาท)</span>
-              <button onClick={() => set({ discount_baht: Math.max(0, discountBaht - 10), discount_pct: 0 })} className="ml-auto px-2.5 py-2 text-muted hover:bg-canvas shrink-0" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-              <input inputMode="numeric" className="w-16 text-center py-2 text-sm outline-none tabular-nums" value={state.discount_baht}
+              <button onClick={() => set({ discount_baht: Math.max(0, discountBaht - 10), discount_pct: 0 })} className="ml-auto px-3 py-2.5 text-muted hover:bg-canvas shrink-0" aria-label="ลด"><Minus className="w-5 h-5" /></button>
+              <input inputMode="numeric" className="flex-1 min-w-0 w-24 text-center py-2.5 text-lg font-semibold outline-none tabular-nums" value={state.discount_baht}
                 onChange={(e) => set({ discount_baht: e.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, ""), discount_pct: 0 })} onFocus={(e) => e.target.select()} />
-              <button onClick={() => set({ discount_baht: discountBaht + 10, discount_pct: 0 })} className="px-2.5 py-2 text-muted hover:bg-canvas shrink-0" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+              <button onClick={() => set({ discount_baht: discountBaht + 10, discount_pct: 0 })} className="px-3 py-2.5 text-muted hover:bg-canvas shrink-0" aria-label="เพิ่ม"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
         )}
