@@ -63,7 +63,12 @@ export function Sidebar({ user, pending = 0 }: { user: User; pending?: number })
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const groups = groupsFor(user, pending);
-  const active = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
+  // A route can match several menu hrefs (e.g. /products/barcodes matches both /products and
+  // /products/barcodes). Only the MOST SPECIFIC (longest) match should light up, so a child
+  // page doesn't also highlight its parent menu item.
+  const matches = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
+  const bestMatch = groups.flatMap((g) => g.items.map((i) => i.href)).filter(matches).sort((a, b) => b.length - a.length)[0];
+  const active = (href: string) => href === bestMatch;
 
   // close the mobile drawer whenever the route changes
   useEffect(() => { setOpen(false); }, [path]);
