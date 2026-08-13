@@ -169,7 +169,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <Card title="สัดส่วนตามเกรด" subtitle="รายได้ & จำนวน แยกตามเกรด (% ของยอดรวม)" className="lg:col-span-2" fill bodyClass="min-h-[18rem]">
           <GradeColumns data={gradeCols} />
         </Card>
-        <Card title="สต๊อกใกล้หมด" subtitle="เรียงจากคงเหลือน้อยสุด · กดดูทั้งหมดได้">
+        <Card title="สต๊อกใกล้หมด" subtitle="เรียงจากคงเหลือน้อยสุด · กดดูทั้งหมดได้" fill bodyClass="min-h-[18rem]">
           <LowStockList data={stockAll} />
         </Card>
       </div>

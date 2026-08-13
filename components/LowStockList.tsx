@@ -11,8 +11,8 @@ export function LowStockList({ data, initial = 8 }: { data: Row[]; initial?: num
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? data : data.slice(0, initial);
   return (
-    <div>
-      <div className={"space-y-0.5" + (expanded ? " max-h-[26rem] overflow-y-auto pr-1" : "")}>
+    <div className="flex flex-col h-full">
+      <div className={"space-y-0.5 flex-1" + (expanded ? " max-h-[26rem] overflow-y-auto pr-1" : "")}>
         {shown.map((s, i) => (
           <div key={i} className="flex items-center gap-2 py-1.5 text-sm border-b border-line-soft last:border-0">
             <span className="font-medium text-ink truncate flex-1">{s.scent}</span>
@@ -23,7 +23,7 @@ export function LowStockList({ data, initial = 8 }: { data: Row[]; initial?: num
       </div>
       {data.length > initial && (
         <button type="button" onClick={() => setExpanded((v) => !v)}
-          className="mt-2.5 text-xs font-medium text-brand-dark hover:underline">
+          className="mt-2.5 shrink-0 text-xs font-medium text-brand-dark hover:underline text-left">
           {expanded ? "▲ ย่อ" : `▾ ดูทั้งหมด (${data.length})`}
         </button>
       )}
