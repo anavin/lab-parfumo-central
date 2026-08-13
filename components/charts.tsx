@@ -106,8 +106,12 @@ export function RevenueCustomersCombo({ data, xKey = "x" }: { data: any[]; xKey?
         domain={[0, (max: number) => Math.ceil((max * 2) / 10) * 10]} />
       <Tooltip content={<ComboTip />} />
       <Legend verticalAlign="top" height={26} iconType="plainline" iconSize={14} wrapperStyle={{ fontSize: 12, color: "#3d434e" }} />
-      <Area yAxisId="rev" type="monotone" dataKey="revenue" name="รายได้ (฿)" stroke={BRAND} strokeWidth={2.5} fill="url(#rc)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-      <Line yAxisId="cust" type="monotone" dataKey="customers" name="ลูกค้า (ราย)" stroke={CUST} strokeWidth={2.5} dot={{ r: 2.5, fill: CUST, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} />
+      <Area yAxisId="rev" type="monotone" dataKey="revenue" name="รายได้ (฿)" stroke={BRAND} strokeWidth={2.5} fill="url(#rc)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }}>
+        <LabelList dataKey="revenue" position="top" offset={8} formatter={baht} style={{ fontSize: 9, fill: "#a17c48", fontWeight: 600 }} />
+      </Area>
+      <Line yAxisId="cust" type="monotone" dataKey="customers" name="ลูกค้า (ราย)" stroke={CUST} strokeWidth={2.5} dot={{ r: 2.5, fill: CUST, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }}>
+        <LabelList dataKey="customers" position="bottom" offset={8} formatter={numAbbr} style={{ fontSize: 9, fill: CUST, fontWeight: 600 }} />
+      </Line>
     </ComposedChart>,
   );
 }
@@ -147,12 +151,13 @@ export function Columns({ data, color = BRAND, money = true, highlight }: {
 }) {
   const fmt = money ? baht : numAbbr;
   return box(
-    <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+    <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
       <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
       <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval={0} />
       <YAxis tickFormatter={fmt} tick={axis} tickLine={false} axisLine={false} width={44} />
       <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }} content={<TT fmt={fmt} />} />
       <Bar dataKey="value" name={money ? "รายได้" : "จำนวน"} radius={[4, 4, 0, 0]} maxBarSize={44}>
+        <LabelList dataKey="value" position="top" formatter={fmt} style={{ fontSize: 10, fill: "#697586", fontWeight: 600 }} />
         {data.map((d, i) => <Cell key={i} fill={highlight && d.label === highlight ? "#836234" : color} />)}
       </Bar>
     </BarChart>,
@@ -184,14 +189,18 @@ function GradeTip({ active, payload, label }: any) {
 
 export function GradeColumns({ data }: { data: { label: string; revenue: number; qty: number; revenuePct: number; qtyPct: number }[] }) {
   return box(
-    <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={3} barCategoryGap="28%">
+    <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 0 }} barGap={3} barCategoryGap="28%">
       <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
       <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#3d434e" }} tickLine={false} axisLine={false} interval={0} />
       <YAxis tickFormatter={(v: number) => v + "%"} tick={axis} tickLine={false} axisLine={false} width={38} />
       <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }} content={<GradeTip />} />
       <Legend verticalAlign="top" height={26} iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 12, color: "#3d434e" }} />
-      <Bar dataKey="revenuePct" name="รายได้" fill={GOLD_DARK} radius={[4, 4, 0, 0]} maxBarSize={40} />
-      <Bar dataKey="qtyPct" name="จำนวน" fill={GOLD_LIGHT} radius={[4, 4, 0, 0]} maxBarSize={40} />
+      <Bar dataKey="revenuePct" name="รายได้" fill={GOLD_DARK} radius={[4, 4, 0, 0]} maxBarSize={40}>
+        <LabelList dataKey="revenuePct" position="top" formatter={(v: number) => Math.round(v) + "%"} style={{ fontSize: 10, fill: GOLD_DARK, fontWeight: 600 }} />
+      </Bar>
+      <Bar dataKey="qtyPct" name="จำนวน" fill={GOLD_LIGHT} radius={[4, 4, 0, 0]} maxBarSize={40}>
+        <LabelList dataKey="qtyPct" position="top" formatter={(v: number) => Math.round(v) + "%"} style={{ fontSize: 10, fill: "#8a6a37", fontWeight: 600 }} />
+      </Bar>
     </BarChart>,
   );
 }
