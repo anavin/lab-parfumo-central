@@ -83,12 +83,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // discount (e.g. negotiated when buying several), distributed to each line.
 type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean; stock?: number | null };
 type Tender = { channel: string; amount: any };
-type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; items: BillItem[]; attachments: string[]; splitPay: boolean; tenders: Tender[] };
+type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; discount_baht: any; items: BillItem[]; attachments: string[]; splitPay: boolean; tenders: Tender[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number; payment_channel: string };
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
+const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
@@ -393,20 +393,35 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   // back to the bill default), else the bill default for everyone
   const effChannel = (it: BillItem) => (state.splitPay ? (it.payment_channel || state.payment_channel) : state.payment_channel);
 
-  // per-item discount (baht) + a bill-level extra discount (%) on top
+  // per-item discount (baht) + a bill-level extra discount: EITHER a % (0/5/10 presets)
+  // OR a fixed baht amount (กำหนดเอง). A baht amount, if set, takes precedence over the %.
   const pct = Math.min(100, Math.max(0, Number(state.discount_pct) || 0));
-  const lines = state.items.map((it) => {
+  const discountBaht = Math.max(0, Math.round(Number(state.discount_baht) || 0));
+  const base = state.items.map((it) => {
     const sub = (Number(it.qty) || 0) * (Number(it.unit_price) || 0);
     // ของแถม (gift) → discount = full price so the line is free (฿0)
     const itemDisc = it.gift ? sub : Math.min(sub, Number(it.discount) || 0);
-    const billDisc = Math.round(((sub - itemDisc) * pct) / 100);
-    const discount = itemDisc + billDisc;   // total discount stored on this line
-    return { it, sub, discount, total: sub - discount, channel: effChannel(it) };
+    return { it, sub, itemDisc, eligible: sub - itemDisc, channel: effChannel(it) };
   });
-  const subtotal = lines.reduce((s, l) => s + l.sub, 0);
-  const discountTotal = lines.reduce((s, l) => s + l.discount, 0);
-  const itemDiscTotal = lines.reduce((s, l) => s + (l.it.gift ? l.sub : Math.min(l.sub, Number(l.it.discount) || 0)), 0);
-  const billDiscTotal = discountTotal - itemDiscTotal;   // baht from the bill-level %
+  const subtotal = base.reduce((s, b) => s + b.sub, 0);
+  const itemDiscTotal = base.reduce((s, b) => s + b.itemDisc, 0);
+  const eligibleTotal = base.reduce((s, b) => s + b.eligible, 0);
+  // total bill-level discount in baht, capped so it never exceeds the eligible amount
+  const billDiscTotal = Math.min(eligibleTotal, discountBaht > 0 ? discountBaht : Math.round((eligibleTotal * pct) / 100));
+  // spread it across lines proportional to each line's eligible amount; the last eligible
+  // line absorbs the rounding remainder so the per-line discounts sum EXACTLY to billDiscTotal
+  const lastEligible = base.reduce((li, b, i) => (b.eligible > 0 ? i : li), -1);
+  let spread = 0;
+  const lines = base.map((b, i) => {
+    let billDisc = 0;
+    if (billDiscTotal > 0 && eligibleTotal > 0 && b.eligible > 0) {
+      billDisc = i === lastEligible ? billDiscTotal - spread : Math.round((billDiscTotal * b.eligible) / eligibleTotal);
+      spread += billDisc;
+    }
+    const discount = b.itemDisc + billDisc;   // total discount stored on this line
+    return { it: b.it, sub: b.sub, discount, total: b.sub - discount, channel: b.channel };
+  });
+  const discountTotal = itemDiscTotal + billDiscTotal;
   const net = subtotal - discountTotal;
   const payKnown = PAYMENTS.some((p) => p.v === state.payment_channel);
 
@@ -535,23 +550,29 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
             ส่วนลดเพิ่มท้ายบิล
             <ChevronDown className={"w-4 h-4 text-muted transition-transform " + (showDisc ? "rotate-180" : "")} />
           </span>
-          {pct > 0
-            ? <span className="text-sm font-semibold text-brand-dark shrink-0">{pct}% · −{baht(billDiscTotal)}</span>
+          {billDiscTotal > 0
+            ? <span className="text-sm font-semibold text-brand-dark shrink-0">{discountBaht > 0 ? `−${baht(billDiscTotal)}` : `${pct}% · −${baht(billDiscTotal)}`}</span>
             : <span className="text-xs text-muted shrink-0">{(showDisc ? "แตะเพื่อซ่อน" : "ไม่มีส่วนลด · แตะเพื่อใส่")}</span>}
         </button>
         {showDisc && (
-          <div className="flex items-stretch gap-2 mt-2">
-            {[0, 5, 10].map((v) => (
-              <button key={v} onClick={() => { set({ discount_pct: v }); setShowDisc(false); }}
-                className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors " +
-                  (pct === v ? "bg-brand text-white border-brand" : "border-line text-muted hover:bg-canvas")}>
-                {v}%
-              </button>
-            ))}
-            <div className={"flex items-center rounded-lg border overflow-hidden shrink-0 " + (![0, 5, 10].includes(pct) ? "border-brand" : "border-line")}>
-              <button onClick={() => set({ discount_pct: Math.max(0, pct - 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="ลด"><Minus className="w-4 h-4" /></button>
-              <input inputMode="numeric" className="w-9 text-center py-2 text-sm outline-none tabular-nums" value={state.discount_pct} onChange={(e) => set({ discount_pct: e.target.value.replace(/^0+(?=\d)/, "") })} onFocus={(e) => e.target.select()} />
-              <button onClick={() => set({ discount_pct: Math.min(100, pct + 1) })} className="px-2.5 py-2 text-muted hover:bg-canvas" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
+          <div className="mt-2 space-y-2">
+            {/* percent presets */}
+            <div className="flex items-stretch gap-2">
+              {[0, 5, 10].map((v) => (
+                <button key={v} onClick={() => { set({ discount_pct: v, discount_baht: 0 }); setShowDisc(false); }}
+                  className={"flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors " +
+                    (discountBaht === 0 && pct === v ? "bg-brand text-white border-brand" : "border-line text-muted hover:bg-canvas")}>
+                  {v}%
+                </button>
+              ))}
+            </div>
+            {/* custom baht amount — adjustable, overrides the % when set */}
+            <div className={"flex items-center rounded-lg border overflow-hidden " + (discountBaht > 0 ? "border-brand" : "border-line")}>
+              <span className="pl-3 pr-2 text-sm text-muted shrink-0">กำหนดเอง (บาท)</span>
+              <button onClick={() => set({ discount_baht: Math.max(0, discountBaht - 10), discount_pct: 0 })} className="ml-auto px-2.5 py-2 text-muted hover:bg-canvas shrink-0" aria-label="ลด"><Minus className="w-4 h-4" /></button>
+              <input inputMode="numeric" className="w-16 text-center py-2 text-sm outline-none tabular-nums" value={state.discount_baht}
+                onChange={(e) => set({ discount_baht: e.target.value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, ""), discount_pct: 0 })} onFocus={(e) => e.target.select()} />
+              <button onClick={() => set({ discount_baht: discountBaht + 10, discount_pct: 0 })} className="px-2.5 py-2 text-muted hover:bg-canvas shrink-0" aria-label="เพิ่ม"><Plus className="w-4 h-4" /></button>
             </div>
           </div>
         )}
