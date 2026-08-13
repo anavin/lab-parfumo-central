@@ -7,6 +7,8 @@ import { PageHeader, Stat, Card, Badge, Hint } from "@/components/ui";
 import { RevenueCustomersCombo, Donut, Columns, GradeColumns } from "@/components/charts";
 import { BarList } from "@/components/BarList";
 import { TopScentsCard } from "@/components/TopScentsCard";
+import { BAList } from "@/components/BAList";
+import { LowStockList } from "@/components/LowStockList";
 import { DashboardFilters } from "@/components/DashboardFilters";
 import { baht, num, compactBaht } from "@/lib/format";
 import {
@@ -34,7 +36,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const [k, rev, cust, scents, sizes, pay, nation, ba, stock, dRev, dCust,
          sstats, grades, dow, hours, stockAll] = await Promise.all([
     kpis(f), monthlyRevenue(f), monthlyCustomers(f), topScents(f, 500),
-    sizeMix(f), paymentMix(f), nationMix(f), byBA(f, 8), stockSummary(source),
+    sizeMix(f), paymentMix(f), nationMix(f), byBA(f), stockSummary(source),
     singleMonth ? dailyRevenue(singleMonth, source) : Promise.resolve([]),
     singleMonth ? dailyCustomers(singleMonth, source) : Promise.resolve([]),
     salesStats(f), gradeMix(f), salesByDow(f), salesByHour(f), stockLive(source),
@@ -67,7 +69,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     label: g.grade, revenue: g.revenue, qty: g.qty,
     revenuePct: (g.revenue / gradeRevTot) * 100, qtyPct: (g.qty / gradeQtyTot) * 100,
   }));
-  const lowStock = stockAll.slice(0, 8);
 
   // When a single month is selected, the trend chart shows daily data.
   const daily = !!singleMonth;
@@ -168,16 +169,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <Card title="สัดส่วนตามเกรด" subtitle="รายได้ & จำนวน แยกตามเกรด (% ของยอดรวม)" className="lg:col-span-2" fill bodyClass="min-h-[18rem]">
           <GradeColumns data={gradeCols} />
         </Card>
-        <Card title="สต๊อกใกล้หมด" subtitle="8 อันดับคงเหลือน้อยสุด">
-          <div className="space-y-0.5">
-            {lowStock.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 py-1.5 text-sm border-b border-line-soft last:border-0">
-                <span className="font-medium text-ink truncate flex-1">{s.scent}</span>
-                <span className="text-muted-soft text-[11px] shrink-0">{s.size}</span>
-                <Badge tone={s.remaining <= 0 ? "danger" : s.remaining <= 3 ? "warn" : "success"}>{num(s.remaining)}</Badge>
-              </div>
-            ))}
-          </div>
+        <Card title="สต๊อกใกล้หมด" subtitle="เรียงจากคงเหลือน้อยสุด · กดดูทั้งหมดได้">
+          <LowStockList data={stockAll} />
         </Card>
       </div>
 
@@ -211,16 +204,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             </tbody>
           </table>
         </Card>
-        <Card title="ยอดขายตาม BA" subtitle="พนักงานขายยอดสูงสุด">
-          <div className="space-y-1">
-            {ba.map((b, i) => (
-              <div key={b.ba} className="flex items-center gap-3 py-1.5">
-                <span className="w-5 h-5 rounded-md bg-brand-soft text-brand-dark text-[11px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                <span className="text-sm font-medium truncate">{b.ba}</span>
-                <span className="ml-auto text-sm font-semibold tabular-nums">{baht(b.revenue)}</span>
-              </div>
-            ))}
-          </div>
+        <Card title="ยอดขายตาม BA" subtitle="พนักงานขายรายคน">
+          <BAList data={ba} />
         </Card>
       </div>
     </div>
