@@ -77,7 +77,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ประเภท</th>
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ขนาด</th>
                 <th className="pb-1.5 pr-3 font-semibold text-right">เบิก</th>
-                {received && <th className="pb-1.5 pr-3 font-semibold text-right">จ่ายจริง</th>}
+                {received && <th className="pb-1.5 pr-3 font-semibold text-center">จ่ายจริง</th>}
                 <th className="pb-1.5 font-semibold">หน่วย</th>
               </tr>
             </thead>
@@ -93,7 +93,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                     <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
                     <td className="py-2 pr-3 text-right font-medium tabular-nums">{num(it.qty)}</td>
-                    {received && <td className={`py-2 pr-3 text-right font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
+                    {received && <td className={`py-2 pr-3 text-center font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
                     <td className="py-2 whitespace-nowrap">ขวด</td>
                   </tr>
                 );
