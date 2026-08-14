@@ -35,10 +35,10 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           </div>
 
           <div className="flex items-start justify-between gap-8 mb-5">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm flex-1">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm flex-1">
               <Field label="PO Order No." value={po.po_number} />
               <Field label="วันที่" value={fmtDate(po.order_date)} />
-              <Field label="Branch" value={po.branch_label} />
+              <div className="col-span-2"><Field label="Branch" value={po.branch_label} nowrap /></div>
               <Field label="รหัสสาขา" value={po.store_no ?? "-"} />
               <Field label="Delivery No." value={po.delivery_number ?? "-"} />
             </div>
@@ -109,11 +109,11 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, nowrap = false }: { label: string; value: string; nowrap?: boolean }) {
   return (
     <div className="flex gap-2">
-      <span className="text-black/45 min-w-[92px]">{label} :</span>
-      <span className="font-medium">{value}</span>
+      <span className="text-black/45 min-w-[92px] shrink-0">{label} :</span>
+      <span className={"font-medium" + (nowrap ? " whitespace-nowrap" : "")}>{value}</span>
     </div>
   );
 }
