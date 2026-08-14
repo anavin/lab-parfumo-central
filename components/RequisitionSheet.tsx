@@ -19,6 +19,14 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   const totalRecv = items.reduce((s, i) => s + Number(i.received_qty ?? i.qty ?? 0), 0);
   const hasDiff = received && items.some((i) => i.received_qty != null && Number(i.received_qty) !== Number(i.qty));
 
+  // Order the sheet by ประเภท (grade) → ชื่อสินค้า (A→Z / ก→ฮ) → ขนาดใหญ่ก่อน, so the same
+  // type sits together and each scent's larger bottles are listed first.
+  const sizeNum = (s: string | null) => parseInt(String(s ?? "").replace(/[^\d]/g, ""), 10) || 0;
+  const rows = [...items].sort((a, b) =>
+    (a.grade ?? "").localeCompare(b.grade ?? "", "th") ||
+    (a.scent ?? "").localeCompare(b.scent ?? "", "th") ||
+    sizeNum(b.size) - sizeNum(a.size));
+
   return (
     <>
       {["ต้นฉบับ", "สำเนา"].map((copyLabel, ci) => (
@@ -74,7 +82,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </tr>
             </thead>
             <tbody>
-              {items.map((it, i) => {
+              {rows.map((it, i) => {
                 const rq = it.received_qty ?? it.qty;
                 const diff = received && it.received_qty != null && Number(it.received_qty) !== Number(it.qty);
                 return (
