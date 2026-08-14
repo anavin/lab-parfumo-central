@@ -165,7 +165,7 @@ summary:focus-visible, [tabindex]:focus-visible {
 .req-sheet {
   width: 210mm;
   min-height: 297mm;
-  padding: 16mm 14mm;
+  padding: 14mm;              /* equal margins on all four sides (matches the print @page) */
   margin: 0 auto 1.5rem;
   display: flex;
   flex-direction: column;
@@ -177,7 +177,7 @@ summary:focus-visible, [tabindex]:focus-visible {
 @media print {
   .no-print { display: none !important; }
   html, body { background: #fff !important; }
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4; margin: 14mm; }   /* equal A4 margins top/bottom/left/right */
 
   /* Safari/WebKit prints a BLANK page when the content sits inside a flex box with
      min-height:100vh (our app shell) — force plain top-down block flow for print so

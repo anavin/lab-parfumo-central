@@ -110,9 +110,9 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           </table>
 
           <div className="req-sign grid grid-cols-3 gap-8 pt-12 text-[13px]">
-            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้เบิก</div></div>
-            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้ตรวจ</div></div>
-            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้จ่าย</div></div>
+            <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้เบิก)</div></div>
+            <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้ตรวจ)</div></div>
+            <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้จ่าย)</div></div>
           </div>
         </div>
       ))}
