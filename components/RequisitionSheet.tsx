@@ -1,4 +1,5 @@
 import { fmtDate, num } from "@/lib/format";
+import { Barcode } from "@/components/Barcode";
 
 // Shared requisition document — rendered identically in the on-screen preview
 // (requisitions/[id]) AND the standalone print page (print/requisition/[id]), so
@@ -27,9 +28,10 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               <div className="text-xl font-bold">บริษัท ทัช ไดเวอร์เจนซ์ จำกัด</div>
               <div className="text-xs text-black/60 mt-1">288/31 หมู่ที่ 12 ต.ราชาเทวะ อ.บางพลี จ.สมุทรปราการ 10540 · 081-234-1438</div>
             </div>
-            <div className="text-right">
+            <div className="text-right flex flex-col items-end">
               <div className="text-2xl font-bold text-gold-dark">ใบเบิกสินค้า</div>
               <div className="text-base font-bold text-ink mt-1">{copyLabel}</div>
+              {po.po_number && <div className="mt-2"><Barcode value={po.po_number} height={44} width={1.6} fontSize={13} margin={2} /></div>}
             </div>
           </div>
 
