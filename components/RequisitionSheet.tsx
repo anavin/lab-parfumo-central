@@ -1,5 +1,4 @@
 import { fmtDate, num } from "@/lib/format";
-import { Barcode } from "@/components/Barcode";
 
 // Shared requisition document — rendered identically in the on-screen preview
 // (requisitions/[id]) AND the standalone print page (print/requisition/[id]), so
@@ -37,7 +36,6 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm mb-5">
             <Field label="PO Order No." value={po.po_number} />
             <Field label="วันที่" value={fmtDate(po.order_date)} />
-            <Field label="PO Version" value={po.version ?? "-"} />
             <Field label="Branch" value={po.branch_label} />
             <Field label="รหัสสาขา" value={po.store_no ?? "-"} />
             <Field label="Delivery No." value={po.delivery_number ?? "-"} />
@@ -71,7 +69,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 return (
                   <tr key={i} className="border-t border-neutral-200 align-middle">
                     <td className="py-2 pr-3 text-center text-black tabular-nums">{i + 1}</td>
-                    <td className="py-2 pr-3"><Barcode value={it.barcode ?? ""} height={46} width={1.8} fontSize={12} margin={2} /></td>
+                    <td className="py-2 pr-3 tabular-nums text-neutral-700 whitespace-nowrap">{it.barcode || "-"}</td>
                     <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
