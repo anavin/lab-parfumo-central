@@ -28,19 +28,26 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               <div className="text-xl font-bold">บริษัท ทัช ไดเวอร์เจนซ์ จำกัด</div>
               <div className="text-xs text-black/60 mt-1">288/31 หมู่ที่ 12 ต.ราชาเทวะ อ.บางพลี จ.สมุทรปราการ 10540 · 081-234-1438</div>
             </div>
-            <div className="text-right flex flex-col items-end">
+            <div className="text-right">
               <div className="text-2xl font-bold text-gold-dark">ใบเบิกสินค้า</div>
               <div className="text-base font-bold text-ink mt-1">{copyLabel}</div>
-              {po.po_number && <div className="mt-2"><Barcode value={po.po_number} height={44} width={1.6} fontSize={13} margin={2} /></div>}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm mb-5">
-            <Field label="PO Order No." value={po.po_number} />
-            <Field label="วันที่" value={fmtDate(po.order_date)} />
-            <Field label="Branch" value={po.branch_label} />
-            <Field label="รหัสสาขา" value={po.store_no ?? "-"} />
-            <Field label="Delivery No." value={po.delivery_number ?? "-"} />
+          <div className="flex items-start justify-between gap-8 mb-5">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm flex-1">
+              <Field label="PO Order No." value={po.po_number} />
+              <Field label="วันที่" value={fmtDate(po.order_date)} />
+              <Field label="Branch" value={po.branch_label} />
+              <Field label="รหัสสาขา" value={po.store_no ?? "-"} />
+              <Field label="Delivery No." value={po.delivery_number ?? "-"} />
+            </div>
+            {po.po_number && (
+              <div className="shrink-0 flex flex-col items-center border border-neutral-300 rounded-md px-3 py-2">
+                <span className="text-[10px] text-black/45 mb-1 self-start">PO Order No.</span>
+                <Barcode value={po.po_number} height={42} width={1.5} fontSize={13} margin={2} />
+              </div>
+            )}
           </div>
 
           {received && (
