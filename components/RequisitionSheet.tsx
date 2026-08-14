@@ -63,7 +63,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           {received && (
             <div className={`mb-4 rounded-lg px-4 py-2.5 text-sm ${hasDiff ? "bg-warn-soft border border-warn/40 text-ink" : "bg-success-soft border border-success/30 text-success"}`}>
               {hasDiff
-                ? <>⚠️ รับของแล้ว · <b>มีส่วนต่าง</b> — เบิก {num(totalQty)} · รับจริง {num(totalRecv)} ({totalRecv - totalQty > 0 ? "+" : ""}{num(totalRecv - totalQty)})</>
+                ? <>⚠️ รับของแล้ว · <b>มีส่วนต่าง</b> — เบิก {num(totalQty)} · จ่ายจริง {num(totalRecv)} ({totalRecv - totalQty > 0 ? "+" : ""}{num(totalRecv - totalQty)})</>
                 : <>✓ รับของแล้ว · ครบตามเบิก ({num(totalRecv)} ชิ้น)</>}
             </div>
           )}
@@ -77,7 +77,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ประเภท</th>
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ขนาด</th>
                 <th className="pb-1.5 pr-3 font-semibold text-right">เบิก</th>
-                {received && <th className="pb-1.5 pr-3 font-semibold text-right">รับจริง</th>}
+                {received && <th className="pb-1.5 pr-3 font-semibold text-right">จ่ายจริง</th>}
                 <th className="pb-1.5 font-semibold">หน่วย</th>
               </tr>
             </thead>
@@ -109,9 +109,10 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </tfoot>
           </table>
 
-          <div className="req-sign grid grid-cols-2 gap-12 pt-12 text-[13px]">
+          <div className="req-sign grid grid-cols-3 gap-8 pt-12 text-[13px]">
             <div className="text-center"><div className="border-t border-black pt-1.5">ผู้เบิก</div></div>
-            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้รับสินค้า</div></div>
+            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้ตรวจ</div></div>
+            <div className="text-center"><div className="border-t border-black pt-1.5">ผู้จ่าย</div></div>
           </div>
         </div>
       ))}
