@@ -16,7 +16,7 @@ const nextConfig = {
     "/receipt/[ref]": RECEIPT_ASSETS,
     "/api/receipt/[ref]/pdf": RECEIPT_ASSETS,
   },
-  serverExternalPackages: ["@electric-sql/pglite"],
+  serverExternalPackages: ["@electric-sql/pglite", "puppeteer-core", "@sparticuz/chromium"],
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   // bill photo evidence is sent inline with the submit action (compressed)

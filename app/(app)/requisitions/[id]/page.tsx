@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { q } from "@/lib/db";
 import { RequisitionActions } from "@/components/RequisitionActions";
 import { RequisitionSheet } from "@/components/RequisitionSheet";
@@ -40,9 +40,13 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
           <Link href="/requisitions" className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-black">← กลับ</Link>
           <div className="flex gap-2 items-center flex-wrap">
             <RequisitionActions id={po.id} status={po.status} />
+            <a href={`/api/requisition/${po.id}/pdf`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-gold text-white hover:bg-gold-dark transition-colors">
+              <Download className="w-4 h-4" /> ดาวน์โหลด PDF
+            </a>
             <a href={`/print/requisition/${po.id}`} target="_blank" rel="noopener"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-gold text-white hover:bg-gold-dark transition-colors">
-              <FileText className="w-4 h-4" /> พิมพ์ / PDF
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium border border-line text-muted hover:bg-canvas transition-colors">
+              <FileText className="w-4 h-4" /> พิมพ์
             </a>
           </div>
         </div>
