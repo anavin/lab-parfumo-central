@@ -236,11 +236,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
 
                 <div className="flex-1 rounded-lg border border-neutral-300 overflow-hidden shadow-sm flex flex-col">
                   <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">หมายเหตุ</div>
-                  <div className="flex-1 px-4 py-4 space-y-6">
-                    <div className="border-b border-dashed border-neutral-300" />
-                    <div className="border-b border-dashed border-neutral-300" />
-                    <div className="border-b border-dashed border-neutral-300" />
-                  </div>
+                  <div className="flex-1 px-4 py-4" />
                 </div>
               </div>
 
