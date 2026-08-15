@@ -56,7 +56,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   } catch (e) {
     console.error("[requisition pdf]", e);
-    return new Response("สร้าง PDF ไม่สำเร็จ — ลองใช้ปุ่มพิมพ์แทน", { status: 500 });
+    return new Response("สร้าง PDF ไม่สำเร็จ — ลองใช้ปุ่มพิมพ์แทน\n\n" + (e as Error)?.message, { status: 500 });
   } finally {
     await browser?.close().catch(() => {});
   }
