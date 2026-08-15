@@ -195,13 +195,13 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  /* The /print/requisition route sets @page{margin:10mm}. Each sheet is a FIXED one-page A4
-     box (275mm ≈ 297 − 2×10mm, a hair under so it never spills to a blank page) with
-     overflow:hidden as a hard stop, flex column so the signatures / "มีต่อ" note pin to the
-     bottom. Row caps (in the component) keep content within the box. */
+  /* @page{margin:10mm} → printable area ≈ 277mm. Each sheet is a flex column with a SAFE
+     min-height (235mm) — short enough that the bottom-pinned footer (signatures ≈40mm) still
+     fits within 277mm, so nothing spills to a blank page (fixed 275mm+overflow:hidden pushed
+     the pinned note past the edge onto a new page). Row caps keep full pages under 277mm too. */
   .req-sheet {
     width: auto !important; padding: 0 !important; margin: 0 !important;
-    height: 275mm !important; overflow: hidden !important;
+    min-height: 235mm !important;
     display: flex !important; flex-direction: column !important;
     box-shadow: none !important; border: none !important; border-radius: 0 !important;
   }

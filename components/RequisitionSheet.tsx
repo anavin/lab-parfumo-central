@@ -18,9 +18,9 @@ export type SheetItem = {
 // rows per A4 page (kept conservative so a page never overflows to a blank one). Page 1
 // carries the full header so it holds fewer; the LAST page also reserves FOOTER_ROWS of
 // space for the summary box + signatures.
-const CAP_P1 = 20;        // page 1 (full header), not the last page
-const CAP_PN = 24;        // continuation page (compact header), not the last page
-const FOOTER_ROWS = 10;   // rows-equivalent space the summary + signatures need on the last page
+const CAP_P1 = 18;        // page 1 (full header), not the last page
+const CAP_PN = 22;        // continuation page (compact header), not the last page
+const FOOTER_ROWS = 12;   // rows-equivalent space the summary + notes + signatures need on the last page
 
 export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[] }) {
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
@@ -202,8 +202,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
 
           {s.isLast ? (
             <>
-              {/* last-page footer row: type summary (left) + notes box (right) fill the width */}
-              <div className="mt-6 flex items-start gap-6">
+              {/* last-page footer row: type summary (left) + notes box (right), equal height */}
+              <div className="mt-6 flex items-stretch gap-6">
                 <div className="rounded-lg border border-neutral-300 overflow-hidden shadow-sm">
                   <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">สรุปตามประเภท</div>
                   <table className="text-[12px] border-collapse">
@@ -236,9 +236,9 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                   </table>
                 </div>
 
-                <div className="flex-1 rounded-lg border border-neutral-300 overflow-hidden shadow-sm">
+                <div className="flex-1 rounded-lg border border-neutral-300 overflow-hidden shadow-sm flex flex-col">
                   <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">หมายเหตุ</div>
-                  <div className="px-4" style={{ height: "90px" }} />
+                  <div className="flex-1 px-4 py-4 min-h-[80px]" />
                 </div>
               </div>
 
@@ -250,7 +250,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </div>
             </>
           ) : (
-            <div className="mt-auto pt-3 text-right text-[12px] text-black/50">มีต่อหน้าถัดไป →</div>
+            <div className="mt-auto pt-3 text-right text-[12px] text-black/50">มีต่อหน้าถัดไป</div>
           )}
         </div>
       ))}
