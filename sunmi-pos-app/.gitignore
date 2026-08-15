@@ -6,3 +6,8 @@ build/
 .DS_Store
 /captures
 app/release/
+
+# release signing (keep secret, never commit)
+keystore.properties
+*.keystore
+*.jks
