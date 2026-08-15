@@ -159,20 +159,17 @@ summary:focus-visible, [tabindex]:focus-visible {
   .lp-corner { animation: none; opacity: .9; }
 }
 
-/* ใบเบิกสินค้า preview — render each copy (ต้นฉบับ/สำเนา) as a real A4 page so the
-   on-screen sheet looks like the printed document: portrait A4, content at the top,
-   signatures pinned to the bottom, blank space between when the list is short. */
+/* ใบเบิกสินค้า — same approach as the daily report (DailyReportSheet): a plain block sheet
+   that flows top-down, NOT a fixed-size flex A4 box. Preview == print, and Safari saves the
+   PDF reliably (fixed-mm flex boxes print blank / shift on Safari). */
 .req-sheet {
-  width: 210mm;
-  min-height: 297mm;
-  padding: 14mm;              /* equal margins on all four sides (matches the print @page) */
+  max-width: 800px;
   margin: 0 auto 1.5rem;
-  display: flex;
-  flex-direction: column;
+  padding: 40px 40px 48px;
   font-family: var(--font-sans);
   color: #1a1614;
 }
-.req-sign { margin-top: auto; padding-top: 12mm; }
+.req-sign { margin-top: 3rem; }
 
 @media print {
   .no-print { display: none !important; }
@@ -193,17 +190,14 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  /* Safari prints a BLANK page for a fixed-size flex A4 box — force plain block flow like the
-     daily report (the known-good pattern) and let the table paginate normally. */
-  .req-sheet {
-    width: auto !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important;
-    box-shadow: none !important; display: block !important;
-  }
+  /* identical to the daily report: plain block flow, no card chrome, table paginates normally.
+     (A fixed-size flex A4 box prints BLANK / shifts on Safari — this is the known-good pattern.) */
+  .req-sheet { max-width: none !important; padding: 0 !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
   .req-sheet:last-child { page-break-after: avoid; }
   .req-sheet table { page-break-inside: auto; }
   .req-sheet tr { page-break-inside: avoid; }
   .req-sheet thead { display: table-header-group; }   /* repeat the column headers on each page */
-  .req-sign { margin-top: 3rem !important; padding-top: 0 !important; }
+  .req-sign { margin-top: 3rem !important; }
 
   /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
   .daily-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
