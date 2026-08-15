@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ClipboardCopy, Check, FileText, Paperclip, Loader2 } from "lucide-react";
+import { ClipboardCopy, Check, FileText, Paperclip, Loader2, Camera } from "lucide-react";
 import { getDailyReport, getMyCashFloat, saveMyCashFloat } from "@/lib/actions/report";
 import { getCashSlips, addCashAttachments, deleteCashAttachment } from "@/lib/actions/cash";
 import { PhotoStrip } from "@/components/BillPhotos";
+import { CameraCapture } from "@/components/CameraCapture";
 import { compressImage } from "@/lib/img";
+const hasGetUserMedia = () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 import type { DailyReport as ReportData, CashAttachment } from "@/lib/queries";
 import { branchName } from "@/lib/branches";
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
@@ -30,8 +32,10 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
   const loaded = useRef(false);
   const [slips, setSlips] = useState<CashAttachment[]>([]);   // bank-deposit slips for the day
   const slipRef = useRef<HTMLInputElement>(null);
+  const slipCamRef = useRef<HTMLInputElement>(null);
   const [slipBusy, setSlipBusy] = useState(false);
   const [slipErr, setSlipErr] = useState<string | null>(null);
+  const [slipCam, setSlipCam] = useState(false);   // in-app camera overlay for deposit slips
 
   // re-fetch on date change AND whenever `revision` changes (the page re-renders it
   // after a bill is saved/approved via router.refresh, so the report stays live)
@@ -54,7 +58,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
     getCashSlips(date, source).then(setSlips).catch(() => setSlips([]));
   }, [date, revision, source]);
 
-  const addSlips = async (files: FileList | null) => {
+  const addSlips = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setSlipBusy(true); setSlipErr(null);
     try {
@@ -64,7 +68,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       if (!out.length) { setSlipErr("แนบไม่สำเร็จ — รองรับ JPG/PNG"); return; }
       const res = await addCashAttachments(date, out, source);
       if (res?.ok) setSlips(await getCashSlips(date, source)); else setSlipErr(res?.error ?? "แนบไม่สำเร็จ");
-    } finally { setSlipBusy(false); if (slipRef.current) slipRef.current.value = ""; }
+    } finally { setSlipBusy(false); if (slipRef.current) slipRef.current.value = ""; if (slipCamRef.current) slipCamRef.current.value = ""; }
   };
   const removeSlip = (id: number) => {
     setSlips((s) => s.filter((x) => x.id !== id));   // optimistic
@@ -194,15 +198,21 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
           </div>
           <PhotoStrip photos={slips} size={56} onDelete={removeSlip} />
           {slips.length < 6 && (
-            <div className="flex justify-end mt-1.5">
+            <div className="flex justify-end gap-2 mt-1.5">
+              <button type="button" onClick={() => (hasGetUserMedia() ? setSlipCam(true) : slipCamRef.current?.click())} disabled={slipBusy}
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-dashed border-line text-xs text-muted hover:bg-canvas disabled:opacity-50">
+                {slipBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} ถ่ายรูป
+              </button>
               <button type="button" onClick={() => slipRef.current?.click()} disabled={slipBusy}
                 className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-dashed border-line text-xs text-muted hover:bg-canvas disabled:opacity-50">
-                {slipBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} แนบสลิป
+                <Paperclip className="w-4 h-4" /> แนบสลิป
               </button>
             </div>
           )}
           <input ref={slipRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addSlips(e.target.files)} />
+          <input ref={slipCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => addSlips(e.target.files)} />
           {slipErr && <div className="mt-1 text-[11px] text-danger leading-snug">{slipErr}</div>}
+          {slipCam && <CameraCapture onCapture={(f) => { setSlipCam(false); addSlips([f]); }} onClose={() => setSlipCam(false)} />}
         </div>
       </div>
       )}

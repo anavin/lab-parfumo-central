@@ -351,7 +351,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
-  const [showDisc, setShowDisc] = useState(true);                  // discount open at first; collapses once a preset is picked
+  const [showDisc, setShowDisc] = useState(false);                 // end-of-bill discount hidden by default (tap to open)
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
   const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
