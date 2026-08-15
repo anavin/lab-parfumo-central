@@ -46,6 +46,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   // mix up types. Numbering stays continuous across the whole document.
   const colCount = received ? 8 : 7;
   const gradeLabel = (g: string | null) => (g && g.trim() ? g : "อื่นๆ");
+  // bags are counted in ใบ, perfume bottles in ขวด
+  const unitOf = (g: string | null) => ((g ?? "").trim().toLowerCase() === "bag" ? "ใบ" : "ขวด");
   const renderBody = (pageRows: SheetItem[], start: number): any[] => {
     const out: any[] = [];
     pageRows.forEach((it, j) => {
@@ -74,7 +76,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
           <td className="py-2 pr-3 text-right font-medium tabular-nums">{num(it.qty)}</td>
           {received && <td className={`py-2 pr-3 text-center font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
-          <td className="py-2 whitespace-nowrap">ขวด</td>
+          <td className="py-2 whitespace-nowrap">{unitOf(it.grade)}</td>
         </tr>);
     });
     return out;
@@ -191,7 +193,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                   <td colSpan={5} className="py-2 pr-3 text-right">รวมทั้งสิ้น</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{num(totalQty)}</td>
                   {received && <td className="py-2 pr-3 text-center tabular-nums">{num(totalRecv)}</td>}
-                  <td className="py-2 whitespace-nowrap">ขวด</td>
+                  <td className="py-2 whitespace-nowrap">ชิ้น</td>
                 </tr>
               </tfoot>
             )}
@@ -209,7 +211,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                       <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-neutral-300">
                         <th className="py-2 px-4 text-left font-semibold">ประเภท</th>
                         <th className="py-2 px-4 text-right font-semibold">รายการ</th>
-                        <th className="py-2 px-4 text-right font-semibold">ขวด</th>
+                        <th className="py-2 px-4 text-right font-semibold">จำนวน</th>
                         {received && <th className="py-2 px-4 text-right font-semibold">จ่ายจริง</th>}
                       </tr>
                     </thead>
