@@ -193,8 +193,16 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  .req-sheet { width: auto !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
+  /* Safari prints a BLANK page for a fixed-size flex A4 box — force plain block flow like the
+     daily report (the known-good pattern) and let the table paginate normally. */
+  .req-sheet {
+    width: auto !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important;
+    box-shadow: none !important; display: block !important;
+  }
   .req-sheet:last-child { page-break-after: avoid; }
+  .req-sheet table { page-break-inside: auto; }
+  .req-sheet tr { page-break-inside: avoid; }
+  .req-sheet thead { display: table-header-group; }   /* repeat the column headers on each page */
   .req-sign { margin-top: 3rem !important; padding-top: 0 !important; }
 
   /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
