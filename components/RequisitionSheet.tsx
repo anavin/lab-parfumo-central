@@ -19,13 +19,18 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   const totalRecv = items.reduce((s, i) => s + Number(i.received_qty ?? i.qty ?? 0), 0);
   const hasDiff = received && items.some((i) => i.received_qty != null && Number(i.received_qty) !== Number(i.qty));
 
-  // Order the sheet by ประเภท (grade) → ชื่อสินค้า (A→Z / ก→ฮ) → ขนาดใหญ่ก่อน, so the same
-  // type sits together and each scent's larger bottles are listed first.
+  // Order the sheet by grade in a FIXED order (EDP → EDP+ → EDT → Le Parfum → everything else
+  // last) → largest size first → scent A→Z.
+  const GRADE_ORDER = ["EDP", "EDP+", "EDT", "LE PARFUM"];
+  const gradeRank = (g: string | null) => {
+    const i = GRADE_ORDER.indexOf((g ?? "").trim().toUpperCase());
+    return i === -1 ? 99 : i;
+  };
   const sizeNum = (s: string | null) => parseInt(String(s ?? "").replace(/[^\d]/g, ""), 10) || 0;
   const rows = [...items].sort((a, b) =>
-    (a.grade ?? "").localeCompare(b.grade ?? "", "th") ||
-    (a.scent ?? "").localeCompare(b.scent ?? "", "th") ||
-    sizeNum(b.size) - sizeNum(a.size));
+    gradeRank(a.grade) - gradeRank(b.grade) ||
+    sizeNum(b.size) - sizeNum(a.size) ||
+    (a.scent ?? "").localeCompare(b.scent ?? "", "en"));
 
   return (
     <>
