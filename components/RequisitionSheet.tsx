@@ -18,9 +18,9 @@ export type SheetItem = {
 // rows per A4 page (kept conservative so a page never overflows to a blank one). Page 1
 // carries the full header so it holds fewer; the LAST page also reserves FOOTER_ROWS of
 // space for the summary box + signatures.
-const CAP_P1 = 19;        // page 1 (full header), not the last page — sized for the 257mm content area
-const CAP_PN = 23;        // continuation page (compact header), not the last page
-const FOOTER_ROWS = 11;   // rows-equivalent space the summary + notes + signatures need on the last page
+const CAP_P1 = 18;        // page 1 (full header), not the last page — sized for the 257mm content area
+const CAP_PN = 21;        // continuation page (compact header), not the last page
+const FOOTER_ROWS = 10;   // rows-equivalent space the summary + notes + signatures need on the last page
 
 export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[] }) {
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
@@ -121,7 +121,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   return (
     <>
       {sheets.map((s, si) => (
-        <div key={`${s.copyLabel}-${s.pageNo}`} className="print-area req-sheet card bg-white"
+        <div key={`${s.copyLabel}-${s.pageNo}`} className={"print-area req-sheet card bg-white" + (s.isLast ? " req-last" : "")}
           style={si > 0 ? { pageBreakBefore: "always" } : undefined}>
           {s.pageNo === 1 ? (
             <>

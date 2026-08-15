@@ -206,8 +206,12 @@ summary:focus-visible, [tabindex]:focus-visible {
     box-shadow: none !important; border: none !important; border-radius: 0 !important;
   }
   .req-sheet:last-child { page-break-after: avoid; }
-  .req-sign { margin-top: 14mm !important; padding-top: 0 !important; }
   .req-foot { margin-top: 6mm !important; }
+  /* ONLY the last sheet (few rows — footer reserved) fills the page and pins the signatures to
+     the bottom. It stays safely under 257mm so it never spills; other sheets are plain block
+     flow so a near-full page can't spill. */
+  .req-sheet.req-last { min-height: 250mm !important; display: flex !important; flex-direction: column !important; }
+  .req-sign { margin-top: auto !important; padding-top: 0 !important; }
 
   /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
   .daily-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
