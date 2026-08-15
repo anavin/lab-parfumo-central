@@ -200,37 +200,48 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
 
           {s.isLast ? (
             <>
-              {/* per-type summary — quick cross-check that each ประเภท has the right count */}
-              <div className="mt-6 inline-block align-top rounded-lg border border-neutral-300 overflow-hidden shadow-sm">
-                <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">สรุปตามประเภท</div>
-                <table className="text-[12px] border-collapse">
-                  <thead>
-                    <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-neutral-300">
-                      <th className="py-2 px-4 text-left font-semibold">ประเภท</th>
-                      <th className="py-2 px-4 text-right font-semibold">รายการ</th>
-                      <th className="py-2 px-4 text-right font-semibold">ขวด</th>
-                      {received && <th className="py-2 px-4 text-right font-semibold">จ่ายจริง</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gradeSummary.map((g) => (
-                      <tr key={g.label} className="border-b border-neutral-200 last:border-0">
-                        <td className="py-1.5 px-4 font-medium text-ink whitespace-nowrap">{g.label}</td>
-                        <td className="py-1.5 px-4 text-right tabular-nums">{num(g.items)}</td>
-                        <td className="py-1.5 px-4 text-right tabular-nums">{num(g.qty)}</td>
-                        {received && <td className="py-1.5 px-4 text-right tabular-nums">{num(g.recv)}</td>}
+              {/* last-page footer row: type summary (left) + notes box (right) fill the width */}
+              <div className="mt-6 flex items-stretch gap-6">
+                <div className="rounded-lg border border-neutral-300 overflow-hidden shadow-sm self-start">
+                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">สรุปตามประเภท</div>
+                  <table className="text-[12px] border-collapse">
+                    <thead>
+                      <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-neutral-300">
+                        <th className="py-2 px-4 text-left font-semibold">ประเภท</th>
+                        <th className="py-2 px-4 text-right font-semibold">รายการ</th>
+                        <th className="py-2 px-4 text-right font-semibold">ขวด</th>
+                        {received && <th className="py-2 px-4 text-right font-semibold">จ่ายจริง</th>}
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-neutral-50 font-bold border-t-2 border-black">
-                      <td className="py-2 px-4">รวมทั้งสิ้น</td>
-                      <td className="py-2 px-4 text-right tabular-nums">{num(rows.length)}</td>
-                      <td className="py-2 px-4 text-right tabular-nums">{num(totalQty)}</td>
-                      {received && <td className="py-2 px-4 text-right tabular-nums">{num(totalRecv)}</td>}
-                    </tr>
-                  </tfoot>
-                </table>
+                    </thead>
+                    <tbody>
+                      {gradeSummary.map((g) => (
+                        <tr key={g.label} className="border-b border-neutral-200 last:border-0">
+                          <td className="py-1.5 px-4 font-medium text-ink whitespace-nowrap">{g.label}</td>
+                          <td className="py-1.5 px-4 text-right tabular-nums">{num(g.items)}</td>
+                          <td className="py-1.5 px-4 text-right tabular-nums">{num(g.qty)}</td>
+                          {received && <td className="py-1.5 px-4 text-right tabular-nums">{num(g.recv)}</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-neutral-50 font-bold border-t-2 border-black">
+                        <td className="py-2 px-4">รวมทั้งสิ้น</td>
+                        <td className="py-2 px-4 text-right tabular-nums">{num(rows.length)}</td>
+                        <td className="py-2 px-4 text-right tabular-nums">{num(totalQty)}</td>
+                        {received && <td className="py-2 px-4 text-right tabular-nums">{num(totalRecv)}</td>}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div className="flex-1 rounded-lg border border-neutral-300 overflow-hidden shadow-sm flex flex-col self-start">
+                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">หมายเหตุ</div>
+                  <div className="flex-1 px-4 py-4 space-y-6">
+                    <div className="border-b border-dashed border-neutral-300" />
+                    <div className="border-b border-dashed border-neutral-300" />
+                    <div className="border-b border-dashed border-neutral-300" />
+                  </div>
+                </div>
               </div>
 
               <div className="req-sign grid grid-cols-4 gap-6 pt-12 text-[13px]">
