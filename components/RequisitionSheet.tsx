@@ -18,8 +18,8 @@ export type SheetItem = {
 // rows per A4 page (kept conservative so a page never overflows to a blank one). Page 1
 // carries the full header so it holds fewer; the LAST page also reserves FOOTER_ROWS of
 // space for the summary box + signatures.
-const CAP_P1 = 18;        // page 1 (full header), not the last page
-const CAP_PN = 22;        // continuation page (compact header), not the last page
+const CAP_P1 = 20;        // page 1 (full header), not the last page
+const CAP_PN = 24;        // continuation page (compact header), not the last page
 const FOOTER_ROWS = 12;   // rows-equivalent space the summary + notes + signatures need on the last page
 
 export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[] }) {
@@ -121,7 +121,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   return (
     <>
       {sheets.map((s, si) => (
-        <div key={`${s.copyLabel}-${s.pageNo}`} className="print-area req-sheet card bg-white"
+        <div key={`${s.copyLabel}-${s.pageNo}`} className={"print-area req-sheet card bg-white" + (s.isLast ? " req-last" : "")}
           style={si > 0 ? { pageBreakBefore: "always" } : undefined}>
           {s.pageNo === 1 ? (
             <>
@@ -205,7 +205,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               {/* last-page footer row: type summary (left) + notes box (right), equal height */}
               <div className="mt-6 flex items-stretch gap-6">
                 <div className="rounded-lg border border-neutral-300 overflow-hidden shadow-sm">
-                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">สรุปตามประเภท</div>
+                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-ink tracking-wide">สรุปตามประเภท</div>
                   <table className="text-[12px] border-collapse">
                     <thead>
                       <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-neutral-300">
@@ -237,7 +237,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 </div>
 
                 <div className="flex-1 rounded-lg border border-neutral-300 overflow-hidden shadow-sm flex flex-col">
-                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">หมายเหตุ</div>
+                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-ink tracking-wide">หมายเหตุ</div>
                   <div className="flex-1 px-4 py-4 min-h-[80px]" />
                 </div>
               </div>
@@ -250,7 +250,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </div>
             </>
           ) : (
-            <div className="mt-auto pt-3 text-right text-[12px] text-black/50">มีต่อหน้าถัดไป</div>
+            <div className="req-foot mt-auto pt-3 pr-1 text-right text-[12px] text-black/50">มีต่อหน้าถัดไป</div>
           )}
         </div>
       ))}

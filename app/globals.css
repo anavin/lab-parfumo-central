@@ -195,18 +195,23 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  /* @page{margin:10mm} → printable area ≈ 277mm. Each sheet is a flex column with a SAFE
-     min-height (235mm) — short enough that the bottom-pinned footer (signatures ≈40mm) still
-     fits within 277mm, so nothing spills to a blank page (fixed 275mm+overflow:hidden pushed
-     the pinned note past the edge onto a new page). Row caps keep full pages under 277mm too. */
+  /* @page{margin:10mm} → printable ≈277mm. Each sheet is a FIXED 272mm block (safely under so
+     it never spills) with the footer (signatures / "มีต่อ" note) ABSOLUTELY pinned to the
+     bottom — deterministic in Chrome/Puppeteer, and every page is the same height so page 1
+     isn't emptier than the rest. padding-bottom reserves the signature zone. */
   .req-sheet {
-    width: auto !important; padding: 0 !important; margin: 0 !important;
-    min-height: 235mm !important;
-    display: flex !important; flex-direction: column !important;
+    width: auto !important; margin: 0 !important;
+    position: relative !important; display: block !important;
+    height: 272mm !important; overflow: hidden !important;
+    padding: 0 0 12mm !important;              /* reserve for the small "มีต่อ" note */
     box-shadow: none !important; border: none !important; border-radius: 0 !important;
   }
+  .req-sheet.req-last { padding-bottom: 42mm !important; }   /* last sheet reserves the signature zone */
   .req-sheet:last-child { page-break-after: avoid; }
-  .req-sign { margin-top: auto !important; padding-top: 10mm !important; }
+  .req-sign, .req-foot {
+    position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    margin: 0 !important; padding-top: 0 !important;
+  }
 
   /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
   .daily-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
