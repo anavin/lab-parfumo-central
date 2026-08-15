@@ -189,33 +189,35 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           {s.isLast ? (
             <>
               {/* per-type summary — quick cross-check that each ประเภท has the right count */}
-              <div className="mt-6">
-                <div className="text-[12px] font-bold text-ink mb-1.5">สรุปตามประเภท</div>
+              <div className="mt-6 inline-block align-top rounded-lg border border-neutral-300 overflow-hidden shadow-sm">
+                <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-gold-dark tracking-wide">สรุปตามประเภท</div>
                 <table className="text-[12px] border-collapse">
                   <thead>
-                    <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-black">
-                      <th className="py-1 pr-6 text-left font-semibold">ประเภท</th>
-                      <th className="py-1 px-3 text-center font-semibold">รายการ</th>
-                      <th className="py-1 px-3 text-center font-semibold">ขวด (เบิก)</th>
-                      {received && <th className="py-1 px-3 text-center font-semibold">จ่ายจริง</th>}
+                    <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-neutral-300">
+                      <th className="py-2 px-4 text-left font-semibold">ประเภท</th>
+                      <th className="py-2 px-4 text-right font-semibold">รายการ</th>
+                      <th className="py-2 px-4 text-right font-semibold">ขวด</th>
+                      {received && <th className="py-2 px-4 text-right font-semibold">จ่ายจริง</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {gradeSummary.map((g) => (
-                      <tr key={g.label} className="border-b border-neutral-200">
-                        <td className="py-1 pr-6 font-medium">{g.label}</td>
-                        <td className="py-1 px-3 text-center tabular-nums">{num(g.items)}</td>
-                        <td className="py-1 px-3 text-center tabular-nums">{num(g.qty)}</td>
-                        {received && <td className="py-1 px-3 text-center tabular-nums">{num(g.recv)}</td>}
+                      <tr key={g.label} className="border-b border-neutral-200 last:border-0">
+                        <td className="py-1.5 px-4 font-medium text-ink whitespace-nowrap">{g.label}</td>
+                        <td className="py-1.5 px-4 text-right tabular-nums">{num(g.items)}</td>
+                        <td className="py-1.5 px-4 text-right tabular-nums">{num(g.qty)}</td>
+                        {received && <td className="py-1.5 px-4 text-right tabular-nums">{num(g.recv)}</td>}
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-black font-bold">
-                      <td className="py-1 pr-6">รวม</td>
-                      <td className="py-1 px-3 text-center tabular-nums">{num(rows.length)}</td>
-                      <td className="py-1 px-3 text-center tabular-nums">{num(totalQty)}</td>
-                      {received && <td className="py-1 px-3 text-center tabular-nums">{num(totalRecv)}</td>}
-                    </tr>
                   </tbody>
+                  <tfoot>
+                    <tr className="bg-neutral-50 font-bold border-t-2 border-black">
+                      <td className="py-2 px-4">รวมทั้งสิ้น</td>
+                      <td className="py-2 px-4 text-right tabular-nums">{num(rows.length)}</td>
+                      <td className="py-2 px-4 text-right tabular-nums">{num(totalQty)}</td>
+                      {received && <td className="py-2 px-4 text-right tabular-nums">{num(totalRecv)}</td>}
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
 
