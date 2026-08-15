@@ -38,6 +38,45 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
     sizeNum(b.size) - sizeNum(a.size) ||
     (a.scent ?? "").localeCompare(b.scent ?? "", "en"));
 
+  // Render a page's tbody with a full-width GRADE separator before each new type (and a
+  // "(ต่อ)" band when a type carries over to the top of the next page) so the picker can't
+  // mix up types. Numbering stays continuous across the whole document.
+  const colCount = received ? 8 : 7;
+  const gradeLabel = (g: string | null) => (g && g.trim() ? g : "อื่นๆ");
+  const renderBody = (pageRows: SheetItem[], start: number): any[] => {
+    const out: any[] = [];
+    pageRows.forEach((it, j) => {
+      const gi = start + j;
+      const prevGrade = gi === 0 ? undefined : rows[gi - 1].grade;
+      const label = gradeLabel(it.grade);
+      if ((it.grade ?? "") !== (prevGrade ?? "")) {
+        out.push(
+          <tr key={`g${gi}`} className="bg-neutral-100">
+            <td colSpan={colCount} className="py-1.5 px-2 font-bold text-[12px] tracking-wide text-ink border-t-2 border-black">{label}</td>
+          </tr>);
+      } else if (j === 0) {
+        out.push(
+          <tr key={`gc${gi}`} className="bg-neutral-50">
+            <td colSpan={colCount} className="py-1 px-2 font-semibold text-[11px] text-black/50 border-t border-neutral-300">{label} (ต่อ)</td>
+          </tr>);
+      }
+      const rq = it.received_qty ?? it.qty;
+      const diff = received && it.received_qty != null && Number(it.received_qty) !== Number(it.qty);
+      out.push(
+        <tr key={j} className="border-t border-neutral-200 align-middle">
+          <td className="py-2 pr-3 text-center text-black tabular-nums">{gi + 1}</td>
+          <td className="py-2 pr-3 tabular-nums text-neutral-700 whitespace-nowrap">{it.barcode || "-"}</td>
+          <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
+          <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
+          <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
+          <td className="py-2 pr-3 text-right font-medium tabular-nums">{num(it.qty)}</td>
+          {received && <td className={`py-2 pr-3 text-center font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
+          <td className="py-2 whitespace-nowrap">ขวด</td>
+        </tr>);
+    });
+    return out;
+  };
+
   // split the sorted rows into A4 pages
   const pages: SheetItem[][] = [];
   if (rows.length <= FIRST_PAGE_ROWS) {
@@ -124,22 +163,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </tr>
             </thead>
             <tbody>
-              {s.pageRows.map((it, j) => {
-                const rq = it.received_qty ?? it.qty;
-                const diff = received && it.received_qty != null && Number(it.received_qty) !== Number(it.qty);
-                return (
-                  <tr key={j} className="border-t border-neutral-200 align-middle">
-                    <td className="py-2 pr-3 text-center text-black tabular-nums">{s.start + j + 1}</td>
-                    <td className="py-2 pr-3 tabular-nums text-neutral-700 whitespace-nowrap">{it.barcode || "-"}</td>
-                    <td className="py-2 pr-3">{it.scent}{diff && it.line_remark ? <span className="block text-[11px] text-warn-dark">↳ {it.line_remark}</span> : null}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{it.grade ?? "-"}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
-                    <td className="py-2 pr-3 text-right font-medium tabular-nums">{num(it.qty)}</td>
-                    {received && <td className={`py-2 pr-3 text-center font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
-                    <td className="py-2 whitespace-nowrap">ขวด</td>
-                  </tr>
-                );
-              })}
+              {renderBody(s.pageRows, s.start)}
             </tbody>
             {s.isLast && (
               <tfoot>
