@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3010",
     "seed": "node --experimental-strip-types scripts/seed.ts",
-    "reset": "rm -rf .pgdata && node --experimental-strip-types scripts/seed.ts"
+    "reset": "rm -rf .pgdata && node --experimental-strip-types scripts/seed.ts",
+    "backup": "node --experimental-strip-types scripts/backup.mts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
