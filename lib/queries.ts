@@ -207,9 +207,10 @@ export function byBA(f: Filter = ALL, limit: number | null = null) {
   // group by the seller's CURRENT name (join users on created_by) so a rename doesn't
   // split one person into two; fall back to the frozen ba for legacy rows with no user.
   // limit = null → return every BA (no cap).
-  return q<{ ba: string; revenue: number; qty: number }>(`
+  return q<{ ba: string; revenue: number; qty: number; receipts: number }>(`
     select coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ') ba,
-           sum(s.total)::float revenue, sum(s.qty)::float qty
+           sum(s.total)::float revenue, sum(s.qty)::float qty,
+           count(distinct s.receipt_no)::int receipts
     from sales s left join users u on u.id = s.created_by
     where coalesce(u.full_name, nullif(s.ba,''), '') not in ('', '#N/A') and ${SWs}
     group by coalesce(u.full_name, nullif(s.ba,''), 'ไม่ระบุ')
