@@ -77,6 +77,15 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
     return out;
   };
 
+  // per-type summary (รายการ / ขวด เบิก / จ่ายจริง) — built in grade order for the last-page box
+  const gradeSummary: { label: string; items: number; qty: number; recv: number }[] = [];
+  for (const it of rows) {
+    const label = gradeLabel(it.grade);
+    let g = gradeSummary[gradeSummary.length - 1];
+    if (!g || g.label !== label) { g = { label, items: 0, qty: 0, recv: 0 }; gradeSummary.push(g); }
+    g.items += 1; g.qty += Number(it.qty) || 0; g.recv += Number(it.received_qty ?? it.qty) || 0;
+  }
+
   // split the sorted rows into A4 pages
   const pages: SheetItem[][] = [];
   if (rows.length <= FIRST_PAGE_ROWS) {
@@ -178,11 +187,44 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           </table>
 
           {s.isLast ? (
-            <div className="req-sign grid grid-cols-3 gap-8 pt-12 text-[13px]">
-              <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้เบิก)</div></div>
-              <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้ตรวจ)</div></div>
-              <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้จ่าย)</div></div>
-            </div>
+            <>
+              {/* per-type summary — quick cross-check that each ประเภท has the right count */}
+              <div className="mt-6">
+                <div className="text-[12px] font-bold text-ink mb-1.5">สรุปตามประเภท</div>
+                <table className="text-[12px] border-collapse">
+                  <thead>
+                    <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-black">
+                      <th className="py-1 pr-6 text-left font-semibold">ประเภท</th>
+                      <th className="py-1 px-3 text-center font-semibold">รายการ</th>
+                      <th className="py-1 px-3 text-center font-semibold">ขวด (เบิก)</th>
+                      {received && <th className="py-1 px-3 text-center font-semibold">จ่ายจริง</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gradeSummary.map((g) => (
+                      <tr key={g.label} className="border-b border-neutral-200">
+                        <td className="py-1 pr-6 font-medium">{g.label}</td>
+                        <td className="py-1 px-3 text-center tabular-nums">{num(g.items)}</td>
+                        <td className="py-1 px-3 text-center tabular-nums">{num(g.qty)}</td>
+                        {received && <td className="py-1 px-3 text-center tabular-nums">{num(g.recv)}</td>}
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-black font-bold">
+                      <td className="py-1 pr-6">รวม</td>
+                      <td className="py-1 px-3 text-center tabular-nums">{num(rows.length)}</td>
+                      <td className="py-1 px-3 text-center tabular-nums">{num(totalQty)}</td>
+                      {received && <td className="py-1 px-3 text-center tabular-nums">{num(totalRecv)}</td>}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="req-sign grid grid-cols-3 gap-8 pt-12 text-[13px]">
+                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้เบิก)</div></div>
+                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้ตรวจ)</div></div>
+                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้จ่าย)</div></div>
+              </div>
+            </>
           ) : (
             <div className="mt-3 text-right text-[12px] text-black/50">มีต่อหน้าถัดไป →</div>
           )}
