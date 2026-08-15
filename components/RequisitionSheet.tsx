@@ -57,7 +57,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </div>
             {po.po_number && (
               <div className="shrink-0 flex flex-col items-center border border-neutral-300 rounded-md px-3 py-2">
-                <Barcode value={po.po_number} height={42} width={1.5} displayValue={false} margin={2} />
+                <Barcode value={po.po_number} height={42} width={1.5} displayValue={false} margin={2} asImage />
                 <span className="text-[12px] mt-1 whitespace-nowrap tabular-nums">
                   <span className="text-black/45">PO Order No. </span><span className="font-semibold">{po.po_number}</span>
                 </span>
