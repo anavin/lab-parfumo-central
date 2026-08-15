@@ -167,7 +167,7 @@ summary:focus-visible, [tabindex]:focus-visible {
   width: 210mm;
   min-height: 297mm;
   box-sizing: border-box;
-  padding: 10mm;            /* equal margins, matching the print @page{margin:10mm} → preview = each printed A4 page */
+  padding: 20mm;            /* equal margins, matching the print @page{margin:20mm} → content area 170×257mm */
   margin: 0 auto 1.5rem;
   display: flex;
   flex-direction: column;
@@ -195,14 +195,14 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  /* @page{margin:10mm} → printable ≈277mm. Each sheet is a FIXED 272mm block (safely under so
-     it never spills) with the footer (signatures / "มีต่อ" note) ABSOLUTELY pinned to the
-     bottom — deterministic in Chrome/Puppeteer, and every page is the same height so page 1
+  /* @page{margin:20mm} → content area 170×257mm. Each sheet is a FIXED 255mm block (≤257, safely
+     under so it never spills) with the footer (signatures / "มีต่อ" note) ABSOLUTELY pinned to
+     the bottom — deterministic in Chrome/Puppeteer, and every page is the same height so page 1
      isn't emptier than the rest. padding-bottom reserves the signature zone. */
   .req-sheet {
     width: auto !important; margin: 0 !important;
     position: relative !important; display: block !important;
-    height: 272mm !important; overflow: hidden !important;
+    height: 255mm !important; overflow: hidden !important;
     padding: 0 0 12mm !important;              /* reserve for the small "มีต่อ" note */
     box-shadow: none !important; border: none !important; border-radius: 0 !important;
   }

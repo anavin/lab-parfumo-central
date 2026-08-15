@@ -18,8 +18,8 @@ export type SheetItem = {
 // rows per A4 page (kept conservative so a page never overflows to a blank one). Page 1
 // carries the full header so it holds fewer; the LAST page also reserves FOOTER_ROWS of
 // space for the summary box + signatures.
-const CAP_P1 = 20;        // page 1 (full header), not the last page
-const CAP_PN = 24;        // continuation page (compact header), not the last page
+const CAP_P1 = 18;        // page 1 (full header), not the last page — sized for the 257mm content area
+const CAP_PN = 22;        // continuation page (compact header), not the last page
 const FOOTER_ROWS = 12;   // rows-equivalent space the summary + notes + signatures need on the last page
 
 export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[] }) {

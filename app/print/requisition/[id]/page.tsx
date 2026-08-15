@@ -30,9 +30,8 @@ export default async function RequisitionPrintPage({ params }: { params: Promise
 
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* Equal A4 margins on all four sides (physical printers can't print edge-to-edge, and
-          margin:0 came out blank / uneven from a real printer). Scoped to this route only. */}
-      <style>{"@media print{@page{size:A4;margin:10mm}}"}</style>
+      {/* A4 with equal 20mm margins on all sides → content area 170×257mm. Scoped to this route. */}
+      <style>{"@media print{@page{size:A4;margin:20mm}}"}</style>
       <div className="req-wrap mx-auto w-full max-w-[840px] px-4 py-4">
         <div className="mb-4 no-print"><PrintNow title={`${po.po_number}-Requisition`} /></div>
         <RequisitionSheet po={po} items={items} />
