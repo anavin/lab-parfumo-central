@@ -137,12 +137,16 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </div>
 
               <div className="flex items-start justify-between gap-8 mb-5">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm flex-1">
-                  <div className="col-span-2"><Field label="PO Order No." value={po.po_number} nowrap /></div>
-                  <Field label="วันที่" value={fmtDate(po.order_date)} />
-                  <Field label="รหัสสาขา" value={po.store_no ?? "-"} />
-                  <div className="col-span-2"><Field label="Branch" value={po.branch_label} nowrap /></div>
-                  <Field label="Delivery No." value={po.delivery_number ?? "-"} />
+                <div className="text-sm flex-1 space-y-1.5">
+                  <div className="flex flex-wrap gap-x-10 gap-y-1.5">
+                    <Field label="PO Order No." value={po.po_number} nowrap />
+                    <Field label="วันที่" value={fmtDate(po.order_date)} nowrap />
+                  </div>
+                  <Field label="Branch" value={po.branch_label} nowrap />
+                  <div className="flex flex-wrap gap-x-10 gap-y-1.5">
+                    <Field label="รหัสสาขา" value={po.store_no ?? "-"} nowrap />
+                    <Field label="Delivery No." value={po.delivery_number ?? "-"} nowrap />
+                  </div>
                 </div>
                 {po.po_number && (
                   <div className="shrink-0 flex flex-col items-center border border-neutral-300 rounded-md px-3 py-2">
