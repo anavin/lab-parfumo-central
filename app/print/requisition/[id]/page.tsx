@@ -30,6 +30,9 @@ export default async function RequisitionPrintPage({ params }: { params: Promise
 
   return (
     <div className="min-h-screen bg-white text-black">
+      {/* margins live in the .req-sheet 14mm padding, so this route prints edge-to-edge (the box
+          IS one A4 page). Scoped to this route only — plain @page, which Safari handles reliably. */}
+      <style>{"@media print{@page{size:A4;margin:0}}"}</style>
       <div className="req-wrap mx-auto w-full max-w-[840px] px-4 py-4">
         <div className="mb-4 no-print"><PrintNow title={`${po.po_number}-Requisition`} /></div>
         <RequisitionSheet po={po} items={items} />

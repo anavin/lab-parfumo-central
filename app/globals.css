@@ -161,8 +161,8 @@ summary:focus-visible, [tabindex]:focus-visible {
 
 /* ใบเบิกสินค้า — each copy is a real fixed A4 page (210×297mm): content at the top, signatures
    pinned to the bottom via flex, blank space between when the list is short. On print the box
-   IS one A4 page (see the named @page req-a4 with margin:0 + the 14mm padding = the margins),
-   so Safari saves it 1:1 with the preview without overflowing to a blank page. */
+   IS one A4 page — the /print/requisition route sets @page{margin:0} (scoped to that route), and
+   the 14mm padding here provides the margins — so Safari saves it 1:1 with the preview. */
 .req-sheet {
   width: 210mm;
   min-height: 297mm;
@@ -173,7 +173,6 @@ summary:focus-visible, [tabindex]:focus-visible {
   flex-direction: column;
   font-family: var(--font-sans);
   color: #1a1614;
-  page: req-a4;            /* print with the margin-0 named page below */
 }
 .req-sign { margin-top: auto; padding-top: 12mm; }
 
@@ -196,10 +195,9 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  /* requisition prints on its OWN named A4 page with margin:0, so the 210×297mm .req-sheet (with
-     14mm padding = the margins) fills exactly one page — no overflow-to-blank, footer stays pinned
-     bottom. Only card chrome is dropped; the A4 flex box is kept as-is. */
-  @page req-a4 { size: A4; margin: 0; }
+  /* The 210×297mm .req-sheet (14mm padding = the margins) fills exactly one A4 page — the
+     /print/requisition route sets @page{margin:0} (a plain, well-supported @page, unlike the
+     named page Safari mishandles). No overflow-to-blank; footer stays pinned bottom. */
   .req-sheet { margin: 0 !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
   .req-sheet:last-child { page-break-after: avoid; }
   .req-sign { margin-top: auto !important; padding-top: 12mm !important; }
