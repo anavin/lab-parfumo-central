@@ -31,7 +31,7 @@ export default async function RequisitionPrintPage({ params }: { params: Promise
   return (
     <div className="min-h-screen bg-white text-black">
       <div className="req-wrap mx-auto w-full max-w-[840px] px-4 py-4">
-        <div className="mb-4"><PrintNow title={`${po.po_number}-Requisition`} /></div>
+        <div className="mb-4 no-print"><PrintNow title={`${po.po_number}-Requisition`} /></div>
         <RequisitionSheet po={po} items={items} />
       </div>
     </div>
