@@ -103,7 +103,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               <tr className="border-t-2 border-black font-bold">
                 <td colSpan={5} className="py-2 pr-3 text-right">รวมทั้งสิ้น</td>
                 <td className="py-2 pr-3 text-right tabular-nums">{num(totalQty)}</td>
-                {received && <td className="py-2 pr-3 text-right tabular-nums">{num(totalRecv)}</td>}
+                {received && <td className="py-2 pr-3 text-center tabular-nums">{num(totalRecv)}</td>}
                 <td className="py-2 whitespace-nowrap">ขวด</td>
               </tr>
             </tfoot>
