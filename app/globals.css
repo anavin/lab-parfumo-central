@@ -195,18 +195,18 @@ summary:focus-visible, [tabindex]:focus-visible {
   /* requisition (ใบเบิกสินค้า): drop the on-screen A4-page framing so each sheet fills
      the real A4 content box via @page (browser 🖨 print), matching the server PDF. */
   .req-wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-  /* The /print/requisition route sets @page{margin:10mm} (physical printers can't print
-     edge-to-edge). Each sheet prints as plain BLOCK flow at its natural content height — NO
-     forced min-height and NO flex bottom-pin, which previously made every sheet overflow into
-     a blank page and split the signatures across pages. Pagination (in the component) keeps
-     each sheet's content within one page. */
+  /* The /print/requisition route sets @page{margin:10mm}. Each sheet is a FIXED one-page A4
+     box (275mm ≈ 297 − 2×10mm, a hair under so it never spills to a blank page) with
+     overflow:hidden as a hard stop, flex column so the signatures / "มีต่อ" note pin to the
+     bottom. Row caps (in the component) keep content within the box. */
   .req-sheet {
     width: auto !important; padding: 0 !important; margin: 0 !important;
-    min-height: 0 !important; display: block !important;
+    height: 275mm !important; overflow: hidden !important;
+    display: flex !important; flex-direction: column !important;
     box-shadow: none !important; border: none !important; border-radius: 0 !important;
   }
   .req-sheet:last-child { page-break-after: avoid; }
-  .req-sign { margin-top: 0 !important; padding-top: 10mm !important; }
+  .req-sign { margin-top: auto !important; padding-top: 10mm !important; }
 
   /* daily report: fill the A4 page, no card chrome (border/shadow) in the PDF */
   .daily-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
