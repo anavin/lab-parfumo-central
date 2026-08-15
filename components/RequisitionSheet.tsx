@@ -15,9 +15,12 @@ export type SheetItem = {
   grade: string | null; sku: string | null; received_qty: number | null; line_remark: string | null;
 };
 
-// rows per A4 page — the first page carries the full header so it holds fewer
-const FIRST_PAGE_ROWS = 14;
-const CONT_PAGE_ROWS = 22;
+// rows per A4 page (kept conservative so a page never overflows to a blank one). Page 1
+// carries the full header so it holds fewer; the LAST page also reserves FOOTER_ROWS of
+// space for the summary box + signatures.
+const CAP_P1 = 20;        // page 1 (full header), not the last page
+const CAP_PN = 25;        // continuation page (compact header), not the last page
+const FOOTER_ROWS = 9;    // rows-equivalent space the summary + signatures need
 
 export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[] }) {
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
@@ -86,15 +89,22 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
     g.items += 1; g.qty += Number(it.qty) || 0; g.recv += Number(it.received_qty ?? it.qty) || 0;
   }
 
-  // split the sorted rows into A4 pages
+  // split the sorted rows into A4 pages (fill each page to its cap)
   const pages: SheetItem[][] = [];
-  if (rows.length <= FIRST_PAGE_ROWS) {
-    pages.push(rows);
-  } else {
-    pages.push(rows.slice(0, FIRST_PAGE_ROWS));
-    for (let i = FIRST_PAGE_ROWS; i < rows.length; i += CONT_PAGE_ROWS) pages.push(rows.slice(i, i + CONT_PAGE_ROWS));
+  let idx = 0;
+  while (idx < rows.length) {
+    const cap = pages.length === 0 ? CAP_P1 : CAP_PN;
+    pages.push(rows.slice(idx, idx + cap));
+    idx += cap;
   }
   if (!pages.length) pages.push([]);
+  // keep the footer (summary + signatures) from overflowing: if the last page is too full to
+  // also hold it, put the footer on a fresh page instead of spilling into a blank one
+  {
+    const li = pages.length - 1;
+    const cap = li === 0 ? CAP_P1 : CAP_PN;
+    if (pages[li].length > cap - FOOTER_ROWS) pages.push([]);
+  }
 
   // flatten to (copy × page) so we can flag the very first sheet (no page-break before it)
   const sheets: { copyLabel: string; pageRows: SheetItem[]; start: number; pageNo: number; total: number; isLast: boolean }[] = [];
@@ -158,6 +168,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             </div>
           )}
 
+          {s.pageRows.length > 0 && (
           <table className="w-full text-[13px] border-collapse">
             <thead>
               <tr className="text-left text-neutral-500 text-[11px] uppercase tracking-wide border-b-2 border-black">
@@ -185,6 +196,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </tfoot>
             )}
           </table>
+          )}
 
           {s.isLast ? (
             <>
