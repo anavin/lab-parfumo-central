@@ -204,7 +204,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           </table>
           )}
 
-          {s.isLast ? (
+          {s.isLast && (
             <>
               {/* last-page footer row: type summary (left) + notes box (right), equal height */}
               <div className="mt-6 flex items-stretch gap-6">
@@ -253,8 +253,6 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้รับ)</div></div>
               </div>
             </>
-          ) : (
-            <div className="req-foot mt-auto pt-3 pr-1 text-right text-[12px] text-black/50">มีต่อหน้าถัดไป</div>
           )}
         </div>
       ))}
