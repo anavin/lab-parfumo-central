@@ -252,8 +252,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 {["(ผู้เบิก)", "(ผู้ตรวจ)", "(ผู้จ่าย)", "(ผู้รับ)"].map((role) => (
                   <div key={role} className="text-center">
                     <div className="border-t border-black pt-1.5">{role}</div>
-                    <div className="text-[11px] text-black/55 mt-2 whitespace-nowrap">____/____/____</div>
-                    <div className="text-[9px] text-black/40 mt-0.5">วัน / เดือน / ปี</div>
+                    <div className="text-[15px] text-black/60 mt-2.5 whitespace-nowrap tracking-wide">____ /____ /____</div>
                   </div>
                 ))}
               </div>
