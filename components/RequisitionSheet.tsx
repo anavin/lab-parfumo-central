@@ -138,12 +138,12 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
 
               <div className="flex items-start justify-between gap-8 mb-5">
                 <div className="text-sm flex-1 space-y-1.5">
-                  <div className="flex flex-wrap gap-x-10 gap-y-1.5">
+                  <div className="flex flex-wrap justify-between gap-x-10 gap-y-1.5">
                     <Field label="PO Order No." value={po.po_number} nowrap />
                     <Field label="วันที่" value={fmtDate(po.order_date)} nowrap />
                   </div>
                   <Field label="Branch" value={po.branch_label} nowrap />
-                  <div className="flex flex-wrap gap-x-10 gap-y-1.5">
+                  <div className="flex flex-wrap justify-between gap-x-10 gap-y-1.5">
                     <Field label="รหัสสาขา" value={po.store_no ?? "-"} nowrap />
                     <Field label="Delivery No." value={po.delivery_number ?? "-"} nowrap />
                   </div>
@@ -203,6 +203,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
             )}
           </table>
           )}
+          {/* close the table with a rule at the page break (under row 18 / 39 / …) */}
+          {!s.isLast && s.pageRows.length > 0 && <div className="border-t-2 border-black" />}
 
           {s.isLast && (
             <>
