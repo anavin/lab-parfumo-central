@@ -143,10 +143,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                     <Field label="วันที่" value={fmtDate(po.order_date)} nowrap />
                   </div>
                   <Field label="Branch" value={po.branch_label} nowrap />
-                  <div className="flex flex-wrap justify-between gap-x-10 gap-y-1.5">
-                    <Field label="รหัสสาขา" value={po.store_no ?? "-"} nowrap />
-                    <Field label="Delivery No." value={po.delivery_number ?? "-"} nowrap />
-                  </div>
+                  <Field label="รหัสสาขา" value={po.store_no ?? "-"} nowrap />
                 </div>
                 {po.po_number && (
                   <div className="shrink-0 flex flex-col items-center border border-neutral-300 rounded-md px-3 py-2">
