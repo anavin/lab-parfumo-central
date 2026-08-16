@@ -20,7 +20,7 @@ export type SheetItem = {
 // space for the summary box + signatures.
 const CAP_P1 = 18;        // page 1 (full header), not the last page — sized for the 257mm content area
 const CAP_PN = 21;        // continuation page (compact header), not the last page
-const FOOTER_ROWS = 10;   // rows-equivalent space the summary + notes + signatures need on the last page
+const FOOTER_ROWS = 12;   // rows-equivalent space the summary + notes + signatures (with date line) need on the last page
 
 export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[] }) {
   const totalQty = items.reduce((s, i) => s + Number(i.qty || 0), 0);
@@ -249,10 +249,13 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               </div>
 
               <div className="req-sign grid grid-cols-4 gap-6 pt-12 text-[13px]">
-                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้เบิก)</div></div>
-                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้ตรวจ)</div></div>
-                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้จ่าย)</div></div>
-                <div className="text-center"><div className="border-t border-black pt-1.5">(ผู้รับ)</div></div>
+                {["(ผู้เบิก)", "(ผู้ตรวจ)", "(ผู้จ่าย)", "(ผู้รับ)"].map((role) => (
+                  <div key={role} className="text-center">
+                    <div className="border-t border-black pt-1.5">{role}</div>
+                    <div className="text-[11px] text-black/55 mt-2 whitespace-nowrap">____/____/____</div>
+                    <div className="text-[9px] text-black/40 mt-0.5">วัน / เดือน / ปี</div>
+                  </div>
+                ))}
               </div>
             </>
           )}
