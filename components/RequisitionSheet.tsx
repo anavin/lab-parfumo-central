@@ -178,7 +178,7 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 <th className="pb-1.5 pr-3 font-semibold text-center">#</th>
                 <th className="pb-1.5 pr-3 font-semibold">Barcode</th>
                 <th className="pb-1.5 pr-3 font-semibold">ชื่อสินค้า</th>
-                <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ประเภท</th>
+                <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">Grade</th>
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ขนาด</th>
                 <th className="pb-1.5 pr-3 font-semibold text-right">เบิก</th>
                 {received && <th className="pb-1.5 pr-3 font-semibold text-center">จ่ายจริง</th>}
@@ -208,11 +208,11 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
               {/* last-page footer row: type summary (left) + notes box (right), equal height */}
               <div className="mt-6 flex items-stretch gap-6">
                 <div className="rounded-lg border border-neutral-300 overflow-hidden shadow-sm">
-                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-ink tracking-wide">สรุปตามประเภท</div>
+                  <div className="bg-neutral-100 border-b border-neutral-300 px-4 py-2 text-[12px] font-bold text-ink tracking-wide">สรุปตาม Grade</div>
                   <table className="text-[12px] border-collapse">
                     <thead>
                       <tr className="text-neutral-500 text-[10px] uppercase tracking-wide border-b border-neutral-300">
-                        <th className="py-2 px-4 text-left font-semibold">ประเภท</th>
+                        <th className="py-2 px-4 text-left font-semibold">Grade</th>
                         <th className="py-2 px-4 text-right font-semibold">รายการ</th>
                         <th className="py-2 px-4 text-right font-semibold">จำนวน</th>
                         {received && <th className="py-2 px-4 text-right font-semibold">จ่ายจริง</th>}
