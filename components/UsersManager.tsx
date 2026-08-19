@@ -97,6 +97,7 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
       <table className="w-full text-sm">
         <thead className="bg-canvas"><tr className="th border-b border-line-soft">
           <th className="px-5 py-2.5">ผู้ใช้</th><th className="px-3 py-2.5">บทบาท / สิทธิ์</th>
+          <th className="px-3 py-2.5">สาขาที่ทำงาน</th>
           <th className="px-3 py-2.5">สถานะ</th><th className="px-3 py-2.5 hidden sm:table-cell">เข้าล่าสุด</th><th className="px-5 py-2.5 text-right">จัดการ</th>
         </tr></thead>
         <tbody>
@@ -115,8 +116,8 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                     <div className="text-[11px] text-muted-soft mt-1">
                       {u.role === "admin" ? "ทุกเมนู" : custom ? `กำหนดเอง · ${count} เมนู` : `ค่าเริ่มต้น · ${count} เมนู`}
                     </div>
-                    <div className="mt-1.5"><BranchAssign u={u} /></div>
                   </td>
+                  <td className="px-3 py-3"><BranchAssign u={u} /></td>
                   <td className="px-3 py-3">{u.is_active ? <Badge tone="success">ใช้งาน</Badge> : <Badge tone="danger">ปิด</Badge>}</td>
                   <td className="px-3 py-3 text-muted text-xs hidden sm:table-cell">{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit", timeZone: "Asia/Bangkok" }) : "-"}</td>
                   <td className="px-5 py-3 text-right whitespace-nowrap">
@@ -139,14 +140,14 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                 </tr>
                 {profileId === u.id && (
                   <tr className="border-b border-line-soft bg-canvas">
-                    <td colSpan={5} className="px-5 py-4">
+                    <td colSpan={6} className="px-5 py-4">
                       <ProfileEditor u={u} onClose={() => setProfileId(null)} onSaved={() => { setProfileId(null); router.refresh(); }} />
                     </td>
                   </tr>
                 )}
                 {editId === u.id && (
                   <tr className="border-b border-line-soft bg-canvas">
-                    <td colSpan={5} className="px-5 py-4">
+                    <td colSpan={6} className="px-5 py-4">
                       <AccessEditor u={u} onClose={() => setEditId(null)} onSaved={() => { setEditId(null); router.refresh(); }} />
                     </td>
                   </tr>
@@ -282,8 +283,7 @@ function BranchAssign({ u }: { u: U }) {
     if (r?.ok) router.refresh(); else alert(r?.error ?? "บันทึกสาขาไม่สำเร็จ");
   });
   return (
-    <div className="mt-1">
-      <div className="text-[10px] text-muted-soft mb-1">สาขาที่ทำงาน</div>
+    <div>
       <div className="flex flex-wrap gap-1">
         {opts.map((o) => (
           <button key={o.value} type="button" onClick={() => change(o.value)} disabled={pending}
