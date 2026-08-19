@@ -219,4 +219,10 @@ summary:focus-visible, [tabindex]:focus-visible {
   .daily-sheet table { page-break-inside: auto; }
   .daily-sheet tr { page-break-inside: avoid; }
   .daily-sheet thead { display: table-header-group; }   /* repeat header each page */
+
+  /* stock report: same reliable block flow as the daily report */
+  .stock-sheet { max-width: none !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
+  .stock-sheet table { page-break-inside: auto; }
+  .stock-sheet tr { page-break-inside: avoid; }
+  .stock-sheet thead { display: table-header-group; }
 }

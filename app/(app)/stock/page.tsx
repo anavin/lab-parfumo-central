@@ -5,6 +5,7 @@ import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockTable } from "@/components/StockTable";
 import { StockAdjust } from "@/components/StockAdjust";
+import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { BranchTabs } from "@/components/BranchTabs";
@@ -55,6 +56,9 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
             </a>
           )}
         </div>
+      )}
+      {canRequisition && branch && (
+        <BranchStockClose branch={branch} branchLabel={branchName(branch)} remainingUnits={Math.round(s.remaining)} skus={rows.length} />
       )}
       {canRequisition && <StockAdjust defaultBranch={branch} adjustments={adjustments} />}
 

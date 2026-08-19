@@ -18,6 +18,7 @@ const nextConfig = {
     // headless-chromium binary (.br) for the one-click requisition PDF — force it into the
     // function bundle, otherwise @sparticuz/chromium.executablePath() can't extract it on Vercel
     "/api/requisition/[id]/pdf": ["./node_modules/@sparticuz/chromium/**"],
+    "/api/stock/[branch]/pdf": ["./node_modules/@sparticuz/chromium/**"],
   },
   serverExternalPackages: ["@electric-sql/pglite", "puppeteer-core", "@sparticuz/chromium"],
   eslint: { ignoreDuringBuilds: true },

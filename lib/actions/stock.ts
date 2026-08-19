@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/require-user";
 import { resolveBranch, branchName } from "@/lib/branches";
 import { logAudit } from "@/lib/audit";
+import { stockLive } from "@/lib/queries";
 
 export type StockAdjustment = {
   id: number; branch: string; barcode: string; scent: string; size: string;
@@ -32,6 +33,35 @@ export async function addStockAdjustment(input: { branch: string; barcode: strin
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (รัน SQL 0023)" };
     console.error("[addStockAdjustment]", e);
     return { ok: false, error: "บันทึกไม่สำเร็จ" };
+  }
+}
+
+/** Close a branch's stock: return everything still on hand to the central warehouse. Posts a
+ *  negative stock_adjustment (= −remaining) for every product with stock left, zeroing the
+ *  branch. The central warehouse is restocked via the requisition flow (not tracked here), so
+ *  this only removes from the branch. Idempotent-ish: a second run finds remaining=0 → no-op. */
+export async function returnBranchStock(branchInput: string, dateStr: string): Promise<{ ok: boolean; error?: string; items?: number; units?: number }> {
+  const me = await requirePermission("requisitions");
+  const branch = resolveBranch(branchInput);
+  try {
+    const rows = (await stockLive(branch)).filter((r) => (Number(r.remaining) || 0) > 0);
+    if (!rows.length) return { ok: true, items: 0, units: 0 };
+    const note = `คืนเข้าคลัง ${dateStr}`;
+    const payload = rows.map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: Math.round(Number(r.remaining) || 0) }));
+    // one atomic INSERT … SELECT from the JSON so a partial failure can't half-return the branch
+    await q(
+      `insert into stock_adjustments (branch, product_id, barcode, scent, size, qty, note, created_by)
+       select $1, (select id from products where barcode = r.barcode limit 1), r.barcode, r.scent, r.size, -r.remaining, $3, $4
+       from json_to_recordset($2::json) as r(barcode text, scent text, size text, remaining int)`,
+      [branch, JSON.stringify(payload), note, me.id]);
+    const units = payload.reduce((s, r) => s + r.remaining, 0);
+    await logAudit("update", "stock", null, `คืนสต๊อกเข้าคลัง ${branchName(branch)} · ${rows.length} รายการ · ${units} ชิ้น`);
+    revalidatePath("/stock"); revalidatePath("/my");
+    return { ok: true, items: rows.length, units };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (รัน SQL 0023)" };
+    console.error("[returnBranchStock]", e);
+    return { ok: false, error: "คืนสต๊อกไม่สำเร็จ" };
   }
 }
 
