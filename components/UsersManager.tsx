@@ -270,20 +270,29 @@ function AccessEditor({ u, onClose, onSaved }: { u: U; onClose: () => void; onSa
   );
 }
 
-// Admin assigns a user's home branch; /my defaults to it (the salesperson can still switch).
+// Admin assigns a user's home branch (button picker). /my shows this branch (read-only).
 function BranchAssign({ u }: { u: U }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const cur = u.branch ?? "";
+  const opts = [{ value: "", label: "ค่าเริ่มต้น" }, ...branchOptions()];
   const change = (v: string) => start(async () => {
+    if (v === cur) return;
     const r = await setUserBranch(u.id, v || null);
     if (r?.ok) router.refresh(); else alert(r?.error ?? "บันทึกสาขาไม่สำเร็จ");
   });
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-muted-soft shrink-0">สาขา</span>
-      <Select value={u.branch ?? ""} onValueChange={change}
-        options={[{ value: "", label: "ค่าเริ่มต้น" }, ...branchOptions()]}
-        className={"py-1 text-[11px] min-w-[130px]" + (pending ? " opacity-50 pointer-events-none" : "")} />
+    <div className="mt-1">
+      <div className="text-[10px] text-muted-soft mb-1">สาขาที่ทำงาน</div>
+      <div className="flex flex-wrap gap-1">
+        {opts.map((o) => (
+          <button key={o.value} type="button" onClick={() => change(o.value)} disabled={pending}
+            className={"px-2.5 py-1 rounded-md border text-[11px] font-medium transition disabled:opacity-50 " +
+              (cur === o.value ? "border-brand bg-brand text-white" : "border-line bg-surface text-muted hover:bg-canvas")}>
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
