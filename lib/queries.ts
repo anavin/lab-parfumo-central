@@ -26,14 +26,17 @@ export function getMonths() {
 export async function kpis(f: Filter = ALL) {
   // revReceipted/qtyReceipted exclude sales with no receipt number, so per-bill
   // metrics (AOV, ชิ้น/บิล) use a numerator consistent with the bill count.
-  // customers = distinct bills (order_no) — derived straight from real sales so it
-  // always covers every branch/day. The old manually-entered daily_customers table
-  // was CTW-only and went stale (see git history / dashboard combo-chart fix).
+  // customers = distinct bills — derived straight from real sales so it always
+  // covers every branch/day. The old manually-entered daily_customers table was
+  // CTW-only and went stale (see git history / dashboard combo-chart fix).
+  // Bill id = coalesce(receipt_no, order_no): app-entered bills carry receipt_no
+  // (auto-generated if blank) with order_no null; imported SCS rows are the
+  // reverse (order_no set, receipt_no null); imported CTW rows have both.
   const [rev] = await q<{ revenue: number; qty: number; receipts: number; customers: number; revReceipted: number; qtyReceipted: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float   qty,
            count(distinct receipt_no)    receipts,
-           count(distinct order_no)      customers,
+           count(distinct coalesce(receipt_no::text, order_no::text)) customers,
            coalesce(sum(total) filter (where receipt_no is not null),0)::float "revReceipted",
            coalesce(sum(qty)   filter (where receipt_no is not null),0)::float "qtyReceipted"
     from sales where ${SW}`, [f.months, f.source]);
@@ -60,9 +63,10 @@ export function monthlyRevenue(f: Filter = ALL) {
 }
 
 export function monthlyCustomers(f: Filter = ALL) {
-  // customers = distinct bills (order_no) per month — see kpis() note.
+  // customers = distinct bills per month — see kpis() note for the bill-id rule.
   return q<{ month: string; customers: number; sell: number }>(`
-    select month, count(distinct order_no)::int customers, sum(total)::float sell
+    select month, count(distinct coalesce(receipt_no::text, order_no::text))::int customers,
+           sum(total)::float sell
     from sales where month is not null and ${SW}
     group by month order by min(sale_date)`, [f.months, f.source]);
 }
@@ -77,9 +81,10 @@ export function dailyRevenue(month: string, source: string | null) {
 }
 
 export function dailyCustomers(month: string, source: string | null = null) {
-  // customers = distinct bills (order_no) per day — mirrors dailyRevenue's grouping.
+  // customers = distinct bills per day — see kpis() note for the bill-id rule.
   return q<{ label: string; customers: number }>(`
-    select to_char(sale_date,'FMDD') label, count(distinct order_no)::int customers
+    select to_char(sale_date,'FMDD') label,
+           count(distinct coalesce(receipt_no::text, order_no::text))::int customers
     from sales
     where sale_date is not null and month = $1 and ($2::text is null or source = $2)
     group by sale_date order by sale_date`, [month, source]);
