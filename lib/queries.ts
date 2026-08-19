@@ -14,8 +14,6 @@ export const ALL: Filter = { months: null, source: null };
 const SW = `($1::text[] is null or month = any($1)) and ($2::text is null or source = $2)`;
 // same but for an aliased sales table (s.)
 const SWs = `($1::text[] is null or s.month = any($1)) and ($2::text is null or s.source = $2)`;
-// months-only fragment ($1) for date tables without a source column.
-const MW = `($1::text[] is null or month = any($1))`;
 
 /** Ordered month labels (oldest→newest) — used to resolve period presets. */
 export function getMonths() {
@@ -28,21 +26,18 @@ export function getMonths() {
 export async function kpis(f: Filter = ALL) {
   // revReceipted/qtyReceipted exclude sales with no receipt number, so per-bill
   // metrics (AOV, ชิ้น/บิล) use a numerator consistent with the bill count.
-  const [rev] = await q<{ revenue: number; qty: number; receipts: number; revReceipted: number; qtyReceipted: number }>(`
+  // customers = distinct bills (order_no) — derived straight from real sales so it
+  // always covers every branch/day. The old manually-entered daily_customers table
+  // was CTW-only and went stale (see git history / dashboard combo-chart fix).
+  const [rev] = await q<{ revenue: number; qty: number; receipts: number; customers: number; revReceipted: number; qtyReceipted: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float   qty,
            count(distinct receipt_no)    receipts,
+           count(distinct order_no)      customers,
            coalesce(sum(total) filter (where receipt_no is not null),0)::float "revReceipted",
            coalesce(sum(qty)   filter (where receipt_no is not null),0)::float "qtyReceipted"
     from sales where ${SW}`, [f.months, f.source]);
-  // customers split by branch too (source added in 0025); fall back to months-only pre-migration.
-  const custSel = (srcFilter: string) => `
-    select coalesce(sum(customers),0)::int customers,
-           coalesce(sum(sell_amount),0)::float sell
-    from daily_customers where ${MW}${srcFilter}`;
-  let cust: { customers: number; sell: number };
-  try { [cust] = await q<{ customers: number; sell: number }>(custSel(` and ($2::text is null or coalesce(source,'CTW') = $2)`), [f.months, f.source]); }
-  catch (e: any) { if (e?.code !== "42703") throw e; [cust] = await q<{ customers: number; sell: number }>(custSel(``), [f.months]); }
+  const cust = { customers: rev.customers };
   const [cash] = await q<{ total: number }>(
     `select coalesce(sum(amount),0)::float total from cash_entries
      where ($1::text[] is null or to_char(cash_date,'Mon-YY') = any($1))`, [f.months]);
@@ -64,13 +59,12 @@ export function monthlyRevenue(f: Filter = ALL) {
     group by month order by min(sale_date)`, [f.months, f.source]);
 }
 
-export async function monthlyCustomers(f: Filter = ALL) {
-  const sel = (srcFilter: string) => `
-    select month, sum(customers)::int customers, sum(sell_amount)::float sell
-    from daily_customers where month is not null and ${MW}${srcFilter}
-    group by month order by min(cust_date)`;
-  try { return await q<{ month: string; customers: number; sell: number }>(sel(` and ($2::text is null or coalesce(source,'CTW') = $2)`), [f.months, f.source]); }
-  catch (e: any) { if (e?.code !== "42703") throw e; return q<{ month: string; customers: number; sell: number }>(sel(``), [f.months]); }
+export function monthlyCustomers(f: Filter = ALL) {
+  // customers = distinct bills (order_no) per month — see kpis() note.
+  return q<{ month: string; customers: number; sell: number }>(`
+    select month, count(distinct order_no)::int customers, sum(total)::float sell
+    from sales where month is not null and ${SW}
+    group by month order by min(sale_date)`, [f.months, f.source]);
 }
 
 // ---- daily trend (for a single selected month) ----------------------------
@@ -82,14 +76,13 @@ export function dailyRevenue(month: string, source: string | null) {
     group by sale_date order by sale_date`, [month, source]);
 }
 
-export async function dailyCustomers(month: string, source: string | null = null) {
-  const sel = (srcFilter: string) => `
-    select to_char(cust_date,'FMDD') label, sum(customers)::int customers
-    from daily_customers
-    where cust_date is not null and month = $1${srcFilter}
-    group by cust_date order by cust_date`;
-  try { return await q<{ label: string; customers: number }>(sel(` and ($2::text is null or coalesce(source,'CTW') = $2)`), [month, source]); }
-  catch (e: any) { if (e?.code !== "42703") throw e; return q<{ label: string; customers: number }>(sel(``), [month]); }
+export function dailyCustomers(month: string, source: string | null = null) {
+  // customers = distinct bills (order_no) per day — mirrors dailyRevenue's grouping.
+  return q<{ label: string; customers: number }>(`
+    select to_char(sale_date,'FMDD') label, count(distinct order_no)::int customers
+    from sales
+    where sale_date is not null and month = $1 and ($2::text is null or source = $2)
+    group by sale_date order by sale_date`, [month, source]);
 }
 
 // ---- product performance --------------------------------------------------
