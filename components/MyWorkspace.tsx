@@ -245,20 +245,14 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       )}
       <div ref={formRef} className="scroll-mt-16" />
 
-      {/* branch picker — which shop the salesperson is working at today. New bills
-          tag this branch automatically; the choice persists per day. */}
-      {!busy && SOURCE_OPTIONS.length > 1 && (
+      {/* branch — assigned by the admin (read-only). New bills tag this branch automatically. */}
+      {!busy && (
         <div className="mb-4">
           <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted">
             <Store className="w-3.5 h-3.5" /> สาขาที่ทำงานวันนี้
           </div>
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${SOURCE_OPTIONS.length}, minmax(0,1fr))` }}>
-            {SOURCE_OPTIONS.map((b) => (
-              <button key={b.value} onClick={() => pickBranch(b.value)} type="button"
-                className={`px-4 py-3 rounded-xl border text-sm font-semibold transition active:scale-[.99] ${branch === b.value ? "border-brand bg-brand text-white shadow-sm" : "border-line bg-surface text-ink hover:bg-canvas"}`}>
-                {b.label}
-              </button>
-            ))}
+          <div className="px-4 py-3 rounded-xl border border-line bg-canvas text-sm font-semibold text-ink">
+            {SOURCE_OPTIONS.find((o) => o.value === branch)?.label ?? branch}
           </div>
         </div>
       )}
