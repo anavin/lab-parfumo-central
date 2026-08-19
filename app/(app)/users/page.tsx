@@ -11,8 +11,11 @@ export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
   const me = await requirePermission("users");
-  const users = await q<{ id: number; username: string; full_name: string; role: string; permissions: string[] | null; is_active: boolean; last_login_at: string | null }>(
-    `select id, username, full_name, role, permissions, is_active, last_login_at from users order by role, username`);
+  type URow = { id: number; username: string; full_name: string; role: string; permissions: string[] | null; is_active: boolean; last_login_at: string | null; branch: string | null };
+  const usersSel = (branchCol: string) => `select id, username, full_name, role, permissions, is_active, last_login_at, ${branchCol} as branch from users order by role, username`;
+  let users: URow[];
+  try { users = await q<URow>(usersSel("branch")); }
+  catch (e: any) { if (e?.code !== "42703") throw e; users = await q<URow>(usersSel("null::text")); }   // 0026 not run yet
   const logins = await loginHistory(5);
 
   return (

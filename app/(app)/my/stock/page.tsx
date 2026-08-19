@@ -15,11 +15,12 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, maxi
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
 export default async function MyStockPage() {
-  await requireUser();
+  const user = await requireUser();
   const today = bkkToday();
   const jar = await cookies();
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
-  const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
+  const home = isBranch(user.branch) ? user.branch! : DEFAULT_BRANCH;
+  const branch = bDate === today && isBranch(bCode) ? bCode : home;
   const stock = await stockLive(branch);
 
   return (

@@ -2,7 +2,8 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus, KeyRound, Power, ShieldCheck, Check, ChevronDown, RotateCcw, Pencil, Trash2 } from "lucide-react";
-import { createUser, setUserActive, resetPassword, updateUserAccess, updateUserProfile, deleteUser } from "@/lib/actions/auth";
+import { createUser, setUserActive, resetPassword, updateUserAccess, updateUserProfile, deleteUser, setUserBranch } from "@/lib/actions/auth";
+import { branchOptions } from "@/lib/branches";
 import { Badge } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import {
@@ -10,7 +11,7 @@ import {
   effectivePermissions, type PermKey, type RoleKey,
 } from "@/lib/auth/permissions";
 
-type U = { id: number; username: string; full_name: string; role: string; permissions: string[] | null; is_active: boolean; last_login_at: string | null };
+type U = { id: number; username: string; full_name: string; role: string; permissions: string[] | null; is_active: boolean; last_login_at: string | null; branch?: string | null };
 const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-surface focus:outline-none focus:border-brand";
 
 function presetSet(role: string): Set<PermKey> {
@@ -114,6 +115,7 @@ export function UsersManager({ users, meId }: { users: U[]; meId: number }) {
                     <div className="text-[11px] text-muted-soft mt-1">
                       {u.role === "admin" ? "ทุกเมนู" : custom ? `กำหนดเอง · ${count} เมนู` : `ค่าเริ่มต้น · ${count} เมนู`}
                     </div>
+                    <div className="mt-1.5"><BranchAssign u={u} /></div>
                   </td>
                   <td className="px-3 py-3">{u.is_active ? <Badge tone="success">ใช้งาน</Badge> : <Badge tone="danger">ปิด</Badge>}</td>
                   <td className="px-3 py-3 text-muted text-xs hidden sm:table-cell">{u.last_login_at ? new Date(u.last_login_at).toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "2-digit", timeZone: "Asia/Bangkok" }) : "-"}</td>
@@ -264,6 +266,24 @@ function AccessEditor({ u, onClose, onSaved }: { u: U; onClose: () => void; onSa
         <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-lg text-muted hover:bg-line-soft">ยกเลิก</button>
         <button onClick={save} disabled={pending} className="btn btn-primary text-sm">{pending ? "กำลังบันทึก…" : "บันทึกสิทธิ์"}</button>
       </div>
+    </div>
+  );
+}
+
+// Admin assigns a user's home branch; /my defaults to it (the salesperson can still switch).
+function BranchAssign({ u }: { u: U }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const change = (v: string) => start(async () => {
+    const r = await setUserBranch(u.id, v || null);
+    if (r?.ok) router.refresh(); else alert(r?.error ?? "บันทึกสาขาไม่สำเร็จ");
+  });
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] text-muted-soft shrink-0">สาขา</span>
+      <Select value={u.branch ?? ""} onValueChange={change}
+        options={[{ value: "", label: "ค่าเริ่มต้น" }, ...branchOptions()]}
+        className={"py-1 text-[11px] min-w-[130px]" + (pending ? " opacity-50 pointer-events-none" : "")} />
     </div>
   );
 }

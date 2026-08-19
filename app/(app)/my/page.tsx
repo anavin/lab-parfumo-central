@@ -35,11 +35,13 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const today = bkkToday();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date || "") ? sp.date! : today;
 
-  // branch the salesperson picked for TODAY (cookie "my_branch=CODE:YYYY-MM-DD");
-  // ignore it on a different Bangkok day so each day starts with a fresh choice.
+  // branch defaults to the one the ADMIN assigned to this user; the salesperson can still
+  // switch it for TODAY via the on-screen picker (cookie "my_branch=CODE:YYYY-MM-DD"), which
+  // wins only on the same Bangkok day so tomorrow starts fresh on the assigned branch again.
+  const homeBranch = isBranch(user.branch) ? user.branch! : DEFAULT_BRANCH;
   const jar = await cookies();
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
-  const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
+  const branch = bDate === today && isBranch(bCode) ? bCode : homeBranch;
 
   const [kpi, rows, trendRows, receipts] = await Promise.all([
     myDayKpis(user.id, date),

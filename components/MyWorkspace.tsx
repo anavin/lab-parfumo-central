@@ -101,6 +101,12 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // New bills default their source to this; persisted per-day via a cookie so it
   // survives reloads but resets each Bangkok day (mirrors the staff midnight logout).
   const [branch, setBranch] = useState(branchProp);
+  // seed today's cookie with the (admin-assigned) branch on mount so the stock-gated product
+  // search API — which reads the cookie — filters by the right branch even before any manual switch
+  useEffect(() => {
+    try { document.cookie = `my_branch=${branchProp}:${today}; path=/; max-age=86400; samesite=lax`; } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const pickBranch = (code: string) => {
     setBranch(code);
     try { document.cookie = `my_branch=${code}:${today}; path=/; max-age=86400; samesite=lax`; } catch {}

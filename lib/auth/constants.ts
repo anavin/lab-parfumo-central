@@ -14,6 +14,8 @@ export type User = {
   role: Role;
   // Per-user permission override. null → inherit the role preset.
   permissions: string[] | null;
+  // Home branch the admin assigned (CTW/SCS). null → falls back to the default branch.
+  branch?: string | null;
   is_active: boolean;
   last_login_at: string | null;
   created_at: string;

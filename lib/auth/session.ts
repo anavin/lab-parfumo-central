@@ -22,20 +22,26 @@ export async function createSession(userId: number, remember = false): Promise<s
 
 export async function getUserFromToken(token: string | undefined): Promise<User | null> {
   if (!token) return null;
-  const sql = (permCol: string) => `
-    select u.id, u.username, u.full_name, u.role, ${permCol} as permissions, u.is_active, u.last_login_at, u.created_at,
+  const sql = (permCol: string, branchCol: string) => `
+    select u.id, u.username, u.full_name, u.role, ${permCol} as permissions, ${branchCol} as branch, u.is_active, u.last_login_at, u.created_at,
            s.last_activity_at, s.created_at as session_created_at
     from user_sessions s join users u on u.id = s.user_id
     where s.token = $1 and u.is_active = true`;
   type Row = User & { last_activity_at: string; session_created_at: string };
+  const is42703 = (e: any) => e?.code === "42703" || /does not exist/i.test(String(e?.message || ""));
   let rows: Row[];
   try {
-    rows = await q<Row>(sql("u.permissions"), [token]);
+    rows = await q<Row>(sql("u.permissions", "u.branch"), [token]);
   } catch (e: any) {
-    // Migration 0005 (users.permissions) not applied yet → fall back to role
-    // presets so the whole app doesn't hard-crash. (Postgres 42703 = undefined_column.)
-    if (e?.code !== "42703" && !/permissions.*does not exist/i.test(String(e?.message || ""))) throw e;
-    rows = await q<Row>(sql("null::text[]"), [token]);
+    // A column isn't migrated yet (0005 permissions / 0026 branch) → degrade gracefully instead
+    // of crashing login. Try dropping branch first (keeps permissions), then both.
+    if (!is42703(e)) throw e;
+    try {
+      rows = await q<Row>(sql("u.permissions", "null::text"), [token]);
+    } catch (e2: any) {
+      if (!is42703(e2)) throw e2;
+      rows = await q<Row>(sql("null::text[]", "null::text"), [token]);
+    }
   }
   const row = rows[0];
   if (!row) return null;

@@ -10,6 +10,7 @@ import { hashBcrypt, validatePassword } from "@/lib/auth/password";
 import { requirePermission } from "@/lib/auth/require-user";
 import { can, landingFor, permissionForPath, ROLE_PRESETS, ALL_PERM_KEYS, ROLE_LABEL, type RoleKey, type PermKey } from "@/lib/auth/permissions";
 import { logAudit } from "@/lib/audit";
+import { isBranch, branchName } from "@/lib/branches";
 
 // ---- login / logout -------------------------------------------------------
 export async function signIn(_prev: unknown, formData: FormData) {
@@ -74,6 +75,22 @@ export async function createUser(input: { username: string; full_name: string; r
   await q(`insert into users (username, password_hash, full_name, role) values ($1,$2,$3,$4)`,
     [username, hash, input.full_name.trim(), role]);
   await logAudit("create", "user", username, `${input.full_name.trim()} · ${ROLE_LABEL[role] ?? role}`);
+  revalidatePath("/users");
+  return { ok: true };
+}
+
+// Assign a user's home branch (admin). null = default branch; /my defaults to this but the
+// salesperson can still switch for the day.
+export async function setUserBranch(id: number, branch: string | null): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("users");
+  const b = branch && isBranch(branch) ? branch : null;
+  try {
+    await q(`update users set branch = $2 where id = $1`, [id, b]);
+  } catch (e: any) {
+    if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้รัน SQL 0026 (users.branch)" };
+    throw e;
+  }
+  await logAudit("update", "user", String(id), `สาขา → ${b ? branchName(b) : "ค่าเริ่มต้น"}`);
   revalidatePath("/users");
   return { ok: true };
 }

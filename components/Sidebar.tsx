@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks, FileUp,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks, FileUp, PackageCheck,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -44,6 +44,7 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
   { title: "พนักงานขาย", items: [
     { key: "my_sales", href: "/my", label: "ยอดขายของฉัน" },
     { key: "my_sales", href: "/my/stock", label: "สตอกสาขา", icon: Boxes },
+    { key: "my_sales", href: "/my/receive", label: "รับสินค้า", icon: PackageCheck },
     { key: "my_sales", href: "/my/count", label: "นับสต๊อก", icon: ClipboardCheck },
   ]},
 ];

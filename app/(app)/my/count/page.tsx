@@ -13,11 +13,12 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, maxi
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
 export default async function MyCountPage() {
-  await requireUser();
+  const user = await requireUser();
   const today = bkkToday();
   const jar = await cookies();
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
-  const branch = bDate === today && isBranch(bCode) ? bCode : DEFAULT_BRANCH;
+  const home = isBranch(user.branch) ? user.branch! : DEFAULT_BRANCH;
+  const branch = bDate === today && isBranch(bCode) ? bCode : home;
 
   // items to count: what's in stock (remaining>0) OR anything that has moved (sold>0) —
   // so a product sold down to 0 (or oversold) still shows under "มีความเคลื่อนไหว".
