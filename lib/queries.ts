@@ -612,11 +612,13 @@ export async function paymentsForRefs(refs: string[]): Promise<Record<string, Bi
 export async function attachmentsForRefs(refs: string[]): Promise<Record<string, BillAttachment[]>> {
   const uniq = [...new Set((refs || []).filter(Boolean))];
   if (!uniq.length) return {};
-  const rows = await q<BillAttachment>(
-    `select id, bill_ref, created_by from bill_attachments where bill_ref = any($1) order by id`, [uniq]);
-  const map: Record<string, BillAttachment[]> = {};
-  for (const r of rows) (map[r.bill_ref] ??= []).push(r);
-  return map;
+  try {
+    const rows = await q<BillAttachment>(
+      `select id, bill_ref, created_by from bill_attachments where bill_ref = any($1) order by id`, [uniq]);
+    const map: Record<string, BillAttachment[]> = {};
+    for (const r of rows) (map[r.bill_ref] ??= []).push(r);
+    return map;
+  } catch (e) { if (missingTable(e)) return {}; throw e; }   // table not installed on this env
 }
 
 /** Personal daily KPIs for a staff member — counts pending + approved (i.e.
