@@ -30,7 +30,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           subtitle={pendingBills ? `${pendingBills} บิลรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />
         <div className="mb-6"><MonthlyExcelButton /></div>
         {otherPending.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-2.5 text-sm text-ink">
+          <div className="alert-warn mb-4 flex-wrap items-center gap-2 text-sm">
             <span className="text-warn font-medium">อีกสาขามีบิลรอตรวจ:</span>
             {otherPending.map((b) => (
               <a key={b.value} href={`/review?branch=${b.value}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface border border-line hover:bg-canvas">

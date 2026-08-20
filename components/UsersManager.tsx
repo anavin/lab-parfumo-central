@@ -187,7 +187,7 @@ function ProfileEditor({ u, onClose, onSaved }: { u: U; onClose: () => void; onS
       {err && <div className="text-xs text-danger mt-2">{err}</div>}
       <div className="flex gap-2 justify-end mt-3">
         <button onClick={onClose} className="px-3 py-1.5 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-        <button onClick={save} disabled={pending} className="px-4 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึก</button>
+        <button onClick={save} disabled={pending} className="btn btn-brand">บันทึก</button>
       </div>
     </div>
   );

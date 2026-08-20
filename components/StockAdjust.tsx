@@ -85,7 +85,7 @@ export function StockAdjust({ defaultBranch, adjustments }: { defaultBranch: str
         </div>
         <div className="flex items-end h-full">
           <button onClick={submit} disabled={saving}
-            className="mt-[18px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50 whitespace-nowrap">
+            className="btn btn-brand mt-[18px]">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} บันทึก
           </button>
         </div>

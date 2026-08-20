@@ -514,7 +514,7 @@ function RowEditor({ row, onSave, onCancel, pending, savedTenders }: { row: Subm
         <button onClick={() => onSave(isSale
           ? { ...f, qty: Number(f.qty) || 0, unit_price: Number(f.unit_price) || 0, discount: Number(f.discount) || 0, tenders: split ? resolveTenders(f.tenders ?? [], total) : undefined }
           : { ...f, customers: Number(f.customers) || 0, thai: Number(f.thai) || 0, foreign: Number(f.foreign) || 0, sell_amount: Number(f.sell_amount) || 0 })}
-          disabled={pending || (split && !tendersOk)} className="px-4 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
+          disabled={pending || (split && !tendersOk)} className="btn btn-brand">บันทึกการแก้ไข</button>
       </div>
     </div>
   );
@@ -570,7 +570,7 @@ function AddItemAdmin({ refId, pending, onDone }: { refId: string; pending: bool
       </div>
       <div className="flex gap-2">
         <button onClick={() => { setOpen(false); setText(""); setPicked(null); }} className="px-3 py-1.5 rounded-lg border border-line text-sm">ยกเลิก</button>
-        <button onClick={add} disabled={busy || !(picked?.scent ?? text).trim()} className="flex-1 py-1.5 rounded-lg bg-brand text-white text-sm font-semibold disabled:opacity-50">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
+        <button onClick={add} disabled={busy || !(picked?.scent ?? text).trim()} className="btn btn-brand flex-1">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
       </div>
     </div>
   );

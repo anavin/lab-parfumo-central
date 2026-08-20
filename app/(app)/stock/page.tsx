@@ -29,7 +29,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         action={<div className="flex items-center gap-2">
           <BranchTabs withAll />
           {canRequisition && (
-            <Link href="/stock/allocate" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark whitespace-nowrap">
+            <Link href="/stock/allocate" className="btn btn-brand">
               <PackagePlus className="w-4 h-4" /> จัดสต๊อกเข้าสาขา
             </Link>
           )}
@@ -44,14 +44,14 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       </div>
 
       {lowCount > 0 && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3">
+        <div className="alert-warn mb-6 flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-ink">
             <AlertTriangle className="w-5 h-5 text-warn shrink-0" />
             มีสินค้าใกล้หมด/หมด <b>{lowCount}</b> รายการ — ควรเบิกเพิ่ม
           </div>
           {canRequisition && (
             <a href="/requisitions/new?prefill=lowstock"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark shrink-0">
+              className="btn btn-brand shrink-0">
               สร้างใบเบิกของที่ใกล้หมด
             </a>
           )}
