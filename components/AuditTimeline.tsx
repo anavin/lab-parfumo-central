@@ -108,6 +108,7 @@ export function AuditTimeline({ rows }: { rows: Row[] }) {
   };
 
   const activeFilter = action !== ALL || entity !== ALL || user !== ALL || text.trim() !== "";
+  const clearAll = () => { setAction(ALL); setEntity(ALL); setUser(ALL); setText(""); };
 
   return (
     <div className="space-y-5">
@@ -120,24 +121,50 @@ export function AuditTimeline({ rows }: { rows: Row[] }) {
       </div>
 
       {/* filter toolbar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="ค้นหารายละเอียด / ผู้ใช้"
-            className="w-full border border-line rounded-lg pl-8 pr-2.5 py-2 text-sm bg-canvas/50 text-ink focus:outline-none focus:border-brand" />
+      <div className="rounded-xl border border-line bg-surface p-2.5 sm:p-3">
+        <div className="flex flex-col md:flex-row md:items-center gap-2.5">
+          {/* search */}
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="ค้นหารายละเอียด หรือชื่อผู้ใช้"
+              className="w-full border border-line rounded-lg pl-9 pr-9 h-10 text-sm bg-canvas/40 text-ink placeholder:text-muted-soft focus:outline-none focus:border-brand focus:bg-surface transition-colors" />
+            {text && (
+              <button onClick={() => setText("")} aria-label="ล้างคำค้นหา"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 grid place-items-center w-5 h-5 rounded-full text-muted hover:text-ink hover:bg-line">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* filters — fixed-width wrappers so the w-full Select doesn't stretch/stack */}
+          <div className="flex items-center gap-2 [&>div]:h-10 [&_button]:h-10 [&_button]:rounded-lg">
+            <div className="w-[132px] shrink-0"><Select value={user} onValueChange={setUser}
+              options={opt("ผู้ใช้ทั้งหมด", users.map((u) => ({ value: u, label: u })))} /></div>
+            <div className="w-[146px] shrink-0"><Select value={action} onValueChange={setAction}
+              options={opt("การกระทำทั้งหมด", actions.map((a) => ({ value: a, label: meta(a).label })))} /></div>
+            <div className="w-[128px] shrink-0"><Select value={entity} onValueChange={setEntity}
+              options={opt("ประเภททั้งหมด", entities.map((e) => ({ value: e, label: ENTITY[e] ?? e })))} /></div>
+          </div>
         </div>
-        <Select value={user} onValueChange={setUser} className="min-w-[150px]"
-          options={opt("ผู้ใช้ทั้งหมด", users.map((u) => ({ value: u, label: u })))} />
-        <Select value={action} onValueChange={setAction} className="min-w-[140px]"
-          options={opt("การกระทำทั้งหมด", actions.map((a) => ({ value: a, label: meta(a).label })))} />
-        <Select value={entity} onValueChange={setEntity} className="min-w-[130px]"
-          options={opt("ประเภททั้งหมด", entities.map((e) => ({ value: e, label: ENTITY[e] ?? e })))} />
-        <span className="text-xs text-muted whitespace-nowrap ml-auto tabular-nums">{filtered.length.toLocaleString()} / {rows.length.toLocaleString()}</span>
-        <button onClick={exportCSV} disabled={!filtered.length}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-sm font-medium text-ink bg-surface hover:bg-canvas disabled:opacity-50 whitespace-nowrap"
-          title="ส่งออกรายการที่กรองไว้เป็นไฟล์ CSV (เปิดใน Excel ได้)">
-          <Download className="w-4 h-4" /> ส่งออก CSV
-        </button>
+
+        {/* result count + clear + export */}
+        <div className="mt-2.5 pt-2.5 border-t border-line-soft flex items-center gap-2">
+          <span className="text-xs text-muted">
+            แสดง <b className="text-ink tabular-nums font-semibold">{filtered.length.toLocaleString()}</b>
+            {filtered.length !== rows.length && <span className="tabular-nums"> จาก {rows.length.toLocaleString()}</span>} รายการ
+          </span>
+          {activeFilter && (
+            <button onClick={clearAll}
+              className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink px-2 py-1 rounded-md hover:bg-canvas">
+              <X className="w-3.5 h-3.5" /> ล้างตัวกรอง
+            </button>
+          )}
+          <button onClick={exportCSV} disabled={!filtered.length}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border border-line text-sm font-medium text-ink bg-surface hover:bg-canvas disabled:opacity-50 whitespace-nowrap"
+            title="ส่งออกรายการที่กรองไว้เป็นไฟล์ CSV (เปิดใน Excel ได้)">
+            <Download className="w-4 h-4" /> ส่งออก CSV
+          </button>
+        </div>
       </div>
 
       {/* timeline feed */}
