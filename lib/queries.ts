@@ -584,7 +584,11 @@ export async function trashedSubmissions() {
     order by s.deleted_at desc, s.entry_date desc`);
 }
 
-export type BillAttachment = { id: number; bill_ref: string; data: string; created_by: number };
+// `data` (the base64 image) is intentionally NOT loaded in list queries — it's the
+// heaviest column in the DB and pulling it on every force-dynamic render blew up
+// Supabase egress. List views get id-only rows and lazy-load the image bytes through
+// /api/attachment/[id] (cacheable). Insert/other paths may still carry `data`.
+export type BillAttachment = { id: number; bill_ref: string; created_by: number; data?: string };
 
 export type BillTender = { channel: string; amount: number };
 // bill_payments is added by a manual migration in prod; tolerate it being
@@ -609,7 +613,7 @@ export async function attachmentsForRefs(refs: string[]): Promise<Record<string,
   const uniq = [...new Set((refs || []).filter(Boolean))];
   if (!uniq.length) return {};
   const rows = await q<BillAttachment>(
-    `select id, bill_ref, data, created_by from bill_attachments where bill_ref = any($1) order by id`, [uniq]);
+    `select id, bill_ref, created_by from bill_attachments where bill_ref = any($1) order by id`, [uniq]);
   const map: Record<string, BillAttachment[]> = {};
   for (const r of rows) (map[r.bill_ref] ??= []).push(r);
   return map;

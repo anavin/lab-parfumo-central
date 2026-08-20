@@ -78,15 +78,22 @@ export function PhotoPicker({ value, onChange, max = 6 }:
 
 // ---- read-only strip (used in the bill list & the admin review) ------------
 export function PhotoStrip({ photos, onDelete, size = 56 }:
-  { photos: { id?: number; data: string }[]; onDelete?: (id: number) => void; size?: number }) {
+  { photos: { id?: number; data?: string }[]; onDelete?: (id: number) => void; size?: number }) {
   const [view, setView] = useState<string | null>(null);
   if (!photos?.length) return null;
+  // Prefer inline base64 when the caller already has it (cash/PO slips); otherwise
+  // stream the image bytes from the cacheable route so list renders don't pull the
+  // heavy `data` column from the DB every time (see attachmentsForRefs / egress fix).
+  const srcOf = (p: { id?: number; data?: string }) =>
+    p.data ?? (p.id != null ? `/api/attachment/${p.id}` : "");
   return (
     <div className="flex flex-wrap gap-1.5 mt-1.5">
-      {photos.map((p, i) => (
+      {photos.map((p, i) => {
+        const src = srcOf(p);
+        return (
         <div key={p.id ?? i} className="relative rounded-md overflow-hidden border border-line" style={{ width: size, height: size }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.data} alt="หลักฐาน" className="w-full h-full object-cover cursor-zoom-in" onClick={() => setView(p.data)} />
+          <img src={src} alt="หลักฐาน" loading="lazy" decoding="async" className="w-full h-full object-cover cursor-zoom-in" onClick={() => setView(src)} />
           {onDelete && p.id != null && (
             <button type="button" onClick={() => onDelete(p.id!)} aria-label="ลบรูป"
               className="absolute top-0 right-0 w-4 h-4 rounded-bl bg-black/60 text-white flex items-center justify-center hover:bg-danger">
@@ -94,7 +101,8 @@ export function PhotoStrip({ photos, onDelete, size = 56 }:
             </button>
           )}
         </div>
-      ))}
+        );
+      })}
       {view && <Lightbox src={view} onClose={() => setView(null)} />}
     </div>
   );
