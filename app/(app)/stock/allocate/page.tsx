@@ -15,7 +15,7 @@ export default async function AllocateStockPage({ searchParams }: { searchParams
   const allocations = await branchAllocations(branch);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={PackagePlus} title="จัดสต๊อกเข้าสาขา"
         subtitle="ระบุกลิ่น + จำนวนที่เอาไปขายแต่ละสาขา (เบิกจากคลัง — เพิ่มเข้าสต๊อกของสาขานั้น)"
         action={<BranchTabs />} />

@@ -17,7 +17,7 @@ export default async function ProductsPage() {
     `select count(*)::int n, count(distinct grade)::int grades from products`);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1300px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <PageHeader icon={FlaskConical} title="สินค้า" subtitle="เพิ่ม / แก้ไขสินค้าและบาร์โค้ด" />
         <Link href="/products/barcodes"

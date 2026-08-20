@@ -14,7 +14,7 @@ export default async function BarcodesPage() {
      from products order by scent, size`);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={BarcodeIcon} title="สร้าง / พิมพ์บาร์โค้ด"
         subtitle="เลือกสินค้า ระบุจำนวนฉลาก แล้วพิมพ์เป็นสติกเกอร์ติดขวดได้เลย" />
       <BarcodeLabels rows={rows} />

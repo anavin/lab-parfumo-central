@@ -27,7 +27,7 @@ export default async function MyCountPage() {
     .map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: r.remaining, sold: r.sold }));
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={ClipboardCheck} title="นับสต๊อก"
         subtitle={`${branchName(branch)} · สแกนหรือกรอกจำนวนที่นับได้จริง`} />
       <StockCountForm expected={expected} branch={branch} />

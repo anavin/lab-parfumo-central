@@ -12,7 +12,7 @@ export default async function TrashPage() {
   const rows = await trashedRequisitions();
   const bills = await trashedSubmissions();
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-8">
       <PageHeader icon={Trash2} title="ถังขยะ" subtitle="รายการที่ถูกลบ · กู้คืนหรือลบถาวรได้" />
 
       <section>

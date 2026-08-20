@@ -24,7 +24,7 @@ export default async function MyStockPage() {
   const stock = await stockLive(branch);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Boxes} title="สตอกสาขา" subtitle={`คงเหลือของ ${branchName(branch)} วันนี้`} />
       <BranchStockPanel rows={stock} branchName={branchName(branch)} defaultOpen />
     </div>

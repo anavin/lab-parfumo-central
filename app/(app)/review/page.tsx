@@ -24,7 +24,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const payments = await paymentsForRefs(refs);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="no-print">
         <PageHeader icon={ClipboardCheck} title="ตรวจสอบยอดขาย"
           subtitle={pendingBills ? `${pendingBills} บิลรอตรวจสอบ — อนุมัติเพื่อส่งเข้าระบบ` : "ตรวจสอบข้อมูลที่พนักงานกรอกก่อนเข้าระบบ"} />

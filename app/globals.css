@@ -130,7 +130,7 @@ summary:focus-visible, [tabindex]:focus-visible {
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
   padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 14px; font-weight: 500;
-  transition: all 0.15s; cursor: pointer;
+  transition: all 0.15s; cursor: pointer; white-space: nowrap;
 }
 .btn-primary { background: rgb(var(--ink)); color: rgb(var(--surface)); }
 .btn-primary:hover { opacity: 0.9; }
@@ -138,6 +138,35 @@ summary:focus-visible, [tabindex]:focus-visible {
 .btn-brand:hover { background: rgb(var(--brand-dark)); }
 .btn-ghost { background: rgb(var(--surface)); color: rgb(var(--ink)); border: 1px solid rgb(var(--line)); }
 .btn-ghost:hover { background: rgb(var(--line-soft)); }
+/* solid semantic buttons (shared design-system vocabulary) */
+.btn-success { background: rgb(var(--success)); color: #fff; }
+.btn-warn { background: rgb(var(--warn)); color: #fff; }
+.btn-danger-solid { background: rgb(var(--danger)); color: #fff; }
+.btn-success:hover, .btn-warn:hover, .btn-danger-solid:hover { opacity: 0.9; }
+.btn-disabled, .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* status chips — one rounded-full shape, semantic color */
+.chip-brand, .chip-ok, .chip-warn, .chip-danger, .chip-info, .chip-muted {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.125rem 0.625rem; border-radius: 9999px;
+  font-size: 12px; font-weight: 500; white-space: nowrap; line-height: 1.4;
+}
+.chip-brand  { background: rgb(var(--brand-soft)); color: rgb(var(--brand-dark)); }
+.chip-ok     { background: rgb(var(--success-soft)); color: rgb(var(--success)); }
+.chip-warn   { background: rgb(var(--warn-soft)); color: rgb(var(--warn)); }
+.chip-danger { background: rgb(var(--danger-soft)); color: rgb(var(--danger)); }
+.chip-info   { background: rgb(var(--info-soft)); color: rgb(var(--info)); }
+.chip-muted  { background: rgb(var(--line)); color: rgb(var(--muted)); }
+
+/* inline alerts — soft fill + hairline border */
+.alert-error, .alert-success, .alert-warn, .alert-info {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 14px; border: 1px solid;
+}
+.alert-error   { background: rgb(var(--danger-soft)); border-color: rgb(var(--danger) / 0.3); color: rgb(var(--danger)); }
+.alert-success { background: rgb(var(--success-soft)); border-color: rgb(var(--success) / 0.3); color: rgb(var(--success)); }
+.alert-warn    { background: rgb(var(--warn-soft)); border-color: rgb(var(--warn) / 0.35); color: rgb(var(--ink)); }
+.alert-info    { background: rgb(var(--info-soft)); border-color: rgb(var(--info) / 0.3); color: rgb(var(--info)); }
 .th {
   text-align: left; font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.03em; color: rgb(var(--muted));

@@ -95,7 +95,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const avgMonth = monthCount ? k.revenue / monthCount : 0;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={LayoutDashboard} title="แดชบอร์ด"
         subtitle={rev.length ? `ภาพรวมยอดขาย · ${rev[0]?.month} – ${rev.at(-1)?.month}` : "ไม่มีข้อมูลในช่วงที่เลือก"}
         action={<Suspense fallback={<div className="h-9" />}><DashboardFilters months={allMonths} /></Suspense>} />

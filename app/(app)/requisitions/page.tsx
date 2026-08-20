@@ -24,7 +24,7 @@ export default async function Requisitions() {
     order by po.order_date desc nulls last, po.po_number desc`, [ALLOC_STATUS]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={ClipboardList} title="ใบเบิกสินค้า" subtitle={`${rows.length} รายการ`}
         action={<LinkBtn href="/requisitions/new">+ สร้างใบเบิกใหม่</LinkBtn>} />
       <RequisitionsTable rows={rows} />

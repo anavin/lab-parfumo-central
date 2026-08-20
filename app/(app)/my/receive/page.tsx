@@ -23,7 +23,7 @@ export default async function MyReceivePage() {
   const receipts = await pendingReceipts(branch);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[900px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={PackageCheck} title="รับสินค้า"
         subtitle={`${branchName(branch)} · ใบเบิกที่ส่งมาให้สาขา กดรับเพื่อนำเข้าสต๊อก`} />
       {receipts.length

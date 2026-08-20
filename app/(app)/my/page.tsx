@@ -70,7 +70,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     : null;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Store} title="ยอดขายของฉัน" subtitle={`สวัสดี ${user.full_name} · ${thaiDay(date)}`}
         action={<DateNav date={date} today={today} />} />
 

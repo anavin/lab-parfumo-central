@@ -37,7 +37,7 @@ export default async function SalesPage() {
   const avgRate = pct(discTot.discount, discTot.gross);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Receipt} title="การขาย" subtitle="รายเดือน + รายการล่าสุด" action={<ExportButton kind="sales" />} />
       <div className="flex gap-3 flex-wrap"><AddSale /><AddCustomerDay /></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

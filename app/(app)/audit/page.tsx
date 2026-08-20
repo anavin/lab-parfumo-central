@@ -12,7 +12,7 @@ export default async function AuditPage() {
   const rows = await auditLog({}, 300);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={ScrollText} title="บันทึกกิจกรรม (Audit Log)" subtitle="ใครทำอะไรเมื่อไหร่ — ไทม์ไลน์กิจกรรมของทั้งระบบ"
         action={<ClearAuditButton />} />
       <AuditTimeline rows={rows} />
