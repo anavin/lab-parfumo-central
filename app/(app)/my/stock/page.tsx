@@ -25,7 +25,7 @@ export default async function MyStockPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <PageHeader icon={Boxes} title="สตอกสาขา" subtitle={`คงเหลือของ ${branchName(branch)} วันนี้`} />
+      <PageHeader icon={Boxes} title="สต๊อกสาขา" subtitle={`คงเหลือของ ${branchName(branch)} วันนี้`} />
       <BranchStockPanel rows={stock} branchName={branchName(branch)} defaultOpen />
     </div>
   );

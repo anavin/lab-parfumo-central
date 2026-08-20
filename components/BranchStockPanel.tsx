@@ -29,7 +29,7 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
       <div className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
         <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 hover:bg-canvas/60 text-left">
           <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-            <Boxes className="w-4 h-4 text-brand-dark" /> สตอกสาขา {branchName}
+            <Boxes className="w-4 h-4 text-brand-dark" /> สต๊อกสาขา {branchName}
             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-bold">{stocked.length}</span>
           </span>
           <span className="flex items-center gap-2 shrink-0">
@@ -44,7 +44,7 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
               <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด…" className={inp + " w-full pl-8"} />
             </div>
             {list.length === 0 ? (
-              <div className="py-5 text-center text-sm text-muted">{stocked.length ? "ไม่พบสินค้าที่ค้นหา" : "ยังไม่มีสตอกในสาขานี้ (ยังไม่ได้รับของเข้า)"}</div>
+              <div className="py-5 text-center text-sm text-muted">{stocked.length ? "ไม่พบสินค้าที่ค้นหา" : "ยังไม่มีสต๊อกในสาขานี้ (ยังไม่ได้รับของเข้า)"}</div>
             ) : (
               <div className="max-h-[60vh] overflow-auto -mx-1 px-1">
                 {list.map((r) => {
