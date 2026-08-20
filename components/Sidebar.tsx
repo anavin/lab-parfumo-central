@@ -21,7 +21,10 @@ const ICON: Record<PermKey, any> = {
   users: Users, audit: ScrollText, trash: Trash2, my_sales: Store,
 };
 const MENU: { title: string; items: { key: PermKey; href: string; label: string; icon?: any }[] }[] = [
-  { title: "ภาพรวม", items: [{ key: "dashboard", href: "/", label: "แดชบอร์ด" }] },
+  { title: "ภาพรวม", items: [
+    { key: "dashboard", href: "/", label: "แดชบอร์ด" },
+    { key: "review", href: "/review", label: "ตรวจสอบยอดขาย" },
+  ]},
   { title: "ปฏิบัติการ", items: [
     { key: "requisitions", href: "/requisitions", label: "ใบเบิกสินค้า" },
     { key: "shipments", href: "/shipments", label: "ส่ง / คืนสินค้า" },
@@ -36,7 +39,6 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
     { key: "cash", href: "/cash", label: "เงินสด" },
   ]},
   { title: "ผู้ดูแล", items: [
-    { key: "review", href: "/review", label: "ตรวจสอบยอดขาย" },
     { key: "users", href: "/users", label: "จัดการผู้ใช้" },
     { key: "audit", href: "/audit", label: "บันทึกกิจกรรม" },
     { key: "trash", href: "/trash", label: "ถังขยะ" },
