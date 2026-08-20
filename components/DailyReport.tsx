@@ -97,7 +97,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
     const lines = [
       `สรุปยอดขาย ${branchName(source)} ${ddmmyy(date)}`,
       ``,
-      `จำนวนออเดอร์ ${data.orders} รายการ`,
+      `จำนวนบิล ${data.orders} รายการ`,
       `- เงินสด ${nf(data.cash)} บาท`,
       `- โอน/เครดิต ${nf(data.nonCash)} บาท`,
       ``,
@@ -231,7 +231,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
         ) : (
           <>
             <div className="space-y-1.5">
-              <Line label="จำนวนออเดอร์" value={`${data!.orders} รายการ`} />
+              <Line label="จำนวนบิล" value={`${data!.orders} รายการ`} />
               <Line label="เงินสด" value={`${nf(data!.cash)} บาท`} />
               <Line label="โอน / เครดิต" value={`${nf(data!.nonCash)} บาท`} />
             </div>

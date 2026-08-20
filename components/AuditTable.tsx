@@ -10,8 +10,8 @@ type Tone = "success" | "info" | "danger" | "warn" | "brand" | "gray";
 const ACTION: Record<string, { label: string; tone: Tone }> = {
   create: { label: "สร้าง", tone: "success" }, update: { label: "แก้ไข", tone: "info" },
   delete: { label: "ลบ", tone: "warn" }, restore: { label: "กู้คืน", tone: "brand" },
-  purge: { label: "ลบถาวร", tone: "danger" }, login: { label: "เข้าระบบ", tone: "success" },
-  logout: { label: "ออกระบบ", tone: "gray" }, login_failed: { label: "เข้าไม่สำเร็จ", tone: "danger" },
+  purge: { label: "ลบถาวร", tone: "danger" }, login: { label: "เข้าสู่ระบบ", tone: "success" },
+  logout: { label: "ออกจากระบบ", tone: "gray" }, login_failed: { label: "เข้าไม่สำเร็จ", tone: "danger" },
   password: { label: "รหัสผ่าน", tone: "warn" },
 };
 const ENTITY: Record<string, string> = {
