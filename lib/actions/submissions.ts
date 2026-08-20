@@ -8,6 +8,7 @@ import { monthLabel } from "@/lib/month";
 import { branchPrefix, resolveBranch } from "@/lib/branches";
 import { requirePermission } from "@/lib/auth/require-user";
 import { pushLine, siteBaseUrl } from "@/lib/line";
+import { offloadToStorage, deleteAttachment } from "@/lib/attachments";
 
 // ---------------------------------------------------------------- staff: submit
 // Staff entries land in `submissions` (status='pending'). Nothing touches the
@@ -98,7 +99,8 @@ export async function submitBill(input: unknown) {
       [ref, user.id, d.sale_date, t.channel.trim(), t.amount]);
   }
   for (const a of d.attachments ?? []) {
-    await q(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3)`, [ref, user.id, a]);
+    const [ins] = await q<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3) returning id`, [ref, user.id, a]);
+    await offloadToStorage("bill_attachments", "bill", ins.id, a);
   }
   await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}${d.attachments?.length ? ` · แนบ ${d.attachments.length} รูป` : ""}`);
   revalidatePath("/my"); revalidatePath("/review");
@@ -190,7 +192,8 @@ export async function addBillAttachments(billRef: string, images: string[]) {
   const imgs = (images || []).filter((s) => typeof s === "string" && s.startsWith("data:image/") && s.length <= 3_000_000).slice(0, 6);
   if (!imgs.length) throw new Error("ไม่มีรูปที่ถูกต้อง");
   for (const a of imgs) {
-    await q(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3)`, [ref, user.id, a]);
+    const [ins] = await q<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3) returning id`, [ref, user.id, a]);
+    await offloadToStorage("bill_attachments", "bill", ins.id, a);
   }
   await logAudit("update", "submission", null, `แนบรูปบิล ${ref} · ${imgs.length} รูป`);
   revalidatePath("/my"); revalidatePath("/review");
@@ -204,7 +207,7 @@ export async function deleteBillAttachment(id: number) {
   const [locked] = await q<{ n: number }>(
     `select count(*)::int n from submissions where receipt_no = $1 and status <> 'pending'`, [a.bill_ref]);
   if (locked?.n) throw new Error("บิลนี้ถูกตรวจแล้ว ลบรูปไม่ได้");
-  await q(`delete from bill_attachments where id = $1`, [id]);
+  await deleteAttachment("bill_attachments", id);   // also removes the Storage object
   revalidatePath("/my"); revalidatePath("/review");
 }
 

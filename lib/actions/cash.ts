@@ -5,6 +5,7 @@ import { requirePermission, requireUser, isAdmin } from "@/lib/auth/require-user
 import { dailyReport, cashAttachmentsForDate, type CashAttachment } from "@/lib/queries";
 import { logAudit } from "@/lib/audit";
 import { DEFAULT_BRANCH, normalizeBranch, branchName } from "@/lib/branches";
+import { offloadToStorage, deleteAttachment } from "@/lib/attachments";
 
 /** Admin: save the day's opening/deposit, recompute closing from that day's cash sales,
  *  mark it confirmed, and post the bank deposit into the cash ledger — once. */
@@ -54,7 +55,10 @@ export async function addCashAttachments(date: string, images: string[], branch:
   const imgs = (images || []).filter((s) => typeof s === "string" && s.startsWith("data:image/") && s.length <= 3_000_000).slice(0, 6);
   if (!imgs.length) return { ok: false, error: "ไม่มีรูปที่ถูกต้อง" };
   try {
-    for (const a of imgs) await q(`insert into cash_attachments (entry_date, branch, created_by, data) values ($1,$2,$3,$4)`, [date, br, me.id, a]);
+    for (const a of imgs) {
+      const [ins] = await q<{ id: number }>(`insert into cash_attachments (entry_date, branch, created_by, data) values ($1,$2,$3,$4) returning id`, [date, br, me.id, a]);
+      await offloadToStorage("cash_attachments", "cash", ins.id, a);
+    }
     await logAudit("update", "cash", date, `แนบสลิปเงินสด ${date} · ${imgs.length} รูป`);
     revalidatePath("/cash"); revalidatePath("/my");
     return { ok: true };
@@ -70,10 +74,8 @@ export async function addCashAttachments(date: string, images: string[], branch:
 export async function deleteCashAttachment(id: number): Promise<{ ok: boolean; error?: string }> {
   const me = await requireUser();
   try {
-    // scope the delete to the owner unless an admin is doing it
-    const res = isAdmin(me)
-      ? await q(`delete from cash_attachments where id = $1`, [id])
-      : await q(`delete from cash_attachments where id = $1 and created_by = $2`, [id, me.id]);
+    // scope the delete to the owner unless an admin is doing it (also removes Storage object)
+    await deleteAttachment("cash_attachments", id, isAdmin(me) ? undefined : Number(me.id));
     revalidatePath("/cash"); revalidatePath("/my");
     return { ok: true };
   } catch (e) { console.error("[deleteCashAttachment] failed", e); return { ok: false, error: "ลบไม่สำเร็จ" }; }

@@ -2,11 +2,8 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { readAttachmentBytes } from "@/lib/attachments";
 
-// Streams one bill_attachment image by id — from Supabase Storage when migrated,
-// else the legacy base64 in the DB. List pages no longer embed the image (that
-// pulled the DB's heaviest column on every force-dynamic render and blew up
-// egress); they lazy-load through this route, and the immutable Cache-Control
-// means a browser fetches each slip at most once.
+// Streams one po_attachments (requisition packing-slip) image by id — Storage when
+// migrated, else legacy base64. Anyone who can view requisitions may see them.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -18,8 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const nid = Number(id);
   if (!Number.isInteger(nid) || nid <= 0) return new Response("bad id", { status: 400 });
 
-  // Reviewers see every slip; everyone else only the ones they uploaded.
-  const res = await readAttachmentBytes("bill_attachments", nid, can(user, "review"), Number(user.id));
+  const res = await readAttachmentBytes("po_attachments", nid, can(user, "requisitions"), Number(user.id));
   if (res === "not_found") return new Response("not found", { status: 404 });
   if (res === "forbidden") return new Response("forbidden", { status: 403 });
 

@@ -35,7 +35,7 @@ export function RequisitionAttachments({ poId, initial, editable }: { poId: numb
         <span className="text-[11px] text-muted-soft">{initial.length}/8</span>
       </div>
       {initial.length === 0 && !editable && <p className="text-sm text-muted py-3 text-center">ไม่มีไฟล์แนบ</p>}
-      <PhotoStrip photos={initial} size={72} onDelete={editable ? del : undefined} />
+      <PhotoStrip photos={initial} size={72} onDelete={editable ? del : undefined} kind="po" />
       {editable && initial.length < 8 && (
         <label className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-line text-sm text-muted hover:bg-canvas cursor-pointer">
           {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />} แนบไฟล์
