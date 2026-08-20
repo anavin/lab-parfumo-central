@@ -41,7 +41,7 @@ export function BranchStockClose({ branch, branchLabel, remainingUnits, skus }: 
           </a>
           {remainingUnits > 0 && !done && (
             <button onClick={doReturn} disabled={pending}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-danger/50 text-danger text-sm font-semibold hover:bg-danger-soft disabled:opacity-50">
+              className="btn btn-danger-outline">
               {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />} คืนสต๊อกเข้าคลัง
             </button>
           )}

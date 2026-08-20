@@ -138,6 +138,8 @@ summary:focus-visible, [tabindex]:focus-visible {
 .btn-brand:hover { background: rgb(var(--brand-dark)); }
 .btn-ghost { background: rgb(var(--surface)); color: rgb(var(--ink)); border: 1px solid rgb(var(--line)); }
 .btn-ghost:hover { background: rgb(var(--line-soft)); }
+.btn-danger-outline { background: rgb(var(--surface)); color: rgb(var(--danger)); border: 1px solid rgb(var(--danger) / 0.4); }
+.btn-danger-outline:hover { background: rgb(var(--danger-soft)); }
 /* solid semantic buttons (shared design-system vocabulary) */
 .btn-success { background: rgb(var(--success)); color: #fff; }
 .btn-warn { background: rgb(var(--warn)); color: #fff; }

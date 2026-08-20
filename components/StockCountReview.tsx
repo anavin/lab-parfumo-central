@@ -80,7 +80,7 @@ function Card({ c }: { c: StockCount }) {
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} อนุมัติ + ปรับสต๊อก
                   </button>
                   <button onClick={() => { if (confirm("ปฏิเสธผลนับนี้?")) run(() => rejectStockCount(c.id)); }} disabled={saving}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-danger/30 text-danger text-sm font-medium hover:bg-danger-soft disabled:opacity-50">
+                    className="btn btn-danger-outline">
                     <X className="w-4 h-4" /> ปฏิเสธ
                   </button>
                 </div>

@@ -19,7 +19,7 @@ export function ClearAuditButton() {
   };
   return (
     <button onClick={onClick} disabled={pending}
-      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium border border-danger/40 text-danger hover:bg-danger-soft disabled:opacity-50">
+      className="btn btn-danger-outline">
       <Trash2 className="w-4 h-4" /> {pending ? "กำลังล้าง…" : "ล้างบันทึกทั้งหมด"}
     </button>
   );
