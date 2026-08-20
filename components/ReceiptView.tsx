@@ -133,7 +133,7 @@ export function ReceiptView({ filename, receiptNo, date, time, salesperson, item
           <div className="space-y-2">
             {nativePrinter && (
               <button onClick={printThermal} disabled={thermalBusy}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold whitespace-nowrap hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
+                className="btn btn-brand w-full rounded-xl active:scale-[.99]">
                 {thermalBusy ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Printer className="w-4 h-4 shrink-0" />} พิมพ์สลิป (เครื่องนี้)
               </button>
             )}

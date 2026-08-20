@@ -433,7 +433,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
               </div>
               <div className="text-white text-2xl font-bold leading-snug">{result.label}</div>
               {result.sub && <div className="text-white/60 text-base mt-1">{result.sub}</div>}
-              <button onClick={scanNext} className="mt-8 w-full inline-flex items-center justify-center gap-2 px-4 py-4 rounded-xl bg-brand text-white text-base font-semibold hover:bg-brand-dark active:scale-[.99] transition">
+              <button onClick={scanNext} className="btn btn-brand mt-8 w-full rounded-xl text-base active:scale-[.99]">
                 <ScanLine className="w-5 h-5" /> ตกลง — สแกนต่อ
               </button>
               <button onClick={onClose} className="mt-2 text-white/60 text-sm py-2 hover:text-white">เสร็จสิ้น</button>
@@ -468,7 +468,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
               </button>
             </div>
             {continuous ? (
-              <button onClick={onClose} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark whitespace-nowrap">
+              <button onClick={onClose} className="btn btn-brand">
                 <Check className="w-4 h-4" /> เสร็จ
               </button>
             ) : <span className="w-[64px]" />}

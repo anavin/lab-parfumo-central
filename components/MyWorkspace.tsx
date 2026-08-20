@@ -259,7 +259,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
 
       {!busy && (
         <div className="flex gap-2.5 mb-4">
-          <button onClick={startScan} className="flex-[2] inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-brand text-white text-base font-semibold shadow-sm hover:bg-brand-dark active:scale-[.99] transition">
+          <button onClick={startScan} className="btn btn-brand flex-[2] rounded-xl text-base shadow-sm active:scale-[.99]">
             <ScanLine className="w-5 h-5" /> สแกนบาร์โค้ด
           </button>
           <button onClick={startManual} className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas active:scale-[.99] transition">
@@ -517,7 +517,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         {laserMode ? (
           <div className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-brand/50 bg-brand-soft text-brand-dark text-sm font-semibold"><ScanLine className="w-4 h-4" /> ยิง laser ที่บาร์โค้ดได้เลย</div>
         ) : (
-          <button onClick={() => setScanning(true)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
+          <button onClick={() => setScanning(true)} className="btn btn-brand flex-1 rounded-xl active:scale-[.99]"><ScanLine className="w-4 h-4" /> สแกนเพิ่ม</button>
         )}
         <button onClick={addManual} disabled={hasEmptyItem} title={hasEmptyItem ? "กรอกกลิ่นของรายการก่อนหน้าก่อน" : undefined} className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-surface"><Plus className="w-4 h-4" /> เพิ่มเอง</button>
       </div>
@@ -657,7 +657,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         </div>
       </details>
 
-      {missing.length > 0 && <div className="mb-3 text-sm bg-danger-soft border border-danger/30 text-danger rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
+      {missing.length > 0 && <div className="alert-error mb-3 text-sm">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
 
       <div className="border-t border-line pt-3">
         <div className="space-y-0.5 text-sm">
@@ -677,7 +677,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={tryCancel} className="px-4 min-h-[48px] rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
-          <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="px-6 min-h-[48px] rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกข้อมูล</button>
+          <button onClick={submit} disabled={pending || (split && !tenderMatches)} className="btn btn-brand min-h-[48px]">บันทึกข้อมูล</button>
         </div>
       </div>
 
@@ -845,7 +845,7 @@ function AddToBill({ refId, disabled }: { refId: string; disabled?: boolean }) {
       <ItemCard it={it} index={0} onChange={(p) => setIt((prev) => ({ ...prev, ...p }))} onRemove={() => { setOpen(false); setIt(newItem()); }} />
       <div className="flex gap-2">
         <button onClick={() => { setOpen(false); setIt(newItem()); }} className="px-4 py-2 rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
-        <button onClick={add} disabled={busy || !String(it.item || "").trim()} className="flex-1 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
+        <button onClick={add} disabled={busy || !String(it.item || "").trim()} className="btn btn-brand flex-1">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
       </div>
     </div>
   );
@@ -1027,7 +1027,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <h3 className="text-base font-semibold text-ink">แก้ไขรายการขาย</h3>
         <span className="text-xs text-muted">ผู้กรอก: {fullName}</span>
       </div>
-      <button type="button" onClick={() => setScanning(true)} className="w-full mb-4 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-base font-semibold hover:bg-brand-dark"><ScanLine className="w-5 h-5" /> สแกนบาร์โค้ดสินค้า</button>
+      <button type="button" onClick={() => setScanning(true)} className="btn btn-brand w-full mb-4 rounded-xl text-base"><ScanLine className="w-5 h-5" /> สแกนบาร์โค้ดสินค้า</button>
       <div className="relative mb-3">
         <Field label="สินค้า"><input className={inp} value={state.item} onChange={(e) => onItem(e.target.value)} onBlur={() => setTimeout(() => setAcOpen(false), 150)} placeholder="สแกน หรือพิมพ์ค้นหากลิ่น" /></Field>
         {acOpen && res.length > 0 && <div className="absolute z-10 mt-1 w-full max-h-48 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
@@ -1081,7 +1081,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="เวลา"><input type="time" className={inp} value={state.sale_time} onChange={(e) => s("sale_time", e.target.value)} /></Field>
         <Field label="ช่องทางขาย"><Select value={state.source} onValueChange={(v) => s("source", v)} options={SOURCE_OPTIONS} className="py-2.5" /></Field>
       </div>
-      {missing.length > 0 && <div className="mb-3 text-sm bg-danger-soft border border-danger/30 text-danger rounded-lg px-3 py-2">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
+      {missing.length > 0 && <div className="alert-error mb-3 text-sm">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
       {(split ? (state.tenders ?? []).some((t) => isKShop(t.channel)) : isKShop(state.payment_channel)) && <KShopQr key={qrKey} />}
       {/* sticky action bar — matches the new-bill form so saving an edit is always
           one tap away on mobile */}
@@ -1093,7 +1093,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => setState(null)} className="px-4 min-h-[48px] rounded-lg border border-line text-sm font-medium hover:bg-canvas">ยกเลิก</button>
-          <button onClick={handleSave} disabled={pending || !state.item || (split && !tendersOk)} className="px-6 min-h-[48px] rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">บันทึกการแก้ไข</button>
+          <button onClick={handleSave} disabled={pending || !state.item || (split && !tendersOk)} className="btn btn-brand min-h-[48px]">บันทึกการแก้ไข</button>
         </div>
       </div>
       {scanning && <BarcodeScanner knownCodes={knownCodes} onDetected={onScanned} onClose={() => setScanning(false)} />}

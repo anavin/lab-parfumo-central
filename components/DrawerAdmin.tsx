@@ -53,7 +53,7 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
             <span className="inline-flex items-center gap-1 text-xs text-success font-medium"><Lock className="w-3.5 h-3.5" /> เข้าระบบแล้ว</span>
           ) : (
             <button onClick={save} disabled={pending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-brand-dark disabled:opacity-50">
+              className="btn btn-brand text-xs">
               <Check className="w-3.5 h-3.5" /> {pending ? "กำลังบันทึก…" : "ยืนยัน & บันทึกเข้าระบบ"}
             </button>
           )}

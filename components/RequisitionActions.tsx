@@ -46,7 +46,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
         </>
       ) : preApprove ? (
         <button onClick={() => run(() => approveRequisition(id))} disabled={pending}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50"><Check className="w-4 h-4" /> อนุมัติ</button>
+          className="btn btn-brand"><Check className="w-4 h-4" /> อนุมัติ</button>
       ) : null}
 
       {/* admin: edit status override — available in every state */}

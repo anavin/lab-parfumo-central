@@ -93,7 +93,7 @@ function ReceiveCard({ po }: { po: PR }) {
           <input value={remark} placeholder="หมายเหตุรวม (ถ้ามี)" onChange={(e) => setRemark(e.target.value)} className={inp + " w-full"} />
           {err && <div className="text-xs text-danger">{err}</div>}
           <button onClick={receive} disabled={saving}
-            className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">
+            className="btn btn-brand w-full">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
             {anyDiff ? "ยืนยันรับ (มีส่วนต่าง)" : "รับของเข้าสต๊อก"}
           </button>

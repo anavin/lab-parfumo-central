@@ -63,7 +63,7 @@ export function StockAllocateForm({ branch, branchName, allocations }: { branch:
         </div>
         {err && <div className="mt-2 text-xs text-danger">{err}</div>}
         <button onClick={save} disabled={saving}
-          className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">
+          className="btn btn-brand mt-3 w-full rounded-xl">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <PackagePlus className="w-4 h-4" />}
           {saved ? "บันทึกแล้ว" : "บันทึกจัดเข้าสาขา"}
         </button>

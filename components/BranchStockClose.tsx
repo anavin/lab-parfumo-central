@@ -48,7 +48,7 @@ export function BranchStockClose({ branch, branchLabel, remainingUnits, skus }: 
         </div>
       </div>
       {done && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-soft border border-success/30 px-3 py-2 text-sm text-success">
+        <div className="alert-success items-center mt-3 text-sm">
           <CheckCircle2 className="w-4 h-4 shrink-0" /> คืนสต๊อกเข้าคลังแล้ว — {done.items} รายการ · {done.units} ชิ้น · สต๊อก {branchLabel} เป็น 0
         </div>
       )}

@@ -59,7 +59,7 @@ export function StockImport() {
         <div className="text-ink font-semibold">ส่งเข้าระบบแล้ว ({rows.length} รายการ)</div>
         <p className="text-sm text-muted">รอแอดมินตรวจและอนุมัติ — เมื่ออนุมัติแล้ว สต๊อก CTW จะอัปเดตตามตัวเลขนี้</p>
         <div className="flex items-center justify-center gap-2">
-          <Link href="/stock/counts" className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">ไปหน้าตรวจนับสต๊อก</Link>
+          <Link href="/stock/counts" className="btn btn-brand">ไปหน้าตรวจนับสต๊อก</Link>
           <button onClick={() => { setDoneId(null); setRows([]); setFileName(""); }} className="px-4 py-2 rounded-lg border border-line text-sm text-muted hover:bg-canvas">นำเข้าไฟล์ใหม่</button>
         </div>
       </div>
@@ -74,7 +74,7 @@ export function StockImport() {
           <input ref={fileRef} type="file" accept=".xlsx" className="hidden"
             onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
           <button onClick={() => fileRef.current?.click()} disabled={reading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">
+            className="btn btn-brand">
             {reading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} เลือกไฟล์ Excel (.xlsx)
           </button>
           {fileName && <span className="text-sm text-muted truncate">{fileName}</span>}
@@ -142,7 +142,7 @@ export function StockImport() {
             <div className="flex items-center justify-between gap-3">
               <p className="text-[12px] text-muted-soft">ส่งแล้วจะเข้าคิว “ตรวจนับสต๊อก” ให้แอดมินอนุมัติอีกครั้งก่อนปรับสต๊อกจริง</p>
               <button onClick={submit} disabled={saving || rows.length === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50 shrink-0">
+                className="btn btn-brand shrink-0">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />} ส่งเข้าระบบให้แอดมินตรวจ
               </button>
             </div>

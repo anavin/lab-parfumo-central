@@ -155,7 +155,7 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="หมายเหตุ (ถ้ามี)" className={inp + " w-full"} />
         {err && <div className="text-xs text-danger">{err}</div>}
         <button onClick={submit} disabled={saving || doneCount === 0}
-          className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">
+          className="btn btn-brand w-full">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />} ยืนยันผลนับ (ส่งให้แอดมิน)
         </button>
         <p className="text-[11px] text-muted-soft text-center">ระบบจะปรับสต๊อกหลังแอดมินตรวจและอนุมัติ</p>

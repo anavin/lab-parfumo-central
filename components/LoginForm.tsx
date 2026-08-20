@@ -66,7 +66,7 @@ export function LoginForm({ next }: { next: string }) {
         </div>
       )}
       <button type="submit" disabled={busy}
-        className="w-full bg-brand text-white rounded-lg py-2.5 text-sm font-medium hover:bg-brand-dark disabled:opacity-50 transition-colors">
+        className="btn btn-brand w-full">
         {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
       </button>
     </form>

@@ -262,7 +262,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
 
       {!readOnly && (
         <button onClick={copy} disabled={!ready}
-          className="w-full mt-3 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark active:scale-[.99] transition disabled:opacity-50">
+          className="btn btn-brand w-full mt-3 min-h-[48px] rounded-xl active:scale-[.99]">
           {copied ? <><Check className="w-4 h-4" /> คัดลอกแล้ว</> : <><ClipboardCopy className="w-4 h-4" /> คัดลอกรายงาน</>}
         </button>
       )}

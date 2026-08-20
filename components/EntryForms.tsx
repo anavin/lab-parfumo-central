@@ -73,7 +73,7 @@ export function AddSale() {
         <Field label="ช่องทางชำระ"><Select value={f.payment_channel} onValueChange={(v) => s("payment_channel", v)} options={PAY_OPTS} /></Field>
         <div className="md:col-span-4 flex items-center justify-between border-t border-line pt-3">
           <span className="text-sm text-ink">รวม: <b>฿{total.toLocaleString()}</b></span>
-          <button onClick={save} disabled={pending || !canSave} title={canSave ? "" : "ต้องมีชื่อสินค้า จำนวน และราคามากกว่า 0"} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">บันทึกการขาย</button>
+          <button onClick={save} disabled={pending || !canSave} title={canSave ? "" : "ต้องมีชื่อสินค้า จำนวน และราคามากกว่า 0"} className="btn btn-brand">บันทึกการขาย</button>
         </div>
       </div>
     </Panel>
@@ -98,7 +98,7 @@ export function AddCash() {
         <Field label="รายละเอียด"><input className={inp} value={f.description} onChange={(e) => s("description", e.target.value)} /></Field>
         <Field label="ประเภท"><input className={inp} value={f.type} onChange={(e) => s("type", e.target.value)} /></Field>
         <Field label="จำนวนเงิน"><input inputMode="numeric" className={inp} value={f.amount} onFocus={(e) => e.target.select()} onChange={(e) => s("amount", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
-        <div className="md:col-span-4 text-right"><button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">บันทึก</button></div>
+        <div className="md:col-span-4 text-right"><button onClick={save} disabled={pending} className="btn btn-brand">บันทึก</button></div>
       </div>
     </Panel>
   );
@@ -125,7 +125,7 @@ export function AddCustomerDay() {
         <Field label="ยอดขาย"><input inputMode="numeric" className={inp} value={f.sell_amount} onFocus={(e) => e.target.select()} onChange={(e) => s("sell_amount", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <Field label="ไทย"><input inputMode="numeric" className={inp} value={f.thai} onFocus={(e) => e.target.select()} onChange={(e) => s("thai", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <Field label="ต่างชาติ"><input inputMode="numeric" className={inp} value={f.foreign} onFocus={(e) => e.target.select()} onChange={(e) => s("foreign", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
-        <div className="md:col-span-6 text-right"><button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">บันทึก</button></div>
+        <div className="md:col-span-6 text-right"><button onClick={save} disabled={pending} className="btn btn-brand">บันทึก</button></div>
       </div>
     </Panel>
   );

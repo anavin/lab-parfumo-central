@@ -76,7 +76,7 @@ function Card({ c }: { c: StockCount }) {
               {c.status === "pending" && (
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => run(() => approveStockCount(c.id))} disabled={saving}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">
+                    className="btn btn-brand flex-1">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} อนุมัติ + ปรับสต๊อก
                   </button>
                   <button onClick={() => { if (confirm("ปฏิเสธผลนับนี้?")) run(() => rejectStockCount(c.id)); }} disabled={saving}

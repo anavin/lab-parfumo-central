@@ -47,7 +47,7 @@ export function ProductsManager({ rows }: { rows: ProductRow[] }) {
             className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm bg-surface focus:outline-none focus:border-brand" />
         </div>
         {!form && (
-          <button onClick={() => setForm(blank())} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark shrink-0">
+          <button onClick={() => setForm(blank())} className="btn btn-brand shrink-0">
             <Plus className="w-4 h-4" /> เพิ่มสินค้า
           </button>
         )}
@@ -113,7 +113,7 @@ function ProductForm({ state, setState, onSave, pending }: { state: FormState; s
         <Field label="ราคา"><input inputMode="numeric" className={inp} value={state.price} onFocus={(e) => e.target.select()} onChange={(e) => s("price", e.target.value.replace(/^0+(?=\d)/, ""))} /></Field>
         <div className="md:col-span-3 flex justify-end gap-2 border-t border-line pt-3">
           <button onClick={() => setState(null)} className="px-4 py-2 rounded-lg border border-line text-sm hover:bg-canvas">ยกเลิก</button>
-          <button onClick={onSave} disabled={pending || !state.barcode || !state.scent} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium hover:bg-brand-dark disabled:opacity-50">{state.id ? "บันทึกการแก้ไข" : "เพิ่มสินค้า"}</button>
+          <button onClick={onSave} disabled={pending || !state.barcode || !state.scent} className="btn btn-brand">{state.id ? "บันทึกการแก้ไข" : "เพิ่มสินค้า"}</button>
         </div>
       </div>
       {scanning && <BarcodeScanner onDetected={(code) => { setState({ ...state, barcode: code }); setScanning(false); }} onClose={() => setScanning(false)} />}

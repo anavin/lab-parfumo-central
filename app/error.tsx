@@ -21,7 +21,7 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
       <div>
         <div className="text-base font-semibold text-ink mb-1">กำลังโหลดใหม่…</div>
         <p className="text-sm text-muted mb-4">การเชื่อมต่อสะดุดชั่วคราว ระบบกำลังลองใหม่ให้อัตโนมัติ</p>
-        <button onClick={() => { lastAuto = 0; reset(); }} className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark">ลองใหม่</button>
+        <button onClick={() => { lastAuto = 0; reset(); }} className="btn btn-brand">ลองใหม่</button>
       </div>
     </div>
   );

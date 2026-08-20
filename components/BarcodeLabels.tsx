@@ -210,7 +210,7 @@ export function BarcodeLabels({ rows }: { rows: BarcodeRow[] }) {
         <div className="sticky bottom-0 -mx-4 sm:mx-0 mt-4 px-4 sm:px-4 py-3 bg-canvas/95 backdrop-blur border-t border-line flex items-center gap-3 sm:rounded-b-xl">
           <div className="text-sm text-muted">เลือก <b className="text-ink tabular-nums">{selected.length}</b> รายการ · <b className="text-ink tabular-nums">{totalLabels}</b> ฉลาก · ขนาด{cfg.label}</div>
           <button onClick={() => window.print()} disabled={!totalLabels}
-            className="ml-auto inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-40 shadow-sm">
+            className="btn btn-brand ml-auto disabled:opacity-40 shadow-sm">
             <Printer className="w-4 h-4" /> พิมพ์ฉลาก ({totalLabels})
           </button>
         </div>
