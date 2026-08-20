@@ -77,15 +77,17 @@ export function PhotoPicker({ value, onChange, max = 6 }:
 }
 
 // ---- read-only strip (used in the bill list & the admin review) ------------
-export function PhotoStrip({ photos, onDelete, size = 56 }:
-  { photos: { id?: number; data?: string }[]; onDelete?: (id: number) => void; size?: number }) {
+export function PhotoStrip({ photos, onDelete, size = 56, kind = "bill" }:
+  { photos: { id?: number; data?: string }[]; onDelete?: (id: number) => void; size?: number; kind?: "bill" | "cash" }) {
   const [view, setView] = useState<string | null>(null);
   if (!photos?.length) return null;
-  // Prefer inline base64 when the caller already has it (cash/PO slips); otherwise
-  // stream the image bytes from the cacheable route so list renders don't pull the
+  // Prefer inline base64 when the caller already has it (e.g. PO slips still send it);
+  // otherwise stream the bytes from the cacheable route so list renders don't pull the
   // heavy `data` column from the DB every time (see attachmentsForRefs / egress fix).
+  // `kind` picks the right table's route — bill_attachments vs cash_attachments.
+  const base = kind === "cash" ? "/api/attachment/cash/" : "/api/attachment/";
   const srcOf = (p: { id?: number; data?: string }) =>
-    p.data ?? (p.id != null ? `/api/attachment/${p.id}` : "");
+    p.data ?? (p.id != null ? `${base}${p.id}` : "");
   return (
     <div className="flex flex-wrap gap-1.5 mt-1.5">
       {photos.map((p, i) => {

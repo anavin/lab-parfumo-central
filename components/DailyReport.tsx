@@ -196,7 +196,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
             <span className="text-xs text-muted">สลิปฝากธนาคาร</span>
             <span className="text-[11px] text-muted-soft">{slips.length}/6</span>
           </div>
-          <PhotoStrip photos={slips} size={56} onDelete={removeSlip} />
+          <PhotoStrip photos={slips} size={56} onDelete={removeSlip} kind="cash" />
           {slips.length < 6 && (
             <div className="flex justify-end gap-2 mt-1.5">
               <button type="button" onClick={() => (hasGetUserMedia() ? setSlipCam(true) : slipCamRef.current?.click())} disabled={slipBusy}

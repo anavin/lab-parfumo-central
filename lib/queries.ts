@@ -548,7 +548,7 @@ export async function recentlyApprovedSubmissions(branch?: string) {
     from submissions s
     join users u on u.id = s.created_by
     left join users r on r.id = s.reviewed_by
-    where s.status = 'approved' and s.reviewed_at >= now() - interval '30 days'${filter}${await aliveAnd("s")}
+    where s.status = 'approved' and s.reviewed_at >= now() - interval '14 days'${filter}${await aliveAnd("s")}
     order by s.entry_date desc, s.created_at`, branch ? [branch] : []);
 }
 
@@ -981,12 +981,14 @@ async function dailyCashLogLegacy(limit: number) {
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
 }
 
-export type CashAttachment = { id: number; entry_date: string; data: string };
+// `data` (base64 image) is NOT loaded in lists — same egress fix as BillAttachment.
+// Images stream from /api/attachment/cash/[id] (cacheable) instead.
+export type CashAttachment = { id: number; entry_date: string; created_by?: number; data?: string };
 /** Bank-deposit slip photos grouped by day for one branch (admin /cash drawer). */
 export async function cashAttachmentsByDate(branch: string = DEFAULT_BRANCH): Promise<Record<string, CashAttachment[]>> {
   try {
     const rows = await q<CashAttachment>(
-      `select id, entry_date::text entry_date, data from cash_attachments where branch=$1 order by id`, [branch]);
+      `select id, entry_date::text entry_date, created_by from cash_attachments where branch=$1 order by id`, [branch]);
     const map: Record<string, CashAttachment[]> = {};
     for (const r of rows) (map[r.entry_date] ??= []).push(r);
     return map;
@@ -1001,7 +1003,7 @@ export async function cashAttachmentsForDate(date: string, userId?: number, bran
     const params: any[] = [date, branch];
     if (mine) params.push(userId);
     return await q<CashAttachment>(
-      `select id, entry_date::text entry_date, data from cash_attachments
+      `select id, entry_date::text entry_date, created_by from cash_attachments
        where entry_date=$1 and branch=$2${mine ? " and created_by=$3" : ""} order by id`,
       params);
   } catch (e) { if ((e as any)?.code === "42P01") return []; throw e; }

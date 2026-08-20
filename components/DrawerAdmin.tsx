@@ -41,7 +41,7 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
           <input value={deposit} disabled={r.confirmed || pending} inputMode="numeric"
             onChange={(e) => setDeposit(e.target.value.replace(/[^\d]/g, ""))} onFocus={(e) => e.target.select()} className={inp} />
           {/* slips are attached by the salesperson on /my — admin only reviews them here */}
-          <div className="mt-1 flex justify-end"><PhotoStrip photos={slips} size={44} /></div>
+          <div className="mt-1 flex justify-end"><PhotoStrip photos={slips} size={44} kind="cash" /></div>
         </td>
         <td className="px-3 py-2.5 text-right font-semibold text-ink tabular-nums whitespace-nowrap">{baht(r.closing)}</td>
         <td className="px-5 py-2.5 text-right whitespace-nowrap">
