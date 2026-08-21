@@ -266,3 +266,33 @@ export async function q<T = any>(sql: string, params: any[] = []): Promise<T[]> 
   const r = await db.query<T>(sql, params);
   return r.rows;
 }
+
+/** Run several statements atomically. The callback gets a `q`-shaped runner bound
+ * to the transaction — use it for every statement inside; on any throw the whole
+ * thing ROLLBACKs. Works on both pg (BEGIN/COMMIT on one pooled client) and PGlite
+ * (native .transaction). Use for multi-row writes that must all-or-nothing
+ * (bill submit, stock-count approve, receive, allocate, shipment, return). */
+export type TxRun = <T = any>(sql: string, params?: any[]) => Promise<T[]>;
+export async function tx<T>(fn: (run: TxRun) => Promise<T>): Promise<T> {
+  if (usePg()) {
+    const pool = await getPgPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const run: TxRun = async (sql, params = []) => (await client.query(sql, params)).rows;
+      const out = await fn(run);
+      await client.query("COMMIT");
+      return out;
+    } catch (e) {
+      try { await client.query("ROLLBACK"); } catch { /* ignore rollback failure */ }
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+  const db = await getDb();
+  return db.transaction(async (t: any) => {
+    const run: TxRun = async (sql, params = []) => (await t.query(sql, params)).rows;
+    return fn(run);
+  }) as Promise<T>;
+}

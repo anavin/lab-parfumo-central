@@ -1,5 +1,5 @@
 "use server";
-import { requireUser } from "@/lib/auth/require-user";
+import { requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
 import { dailyReport, dailySaleRows, dailySalesByMonth, getDailyCash, saveDailyCash } from "@/lib/queries";
 import { DEFAULT_BRANCH, resolveBranch } from "@/lib/branches";
@@ -36,6 +36,6 @@ export async function getMyCashFloat(date: string, branch: string = DEFAULT_BRAN
 
 /** Autosave a branch's shop drawer for a day (records who last edited). */
 export async function saveMyCashFloat(date: string, branch: string, opening: number, seed: number, deposit: number, closing: number) {
-  const user = await requireUser();
+  const user = await requireAnyPermission(["my_sales", "cash"]);
   return saveDailyCash(date, resolveBranch(branch), opening, seed, deposit, closing, user.id);
 }

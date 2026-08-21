@@ -1,7 +1,7 @@
 "use server";
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { requirePermission, requireUser, isAdmin } from "@/lib/auth/require-user";
+import { requirePermission, requireUser, isAdmin, requireAnyPermission } from "@/lib/auth/require-user";
 import { dailyReport, cashAttachmentsForDate, type CashAttachment } from "@/lib/queries";
 import { logAudit } from "@/lib/audit";
 import { DEFAULT_BRANCH, normalizeBranch, branchName } from "@/lib/branches";
@@ -50,7 +50,7 @@ export async function getCashSlips(date: string, branch: string = DEFAULT_BRANCH
 /** Attach bank-deposit slip photos to a day (salesperson does this on /my when
  *  entering ฝากเข้าธนาคาร; admin just reviews them on /cash). */
 export async function addCashAttachments(date: string, images: string[], branch: string = DEFAULT_BRANCH): Promise<{ ok: boolean; error?: string }> {
-  const me = await requireUser();
+  const me = await requireAnyPermission(["my_sales", "cash"]);
   const br = normalizeBranch(branch);
   const imgs = (images || []).filter((s) => typeof s === "string" && s.startsWith("data:image/") && s.length <= 3_000_000).slice(0, 6);
   if (!imgs.length) return { ok: false, error: "ไม่มีรูปที่ถูกต้อง" };
@@ -72,7 +72,7 @@ export async function addCashAttachments(date: string, images: string[], branch:
 /** Remove a bank-deposit slip photo. A salesperson may only delete their own;
  *  an admin may delete any. */
 export async function deleteCashAttachment(id: number): Promise<{ ok: boolean; error?: string }> {
-  const me = await requireUser();
+  const me = await requireAnyPermission(["my_sales", "cash"]);
   try {
     // scope the delete to the owner unless an admin is doing it (also removes Storage object)
     await deleteAttachment("cash_attachments", id, isAdmin(me) ? undefined : Number(me.id));

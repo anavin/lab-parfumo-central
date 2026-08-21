@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requisitionSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
-import { requirePermission, requireUser } from "@/lib/auth/require-user";
+import { requirePermission, requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 
 export type ReqItemInput = { barcode: string; scent: string; size: string; qty: number; product_id?: number | null };
 export type ReqInput = {
@@ -157,7 +157,7 @@ export async function unapproveRequisition(id: number): Promise<{ ok: boolean; e
 /** Branch staff confirms receipt → records received qty per line + remark, marks
  *  the requisition 'received' (which is what makes it count toward branch stock). */
 export async function receiveRequisition(id: number, lines: { id: number; received_qty: number; remark?: string }[], remark?: string): Promise<{ ok: boolean; error?: string }> {
-  const me = await requireUser();
+  const me = await requireAnyPermission(["my_sales", "requisitions"]);
   try {
     const [po] = await q<{ status: string }>(`select status from purchase_orders where id=$1 and deleted_at is null`, [id]);
     if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
