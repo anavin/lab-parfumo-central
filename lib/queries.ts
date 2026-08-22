@@ -405,7 +405,7 @@ export async function pendingReceipts(branch: string) {
                       filter (where i.id is not null), '[]') lines
       from purchase_orders po left join po_items i on i.po_id = po.id
       where po.status in ('delivered', 'approved') and po.deleted_at is null
-        and upper(substring(po.branch_label from '_([A-Za-z]+)')) = $1
+        and upper(substring(po.branch_label from '^[0-9]+_([A-Za-z]+)')) = $1
       group by po.id order by po.order_date desc, po.id desc`, [normalizeBranch(branch)]);
   } catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }
 }
@@ -421,7 +421,7 @@ export async function branchAllocations(branch: string) {
       from purchase_orders po
       left join po_items i on i.po_id = po.id
       where po.status = $2 and po.deleted_at is null
-        and upper(substring(po.branch_label from '_([A-Za-z]+)')) = $1
+        and upper(substring(po.branch_label from '^[0-9]+_([A-Za-z]+)')) = $1
       group by po.id
       order by po.order_date desc, po.id desc`, [normalizeBranch(branch), ALLOC_STATUS]);
   } catch (e) { if ((e as any)?.code === "42P01") return []; throw e; }

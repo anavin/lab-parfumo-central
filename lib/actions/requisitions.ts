@@ -37,7 +37,7 @@ async function replaceItems(poId: number, items: ReqItemInput[]) {
   await q(`delete from po_items where po_id = $1`, [poId]);
   let line = 1;
   for (const it of items) {
-    if (!it.scent && !it.barcode) continue;
+    if ((!it.scent && !it.barcode) || (Number(it.qty) || 0) <= 0) continue;   // skip empty / qty-0 lines
     await q(
       `insert into po_items (po_id, line_no, barcode, product_id, scent, size, qty)
        values ($1,$2,$3,$4,$5,$6,$7)`,
