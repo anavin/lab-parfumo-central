@@ -50,7 +50,7 @@ export async function returnBranchStock(branchInput: string, dateStr: string): P
     const payload = rows.map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: Math.round(Number(r.remaining) || 0) }));
     // one atomic INSERT … SELECT from the JSON so a partial failure can't half-return the branch;
     // `where not exists` makes a re-run / double-click for the same branch+date a no-op (idempotent).
-    const done = await tx<{ one: number }>(async (run) => run(
+    const done = await tx<{ one: number }[]>(async (run) => run(
       `insert into stock_adjustments (branch, product_id, barcode, scent, size, qty, note, created_by)
        select $1, (select id from products where barcode = r.barcode limit 1), r.barcode, r.scent, r.size, -r.remaining, $3, $4
        from json_to_recordset($2::json) as r(barcode text, scent text, size text, remaining int)

@@ -1,5 +1,5 @@
 "use server";
-import { q, tx } from "@/lib/db";
+import { q, tx, type TxRun } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { SPLIT2, isSplit } from "@/lib/payments";
@@ -136,18 +136,18 @@ export async function submitBill(input: unknown) {
 // ------- add item(s) to an EXISTING pending bill (same receipt_no) -------
 type AddItem = { item: string; barcode?: string; size?: string; qty: number; unit_price: number; discount?: number };
 
-async function insertBillItems(ref: string, shared: { source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null }, items: AddItem[], userId: number, ba: string) {
+async function insertBillItems(run: TxRun, ref: string, shared: { source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null }, items: AddItem[], userId: number, ba: string) {
   for (const it of items) {
     const qty = Number(it.qty) || 0;
     const total = Math.max(0, qty * (Number(it.unit_price) || 0) - (Number(it.discount) || 0));
-    const [row] = await q<{ id: number }>(
+    const [row] = await run<{ id: number }>(
       `insert into submissions
          (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
        values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
       [userId, ba, shared.entry_date, shared.source, shared.sale_time, ref,
        it.item, it.barcode || null, it.size || null, qty, Number(it.unit_price) || 0, Number(it.discount) || 0, total,
        shared.payment_channel, shared.nation]);
-    await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
+    await run(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
   }
 }
 
@@ -161,8 +161,11 @@ export async function addMyBillItems(billRef: string, items: AddItem[]) {
     `select source, entry_date::text entry_date, sale_time, nation, payment_channel
      from submissions where receipt_no = $1 and created_by = $2 and status = 'pending' order by id limit 1`, [ref, user.id]);
   if (!b) return { ok: false, error: "ไม่พบบิล หรือบิลถูกตรวจแล้ว (เพิ่มไม่ได้)" };
+  // a split-payment bill's tenders are fixed at submit; adding items would make the
+  // tender sum ≠ bill total (and the new lines vanish from the channel report) → block it
+  if (isSplit(b.payment_channel)) return { ok: false, error: "บิลจ่าย 2 ทาง เพิ่มสินค้าไม่ได้ (ยอดชำระจะไม่ตรง) — สร้างบิลใหม่แทน" };
   try {
-    await insertBillItems(ref, b, rows, user.id, user.full_name);
+    await tx(async (run) => insertBillItems(run, ref, b, rows, user.id, user.full_name));
     await logAudit("submit", "submission", null, `เพิ่มสินค้าในบิล ${ref} · ${rows.length} รายการ`);
     revalidatePath("/my"); revalidatePath("/review");
     return { ok: true };
@@ -179,9 +182,10 @@ export async function addBillItemsByAdmin(billRef: string, items: AddItem[]) {
     `select source, entry_date::text entry_date, sale_time, nation, payment_channel, created_by
      from submissions where receipt_no = $1 and status = 'pending' order by id limit 1`, [ref]);
   if (!b) return { ok: false, error: "ไม่พบบิล หรือบิลถูกตรวจแล้ว" };
+  if (isSplit(b.payment_channel)) return { ok: false, error: "บิลจ่าย 2 ทาง เพิ่มสินค้าไม่ได้ (ยอดชำระจะไม่ตรง)" };
   try {
     // keep the item under the original salesperson so the bill stays coherent
-    await insertBillItems(ref, b, rows, b.created_by, admin.full_name);
+    await tx(async (run) => insertBillItems(run, ref, b, rows, b.created_by, admin.full_name));
     await logAudit("update", "submission", ref, `แอดมินเพิ่มสินค้าในบิล ${ref} · ${rows.length} รายการ`);
     revalidatePath("/review"); revalidatePath("/my");
     return { ok: true };
