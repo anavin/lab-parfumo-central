@@ -1,5 +1,5 @@
 "use server";
-import { q } from "@/lib/db";
+import { q, tx } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/require-user";
 import { logAudit } from "@/lib/audit";
@@ -28,20 +28,33 @@ export async function allocateBranchStock(branch: string, date: string, items: A
     .filter((i) => (i.barcode || i.scent) && i.qty > 0);
   if (!lines.length) return { ok: false, error: "ยังไม่มีรายการ (เลือกกลิ่น + ใส่จำนวน)" };
   try {
-    const poNo = await nextAllocNo(br, orderDate);
-    const [po] = await q<{ id: number }>(
-      `insert into purchase_orders (po_number, version, order_date, branch_label, status)
-       values ($1,$2,$3,$4,$5) returning id`,
-      [poNo, `${poNo}-1`, orderDate, label, ALLOC_STATUS]);
-    let ln = 0;
-    for (const i of lines) {
-      await q(`insert into po_items (po_id, line_no, barcode, product_id, scent, size, qty) values ($1,$2,$3,$4,$5,$6,$7)`,
-        [po.id, ++ln, i.barcode || null, i.product_id ?? null, i.scent || null, i.size || null, i.qty]);
+    // header + lines in one tx (no partial allocation); retry on a po_number
+    // collision from a concurrent allocation (unique on po_number,version).
+    let poId = 0;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const poNo = await nextAllocNo(br, orderDate);
+      try {
+        poId = await tx<number>(async (run) => {
+          const [po] = await run<{ id: number }>(
+            `insert into purchase_orders (po_number, version, order_date, branch_label, status)
+             values ($1,$2,$3,$4,$5) returning id`,
+            [poNo, `${poNo}-1`, orderDate, label, ALLOC_STATUS]);
+          let ln = 0;
+          for (const i of lines) {
+            await run(`insert into po_items (po_id, line_no, barcode, product_id, scent, size, qty) values ($1,$2,$3,$4,$5,$6,$7)`,
+              [po.id, ++ln, i.barcode || null, i.product_id ?? null, i.scent || null, i.size || null, i.qty]);
+          }
+          await run(`update po_items i set product_id = p.id from products p
+                   where i.po_id = $1 and i.product_id is null and p.barcode = i.barcode`, [po.id]);
+          return po.id;
+        });
+        break;
+      } catch (e: any) {
+        if (e?.code === "23505" && attempt < 4) continue;   // po_number taken → new running number
+        throw e;
+      }
     }
-    // backfill product_id from barcode where the caller didn't supply it
-    await q(`update po_items i set product_id = p.id from products p
-             where i.po_id = $1 and i.product_id is null and p.barcode = i.barcode`, [po.id]);
-    await logAudit("create", "requisition", po.id, `จัดสต๊อกเข้า ${branchName(br)} · ${lines.length} รายการ · ${lines.reduce((s, i) => s + i.qty, 0)} ชิ้น`);
+    await logAudit("create", "requisition", poId, `จัดสต๊อกเข้า ${branchName(br)} · ${lines.length} รายการ · ${lines.reduce((s, i) => s + i.qty, 0)} ชิ้น`);
     revalidatePath("/stock"); revalidatePath("/stock/allocate");
     return { ok: true };
   } catch (e: any) {

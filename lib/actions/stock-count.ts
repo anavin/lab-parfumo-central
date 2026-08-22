@@ -20,18 +20,22 @@ export async function submitStockCount(branch: string, lines: CountLineInput[], 
   const clean = (lines || []).filter((l) => l.barcode);
   if (!clean.length) return { ok: false, error: "ยังไม่มีรายการนับ" };
   try {
-    const [c] = await q<{ id: number }>(
-      `insert into stock_counts (branch, status, note, counted_by) values ($1,'pending',$2,$3) returning id`,
-      [b, (note || "").trim() || null, me.id]);
-    for (const l of clean) {
-      await q(`insert into stock_count_lines (count_id, barcode, scent, size, expected, counted)
-               values ($1,$2,$3,$4,$5,$6)`,
-        [c.id, l.barcode, l.scent || null, l.size || null,
-         Math.max(0, Math.round(Number(l.expected) || 0)), Math.max(0, Math.round(Number(l.counted) || 0))]);
-    }
-    await logAudit("create", "stock", c.id, `ส่งนับสต๊อก ${branchName(b)} (${clean.length} รายการ)`);
+    // header + all count lines in one tx so a partial count is never saved
+    const id = await tx<number>(async (run) => {
+      const [c] = await run<{ id: number }>(
+        `insert into stock_counts (branch, status, note, counted_by) values ($1,'pending',$2,$3) returning id`,
+        [b, (note || "").trim() || null, me.id]);
+      for (const l of clean) {
+        await run(`insert into stock_count_lines (count_id, barcode, scent, size, expected, counted)
+                 values ($1,$2,$3,$4,$5,$6)`,
+          [c.id, l.barcode, l.scent || null, l.size || null,
+           Math.max(0, Math.round(Number(l.expected) || 0)), Math.max(0, Math.round(Number(l.counted) || 0))]);
+      }
+      return c.id;
+    });
+    await logAudit("create", "stock", id, `ส่งนับสต๊อก ${branchName(b)} (${clean.length} รายการ)`);
     revalidatePath("/stock/counts"); revalidatePath("/my/count");
-    return { ok: true, id: c.id };
+    return { ok: true, id };
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (รัน SQL 0024)" };
     console.error("[submitStockCount]", e);

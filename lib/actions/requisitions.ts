@@ -167,7 +167,8 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
       if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
       if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
       for (const l of lines || []) {
-        await run(`update po_items set received_qty=$2, line_remark=$3 where id=$1 and po_id=$4`,
+        // cap received at the ordered qty so a fat-finger can't inflate branch stock
+        await run(`update po_items set received_qty = least($2, qty), line_remark=$3 where id=$1 and po_id=$4`,
           [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
       }
       await run(`update purchase_orders set status='received', received_at=now(), received_by=$2,
