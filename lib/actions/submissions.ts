@@ -1,5 +1,5 @@
 "use server";
-import { q } from "@/lib/db";
+import { q, tx } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { saleSchema, customerDaySchema, billSchema } from "./schemas";
 import { SPLIT2, isSplit } from "@/lib/payments";
@@ -80,28 +80,36 @@ export async function submitBill(input: unknown) {
 
   const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, resolveBranch(d.source)));
   let count = 0, sum = 0;
-  for (const it of d.items) {
-    const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
-    const total = it.qty * (it.unit_price ?? 0) - (it.discount ?? 0);
-    const [row] = await q<{ id: number }>(
-      `insert into submissions
-         (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
-       values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       returning id`,
-      [user.id, user.full_name, d.sale_date, resolveBranch(d.source), d.sale_time || null, ref,
-       it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, it.discount ?? 0, total,
-       pc, d.nation]);
-    await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
-    count++; sum += total;
-  }
-  for (const t of tenders) {
-    await q(`insert into bill_payments (bill_ref, created_by, entry_date, channel, amount) values ($1,$2,$3,$4,$5)`,
-      [ref, user.id, d.sale_date, t.channel.trim(), t.amount]);
-  }
-  for (const a of d.attachments ?? []) {
-    const [ins] = await q<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3) returning id`, [ref, user.id, a]);
-    await offloadToStorage("bill_attachments", "bill", ins.id, a);
-  }
+  // Whole bill in ONE transaction: line rows + split tenders + attachment rows all
+  // commit together, so a mid-loop failure can't leave a half-saved bill (which the
+  // salesperson would re-submit → duplicate). Storage offload runs AFTER commit.
+  const attachIds: { id: number; data: string }[] = [];
+  await tx(async (run) => {
+    for (const it of d.items) {
+      const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
+      const total = it.qty * (it.unit_price ?? 0) - (it.discount ?? 0);
+      const [row] = await run<{ id: number }>(
+        `insert into submissions
+           (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
+         values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         returning id`,
+        [user.id, user.full_name, d.sale_date, resolveBranch(d.source), d.sale_time || null, ref,
+         it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, it.discount ?? 0, total,
+         pc, d.nation]);
+      await run(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
+      count++; sum += total;
+    }
+    for (const t of tenders) {
+      await run(`insert into bill_payments (bill_ref, created_by, entry_date, channel, amount) values ($1,$2,$3,$4,$5)`,
+        [ref, user.id, d.sale_date, t.channel.trim(), t.amount]);
+    }
+    for (const a of d.attachments ?? []) {
+      const [ins] = await run<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3) returning id`, [ref, user.id, a]);
+      attachIds.push({ id: ins.id, data: a });
+    }
+  });
+  // move slip images to Storage after the bill is committed (network call, not part of the DB tx)
+  for (const a of attachIds) await offloadToStorage("bill_attachments", "bill", a.id, a.data);
   await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}${d.attachments?.length ? ` · แนบ ${d.attachments.length} รูป` : ""}`);
   revalidatePath("/my"); revalidatePath("/review");
 

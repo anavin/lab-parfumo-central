@@ -1,5 +1,5 @@
 "use server";
-import { q } from "@/lib/db";
+import { q, tx } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requisitionSchema } from "./schemas";
@@ -159,15 +159,22 @@ export async function unapproveRequisition(id: number): Promise<{ ok: boolean; e
 export async function receiveRequisition(id: number, lines: { id: number; received_qty: number; remark?: string }[], remark?: string): Promise<{ ok: boolean; error?: string }> {
   const me = await requireAnyPermission(["my_sales", "requisitions"]);
   try {
-    const [po] = await q<{ status: string }>(`select status from purchase_orders where id=$1 and deleted_at is null`, [id]);
-    if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
-    if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
-    for (const l of lines || []) {
-      await q(`update po_items set received_qty=$2, line_remark=$3 where id=$1 and po_id=$4`,
-        [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
-    }
-    await q(`update purchase_orders set status='received', received_at=now(), received_by=$2,
-             remark = coalesce(nullif($3,''), remark) where id=$1`, [id, me.id, (remark || "").trim()]);
+    // FOR UPDATE + conditional status flip in one tx: two concurrent receives can't
+    // both pass the status check, and the per-line updates commit all-or-nothing with
+    // the status change (no half-received PO skewing branch stock).
+    const res = await tx<{ ok: boolean; error?: string }>(async (run) => {
+      const [po] = await run<{ status: string }>(`select status from purchase_orders where id=$1 and deleted_at is null for update`, [id]);
+      if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
+      if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
+      for (const l of lines || []) {
+        await run(`update po_items set received_qty=$2, line_remark=$3 where id=$1 and po_id=$4`,
+          [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
+      }
+      await run(`update purchase_orders set status='received', received_at=now(), received_by=$2,
+               remark = coalesce(nullif($3,''), remark) where id=$1`, [id, me.id, (remark || "").trim()]);
+      return { ok: true };
+    });
+    if (!res.ok) return res;
     await logAudit("update", "requisition", id, `รับของเข้าสาขา (${(lines || []).length} รายการ)`);
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/my/stock"); revalidatePath("/stock");
     return { ok: true };
