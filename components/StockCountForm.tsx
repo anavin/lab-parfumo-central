@@ -33,7 +33,8 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
       .then((r) => (r.ok ? r.json() : [])).then((rows: any[]) => setCatalog(new Map((rows || []).map((p) => [String(p.barcode), p])))).catch(() => {});
   }, []);
 
-  const say = (m: string) => { setFlash(m); setTimeout(() => setFlash((f) => (f === m ? null : f)), 1500); };
+  // success flashes auto-clear; a "not found" warning stays until the next scan
+  const say = (m: string, persist = false) => { setFlash(m); if (!persist) setTimeout(() => setFlash((f) => (f === m ? null : f)), 1500); };
   const setCount = (barcode: string, size: string, fn: (n: number) => number) =>
     setRows((rs) => rs.map((r) => (r.barcode === barcode && r.size === size ? { ...r, counted: String(Math.max(0, fn(Number(r.counted) || 0))) } : r)));
 
@@ -50,12 +51,13 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
   const locate = (code: string): ScanResult => {
     const c = String(code || "").trim();
     if (!c) return { ok: false, label: "-" };
-    beep("ok"); try { navigator.vibrate?.(30); } catch {}
+    const ok = () => { beep("ok"); try { navigator.vibrate?.(30); } catch {} };
     const it = rowsRef.current.find((r) => r.barcode === c);
-    if (it) { setActiveKey(`${it.barcode}__${it.size}`); say(`${it.scent} ${it.size}`); return { ok: true, label: `${it.scent} ${it.size}`, sub: `ในระบบ ${it.expected}` }; }
+    if (it) { ok(); setActiveKey(`${it.barcode}__${it.size}`); say(`${it.scent} ${it.size}`); return { ok: true, label: `${it.scent} ${it.size}`, sub: `ในระบบ ${it.expected}` }; }
     const p = catalog.get(c);
-    if (p) { setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1", changed: true }]); setActiveKey(`${c}__${p.size || ""}`); say(`${p.scent} ${p.size} (นอกรายการ)`); return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ" }; }
-    say(`ไม่พบ ${c}`); return { ok: false, label: `ไม่พบ ${c}` };
+    if (p) { ok(); setRows((rs) => [...rs, { barcode: c, scent: p.scent, size: p.size || "", expected: 0, counted: "1", changed: true }]); setActiveKey(`${c}__${p.size || ""}`); say(`${p.scent} ${p.size} (นอกรายการ)`); return { ok: true, label: `${p.scent} ${p.size}`, sub: "นอกรายการ" }; }
+    beep("error"); try { navigator.vibrate?.([60, 40, 60]); } catch {}
+    say(`⚠ ไม่พบ ${c}`, true); return { ok: false, label: `ไม่พบ ${c}` };
   };
   // hardware keyboard-wedge + SUNMI laser jump to the item; the phone camera is below
   useBarcodeScanner(scanning, locate);

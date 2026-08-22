@@ -40,11 +40,12 @@ function ReceiveCard({ po }: { po: PR }) {
   // scan-to-count: tap "สแกนนับ" to zero the counts, then shoot each item's barcode
   // to tally what actually arrived (works with the SUNMI laser + hardware scanners).
   const startScan = () => { setRows((rs) => rs.map((r) => ({ ...r, recv: "0" }))); setScanning(true); };
-  const say = (m: string) => { setFlash(m); setTimeout(() => setFlash((f) => (f === m ? null : f)), 1500); };
+  // success flashes auto-clear; a "not found" warning stays until the next scan
+  const say = (m: string, persist = false) => { setFlash(m); if (!persist) setTimeout(() => setFlash((f) => (f === m ? null : f)), 1500); };
   useBarcodeScanner(open && scanning, (code) => {
     const c = String(code || "").trim();
     const idx = rows.findIndex((r) => r.barcode === c);
-    if (idx < 0) { say(`ไม่พบ ${c} ในใบเบิกนี้`); return; }
+    if (idx < 0) { beep("error"); try { navigator.vibrate?.([60, 40, 60]); } catch {} say(`⚠ ไม่พบ ${c} ในใบเบิกนี้`, true); return; }
     setRows((rs) => rs.map((x, j) => (j === idx ? { ...x, recv: String((Number(x.recv) || 0) + 1) } : x)));
     say(`+1 · ${rows[idx].scent}`);
     beep("ok"); try { navigator.vibrate?.(30); } catch {}

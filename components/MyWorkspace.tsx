@@ -385,8 +385,13 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   // vibrate + on-screen confirmation of the last item scanned
   useBarcodeScanner(true, (code) => {
     onScanned(code).then((r) => {
-      beep("ok"); try { navigator.vibrate?.(40); } catch {}
-      setLastScan(r); setTimeout(() => setLastScan((x) => (x === r ? null : x)), 2000);
+      if (r && (r as any).ok === false) {   // not found → error beep + keep the warning up
+        beep("error"); try { navigator.vibrate?.([60, 40, 60]); } catch {}
+        setLastScan(r);
+      } else {
+        beep("ok"); try { navigator.vibrate?.(40); } catch {}
+        setLastScan(r); setTimeout(() => setLastScan((x) => (x === r ? null : x)), 2000);
+      }
     });
   });
 

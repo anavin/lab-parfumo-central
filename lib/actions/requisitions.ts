@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { requisitionSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { requirePermission, requireUser, requireAnyPermission } from "@/lib/auth/require-user";
+import { can } from "@/lib/auth/permissions";
+import { resolveBranch } from "@/lib/branches";
 
 export type ReqItemInput = { barcode: string; scent: string; size: string; qty: number; product_id?: number | null };
 export type ReqInput = {
@@ -163,9 +165,13 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     // both pass the status check, and the per-line updates commit all-or-nothing with
     // the status change (no half-received PO skewing branch stock).
     const res = await tx<{ ok: boolean; error?: string }>(async (run) => {
-      const [po] = await run<{ status: string }>(`select status from purchase_orders where id=$1 and deleted_at is null for update`, [id]);
+      const [po] = await run<{ status: string; branch_label: string | null }>(`select status, branch_label from purchase_orders where id=$1 and deleted_at is null for update`, [id]);
       if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
       if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
+      // a salesperson (my_sales, not an admin with `requisitions`) may only receive their own branch's PO
+      if (!can(me, "requisitions") && me.branch && resolveBranch(po.branch_label) !== resolveBranch(me.branch)) {
+        return { ok: false, error: "รับได้เฉพาะใบเบิกของสาขาตัวเอง" };
+      }
       for (const l of lines || []) {
         // cap received at the ordered qty so a fat-finger can't inflate branch stock
         await run(`update po_items set received_qty = least($2, qty), line_remark=$3 where id=$1 and po_id=$4`,
