@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
 import { PackageCheck, ChevronDown, Loader2, ScanLine } from "lucide-react";
 import { receiveRequisition } from "@/lib/actions/requisitions";
@@ -46,7 +47,7 @@ function ReceiveCard({ po }: { po: PR }) {
     if (idx < 0) { say(`ไม่พบ ${c} ในใบเบิกนี้`); return; }
     setRows((rs) => rs.map((x, j) => (j === idx ? { ...x, recv: String((Number(x.recv) || 0) + 1) } : x)));
     say(`+1 · ${rows[idx].scent}`);
-    try { navigator.vibrate?.(30); } catch {}
+    beep("ok"); try { navigator.vibrate?.(30); } catch {}
   });
 
   const receive = () => start(async () => {

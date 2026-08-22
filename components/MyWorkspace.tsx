@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus, ChevronDown } from "lucide-react";
 // The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
@@ -165,7 +166,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
                    : newItem({ barcode: code });
       setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false, branch), items: [it] });
-      try { navigator.vibrate?.(40); } catch {}
+      beep("ok"); try { navigator.vibrate?.(40); } catch {}
     } catch (e: any) { onActionError(e); }
   });
   useBarcodeScanner(!bill && !edit, scanToNewBill);
@@ -384,7 +385,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   // vibrate + on-screen confirmation of the last item scanned
   useBarcodeScanner(true, (code) => {
     onScanned(code).then((r) => {
-      try { navigator.vibrate?.(40); } catch {}
+      beep("ok"); try { navigator.vibrate?.(40); } catch {}
       setLastScan(r); setTimeout(() => setLastScan((x) => (x === r ? null : x)), 2000);
     });
   });
@@ -498,6 +499,14 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const hasEmptyItem = state.items.some((it) => !String(it.item || "").trim());
   const hasData = named.length > 0 || state.items.some((it) => Number(it.unit_price) > 0) || state.attachments.length > 0;
   const tryCancel = () => (hasData ? setConfirmCancel(true) : onCancel());
+
+  // warn before losing an unsaved bill on refresh / tab-close / navigating away
+  useEffect(() => {
+    if (!hasData) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasData]);
 
   return (
     <div ref={rootRef} className="card p-4 sm:p-5 mb-4">

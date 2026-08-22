@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { beep } from "@/lib/feedback";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { DecodeHintType, BarcodeFormat, EAN13Reader } from "@zxing/library";
 import { X, Camera, Check, AlertTriangle, ScanLine, Flashlight, FlashlightOff, Keyboard, ZoomIn } from "lucide-react";
@@ -132,7 +133,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
       voteRef.current = { last: "", n: 0 };
       if (continuous) {
         pausedRef.current = true;
-        try { navigator.vibrate?.(45); } catch {}
+        beep("ok"); try { navigator.vibrate?.(45); } catch {}
         setChecking(true);
         Promise.resolve(cbRef.current(code)).then((r) => {
           setChecking(false);
@@ -141,7 +142,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
         }).catch(() => { setChecking(false); setResult({ ok: false, label: code }); });
       } else if (!doneRef.current) {
         doneRef.current = true;
-        try { navigator.vibrate?.(45); } catch {}
+        beep("ok"); try { navigator.vibrate?.(45); } catch {}
         stopAll();
         cbRef.current(code);
       }

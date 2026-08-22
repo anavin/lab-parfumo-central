@@ -31,6 +31,15 @@ function Card({ c }: { c: StockCount }) {
   };
   const run = (fn: () => Promise<any>) => start(async () => { setErr(null); const r = await fn(); if (r && !r.ok) setErr(r.error ?? "ทำรายการไม่สำเร็จ"); else router.refresh(); });
 
+  // fat-finger guard: a mis-typed count posts a big stock adjustment — confirm first
+  const approve = () => {
+    const ls = lines ?? [];
+    const totalAbs = ls.reduce((s, l) => s + Math.abs(Math.round(l.counted - l.expected)), 0);
+    const maxOne = ls.reduce((m, l) => Math.max(m, Math.abs(Math.round(l.counted - l.expected))), 0);
+    if ((totalAbs >= 100 || maxOne >= 50) && !confirm(`ผลนับมีส่วนต่างมาก (รวม ${totalAbs} ชิ้น, สูงสุด ${maxOne} ชิ้น/รายการ) — ยืนยันปรับสต๊อกตามนี้?`)) return;
+    run(() => approveStockCount(c.id));
+  };
+
   return (
     <div className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
       <button onClick={toggle} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-canvas/60 text-left">
@@ -75,7 +84,7 @@ function Card({ c }: { c: StockCount }) {
               {err && <div className="text-xs text-danger mt-2">{err}</div>}
               {c.status === "pending" && (
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => run(() => approveStockCount(c.id))} disabled={saving}
+                  <button onClick={approve} disabled={saving}
                     className="btn btn-brand flex-1">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} อนุมัติ + ปรับสต๊อก
                   </button>

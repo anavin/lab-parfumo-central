@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
 import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search } from "lucide-react";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
@@ -49,7 +50,7 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
   const locate = (code: string): ScanResult => {
     const c = String(code || "").trim();
     if (!c) return { ok: false, label: "-" };
-    try { navigator.vibrate?.(30); } catch {}
+    beep("ok"); try { navigator.vibrate?.(30); } catch {}
     const it = rowsRef.current.find((r) => r.barcode === c);
     if (it) { setActiveKey(`${it.barcode}__${it.size}`); say(`${it.scent} ${it.size}`); return { ok: true, label: `${it.scent} ${it.size}`, sub: `ในระบบ ${it.expected}` }; }
     const p = catalog.get(c);
