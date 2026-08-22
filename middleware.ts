@@ -7,7 +7,9 @@ const PUBLIC = new Set(["/login", "/api/login", "/offline", "/manifest.webmanife
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (PUBLIC.has(pathname) || pathname.startsWith("/_next/") || pathname === "/favicon.ico") {
+  // cron endpoints authenticate themselves via CRON_SECRET (Bearer), not a session
+  // cookie — so they must bypass the cookie gate or the scheduler gets redirected to /login.
+  if (PUBLIC.has(pathname) || pathname.startsWith("/_next/") || pathname.startsWith("/api/cron/") || pathname === "/favicon.ico") {
     return NextResponse.next();
   }
   const token = req.cookies.get(SESSION_COOKIE)?.value;
