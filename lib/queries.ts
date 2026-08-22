@@ -397,7 +397,9 @@ export async function stockSummary(branch: string | null = null) {
 }
 
 /** Approved requisitions waiting for a branch to receive (goods-receipt inbox). */
-export async function pendingReceipts(branch: string) {
+// Requisitions a salesperson must receive = the ones ASSIGNED to them (an admin picks
+// the receiver on the requisition detail page). Unassigned ones show to no one here.
+export async function pendingReceipts(userId: number) {
   try {
     return await q<{ id: number; po_number: string; order_date: string; units: number; lines: { id: number; scent: string; size: string; qty: number; barcode: string }[] }>(`
       select po.id, po.po_number, po.order_date::text order_date, coalesce(sum(i.qty),0)::float units,
@@ -405,8 +407,8 @@ export async function pendingReceipts(branch: string) {
                       filter (where i.id is not null), '[]') lines
       from purchase_orders po left join po_items i on i.po_id = po.id
       where po.status in ('delivered', 'approved') and po.deleted_at is null
-        and upper(substring(po.branch_label from '^[0-9]+_([A-Za-z]+)')) = $1
-      group by po.id order by po.order_date desc, po.id desc`, [normalizeBranch(branch)]);
+        and po.assigned_to = $1
+      group by po.id order by po.order_date desc, po.id desc`, [userId]);
   } catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }
 }
 

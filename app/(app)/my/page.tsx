@@ -47,7 +47,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     myDayKpis(user.id, date),
     mySubmissions(user.id, date),
     myTrend(user.id, 14),
-    pendingReceipts(branch),   // approved requisitions waiting for this branch to receive
+    pendingReceipts(user.id),   // requisitions assigned to THIS salesperson to receive
   ]);
   // Fill every day in the 14-day window (including zero-sale days) so the chart
   // is a true timeline, not just the scattered days that had sales. UTC math so

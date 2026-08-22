@@ -5,7 +5,9 @@ import { q } from "@/lib/db";
 import { RequisitionActions } from "@/components/RequisitionActions";
 import { RequisitionSheet } from "@/components/RequisitionSheet";
 import { RequisitionAttachments } from "@/components/RequisitionAttachments";
+import { RequisitionAssignee } from "@/components/RequisitionAssignee";
 import { getPoAttachments } from "@/lib/actions/po-attachments";
+import { listReceivers } from "@/lib/actions/requisitions";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,7 @@ type PO = {
   id: number; po_number: string; version: string | null; order_date: string; status: string;
   branch_label: string; store_no: string; delivery_number: string | null;
   phone: string | null; shipping_name: string | null; address: string | null; remark: string | null;
+  assigned_to?: number | null;   // salesperson chosen to receive (0029)
 };
 type Item = { line_no: number; barcode: string; scent: string; size: string; qty: number; grade: string | null; sku: string | null; received_qty: number | null; line_remark: string | null };
 
@@ -29,6 +32,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
 
   const attachments = await getPoAttachments(po.id);
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
+  const receivers = await listReceivers();      // for the "who receives this" picker
 
   return (
     // clean document canvas — same as the /print page, just with an action bar on top
@@ -49,6 +53,14 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
               <FileText className="w-4 h-4" /> พิมพ์
             </a>
           </div>
+        </div>
+
+        {/* assign which salesperson receives this — only they see it in /my */}
+        <div className="no-print mb-4 flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 flex-wrap">
+          <RequisitionAssignee id={po.id} current={po.assigned_to ?? null} receivers={receivers} />
+          {po.status === "received"
+            ? <span className="chip-ok">รับของแล้ว</span>
+            : (po.assigned_to ? null : <span className="text-xs text-warn-dark">· ยังไม่มอบหมาย → ยังไม่มีใครเห็นใบรับ</span>)}
         </div>
 
         {/* attachments — kept accessible but out of the document itself */}

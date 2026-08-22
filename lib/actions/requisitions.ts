@@ -188,6 +188,30 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
   } catch (e: any) { if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" }; console.error("[receiveRequisition]", e); return { ok: false, error: "รับของไม่สำเร็จ ลองใหม่" }; }
 }
 
+/** Active salespeople who can be assigned to receive a requisition (for the picker). */
+export async function listReceivers(): Promise<{ id: number; full_name: string; role: string; branch: string | null }[]> {
+  await requirePermission("requisitions");
+  const sel = (branchCol: string) => `select id, full_name, role, ${branchCol} as branch from users where is_active = true order by full_name`;
+  try { return await q(sel("branch")); }
+  catch (e: any) { if (e?.code !== "42703") throw e; return await q(sel("null::text")); }   // 0026 not run yet
+}
+
+/** Assign (or clear) which salesperson receives this requisition. Only that person
+ *  then sees it in their /my receiving inbox. Admin/ops only. */
+export async function assignRequisition(id: number, userId: number | null): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("requisitions");
+  try {
+    await q(`update purchase_orders set assigned_to = $2 where id = $1`, [id, userId]);
+    await logAudit("update", "requisition", id, userId ? `มอบหมายผู้รับ #${userId}` : "ยกเลิกมอบหมายผู้รับ");
+    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0029)" };
+    console.error("[assignRequisition]", e);
+    return { ok: false, error: "มอบหมายไม่สำเร็จ" };
+  }
+}
+
 /** Soft delete → moves the requisition to ถังขยะ (restorable). */
 export async function deleteRequisition(id: number) {
   await requirePermission("requisitions");
