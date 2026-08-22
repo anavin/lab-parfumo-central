@@ -10,6 +10,7 @@ import { branchName, normalizeBranch, BRANCHES } from "@/lib/branches";
 type Row = {
   id: number; po_number: string; version: string | null; order_date: string;
   branch_label: string; store_no: string; status: string; lines: number; qty: number;
+  assigned_to?: number | null;   // 0029 — receiver; null on a ready-to-receive PO = nobody sees it
 };
 
 // full lifecycle → Thai label + colour, in pipeline order
@@ -48,7 +49,17 @@ const columns: Column<Row & { _branch: string }>[] = [
   { key: "lines", header: "รายการ", align: "right", sortValue: (r) => r.lines, render: (r) => <span className="text-muted tabular-nums">{r.lines}</span> },
   { key: "qty", header: "จำนวน", align: "right", sortValue: (r) => r.qty, render: (r) => <span className="font-medium tabular-nums">{num(r.qty)} <span className="text-muted-soft text-xs font-normal">ขวด</span></span> },
   { key: "status", header: "สถานะ", sortValue: (r) => r.status,
-    render: (r) => { const m = statusMeta(r.status); return <Badge tone={m.tone}>{m.label}</Badge>; } },
+    render: (r) => {
+      const m = statusMeta(r.status);
+      // delivered/approved = ready to receive; no assignee → nobody sees it in /my → warn
+      const needsAssign = (r.status === "delivered" || r.status === "approved") && !r.assigned_to;
+      return (
+        <span className="inline-flex items-center gap-1.5 flex-wrap">
+          <Badge tone={m.tone}>{m.label}</Badge>
+          {needsAssign && <span className="chip-warn">⚠ ยังไม่มอบหมาย</span>}
+        </span>
+      );
+    } },
   { key: "open", header: "", sortable: false, align: "right",
     render: (r) => <Link href={`/requisitions/${r.id}`} className="inline-flex items-center gap-0.5 text-brand-dark font-medium hover:underline whitespace-nowrap">เปิด <ChevronRight className="w-3.5 h-3.5" /></Link> },
 ];

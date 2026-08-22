@@ -209,6 +209,12 @@ export async function listReceivers(branch?: string): Promise<{ id: number; full
 export async function assignRequisition(id: number, userId: number | null): Promise<{ ok: boolean; error?: string }> {
   await requirePermission("requisitions");
   try {
+    if (userId != null) {   // only an active salesperson can be the receiver (they have the /my inbox)
+      const [u] = await q<{ role: string; permissions: string[] | null; is_active: boolean }>(
+        `select role, permissions, is_active from users where id = $1`, [userId]);
+      if (!u || !u.is_active) return { ok: false, error: "ไม่พบผู้ใช้ หรือถูกปิดใช้งาน" };
+      if (!can({ role: u.role, permissions: u.permissions }, "my_sales")) return { ok: false, error: "มอบหมายได้เฉพาะพนักงานขาย" };
+    }
     await q(`update purchase_orders set assigned_to = $2 where id = $1`, [id, userId]);
     await logAudit("update", "requisition", id, userId ? `มอบหมายผู้รับ #${userId}` : "ยกเลิกมอบหมายผู้รับ");
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my");
