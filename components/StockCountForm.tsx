@@ -8,7 +8,7 @@ import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 
 type Item = { barcode: string; scent: string; size: string; expected: number; counted: string; changed: boolean };
-const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
+const inp = "border border-line rounded-lg px-2 py-2 min-h-[40px] text-sm bg-surface text-ink focus:outline-none focus:border-brand";
 const sizeNum = (s: string) => parseInt(String(s).replace(/[^\d]/g, ""), 10) || 0;
 const byName = (a: Item, b: Item) => (a.scent || "").localeCompare(b.scent || "") || sizeNum(a.size) - sizeNum(b.size);
 
@@ -141,7 +141,7 @@ export function StockCountForm({ expected, branch }: { expected: { barcode: stri
                 <button type="button" onClick={() => setCount(r.barcode, r.size, (n) => n - 1)} className="p-1.5 rounded-lg border border-line text-muted hover:bg-canvas"><Minus className="w-4 h-4" /></button>
                 <input id={`cnt-${r.barcode}__${r.size}`} value={r.counted} inputMode="numeric" placeholder="—" onFocus={(e) => e.target.select()}
                   onChange={(e) => setRows((rs) => rs.map((x) => (x.barcode === r.barcode && x.size === r.size ? { ...x, counted: e.target.value.replace(/[^\d]/g, "") } : x)))}
-                  className={inp + ` w-12 text-center tabular-nums ${done && diff !== 0 ? (diff < 0 ? "border-danger text-danger" : "border-warn text-warn-dark") : ""}`} />
+                  className={inp + ` w-14 text-center tabular-nums ${done && diff !== 0 ? (diff < 0 ? "border-danger text-danger" : "border-warn text-warn-dark") : ""}`} />
                 <button type="button" onClick={() => setCount(r.barcode, r.size, (n) => n + 1)} className="p-1.5 rounded-lg border border-line text-muted hover:bg-canvas"><Plus className="w-4 h-4" /></button>
               </div>
             </div>

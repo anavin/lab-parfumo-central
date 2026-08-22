@@ -9,7 +9,7 @@ import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 type Line = { id: number; scent: string; size: string; qty: number; barcode: string };
 type PR = { id: number; po_number: string; order_date: string; units: number; lines: Line[] };
 
-const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
+const inp = "border border-line rounded-lg px-2 py-2 min-h-[40px] text-sm bg-surface text-ink focus:outline-none focus:border-brand";
 
 /** Goods-receipt inbox on /my — approved requisitions the branch hasn't received yet. */
 export function ReceivingPanel({ pending }: { pending: PR[] }) {
@@ -80,7 +80,7 @@ function ReceiveCard({ po }: { po: PR }) {
                 <span className="text-[11px] text-muted-soft shrink-0">เบิก {Math.round(r.qty)}</span>
                 <input value={r.recv} inputMode="numeric" onFocus={(e) => e.target.select()}
                   onChange={(e) => setRow(i, { recv: e.target.value.replace(/[^\d]/g, "") })}
-                  className={inp + " w-12 text-right tabular-nums shrink-0" + (diff ? " border-warn text-warn-dark" : "")} />
+                  className={inp + " w-14 text-right tabular-nums shrink-0" + (diff ? " border-warn text-warn-dark" : "")} />
                 {diff && <input value={r.remark} placeholder="เหตุผล" onChange={(e) => setRow(i, { remark: e.target.value })} className={inp + " w-24 shrink-0 text-xs"} />}
               </div>
             );
