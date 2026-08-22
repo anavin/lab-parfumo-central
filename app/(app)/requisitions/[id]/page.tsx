@@ -32,7 +32,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
 
   const attachments = await getPoAttachments(po.id);
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
-  const receivers = await listReceivers();      // for the "who receives this" picker
+  const receivers = await listReceivers(po.branch_label);   // salespeople of THIS branch, for the picker
 
   return (
     // clean document canvas — same as the /print page, just with an action bar on top

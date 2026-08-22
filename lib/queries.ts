@@ -399,17 +399,27 @@ export async function stockSummary(branch: string | null = null) {
 /** Approved requisitions waiting for a branch to receive (goods-receipt inbox). */
 // Requisitions a salesperson must receive = the ones ASSIGNED to them (an admin picks
 // the receiver on the requisition detail page). Unassigned ones show to no one here.
-export async function pendingReceipts(userId: number) {
-  try {
-    return await q<{ id: number; po_number: string; order_date: string; units: number; lines: { id: number; scent: string; size: string; qty: number; barcode: string }[] }>(`
+// `branch` is a fallback: before migration 0029 adds assigned_to, we degrade to the old
+// branch-based inbox instead of showing nothing (so receiving isn't broken between the
+// code deploy and the SQL run).
+export async function pendingReceipts(userId: number, branch?: string) {
+  const base = (whereExtra: string, arg: any) => q<{ id: number; po_number: string; order_date: string; units: number; lines: { id: number; scent: string; size: string; qty: number; barcode: string }[] }>(`
       select po.id, po.po_number, po.order_date::text order_date, coalesce(sum(i.qty),0)::float units,
              coalesce(json_agg(json_build_object('id', i.id, 'scent', i.scent, 'size', i.size, 'qty', i.qty, 'barcode', i.barcode) order by i.line_no)
                       filter (where i.id is not null), '[]') lines
       from purchase_orders po left join po_items i on i.po_id = po.id
-      where po.status in ('delivered', 'approved') and po.deleted_at is null
-        and po.assigned_to = $1
-      group by po.id order by po.order_date desc, po.id desc`, [userId]);
-  } catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }
+      where po.status in ('delivered', 'approved') and po.deleted_at is null and ${whereExtra}
+      group by po.id order by po.order_date desc, po.id desc`, [arg]);
+  try {
+    return await base("po.assigned_to = $1", userId);
+  } catch (e: any) {
+    if (e?.code === "42703" && branch) {   // assigned_to column not migrated yet → old branch inbox
+      try { return await base("upper(substring(po.branch_label from '^[0-9]+_([A-Za-z]+)')) = $1", normalizeBranch(branch)); }
+      catch (e2: any) { if (e2?.code === "42P01" || e2?.code === "42703") return []; throw e2; }
+    }
+    if (e?.code === "42P01" || e?.code === "42703") return [];
+    throw e;
+  }
 }
 
 /** Stock allocations recorded for a branch (the mini-POs tagged ALLOC_STATUS). */

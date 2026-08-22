@@ -20,7 +20,7 @@ export default async function MyReceivePage() {
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
   const home = isBranch(user.branch) ? user.branch! : DEFAULT_BRANCH;
   const branch = bDate === today && isBranch(bCode) ? bCode : home;   // for the subtitle only
-  const receipts = await pendingReceipts(user.id);   // only requisitions assigned to this person
+  const receipts = await pendingReceipts(user.id, branch);   // assigned to this person (falls back to branch pre-0029)
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">

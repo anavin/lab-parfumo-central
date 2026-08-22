@@ -189,11 +189,19 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
 }
 
 /** Active salespeople who can be assigned to receive a requisition (for the picker). */
-export async function listReceivers(): Promise<{ id: number; full_name: string; role: string; branch: string | null }[]> {
+export async function listReceivers(branch?: string): Promise<{ id: number; full_name: string; role: string; branch: string | null }[]> {
   await requirePermission("requisitions");
-  const sel = (branchCol: string) => `select id, full_name, role, ${branchCol} as branch from users where is_active = true order by full_name`;
-  try { return await q(sel("branch")); }
-  catch (e: any) { if (e?.code !== "42703") throw e; return await q(sel("null::text")); }   // 0026 not run yet
+  const sel = (branchCol: string) => `select id, full_name, role, permissions, ${branchCol} as branch from users where is_active = true order by full_name`;
+  let rows: { id: number; full_name: string; role: string; permissions: string[] | null; branch: string | null }[];
+  try { rows = await q(sel("branch")); }
+  catch (e: any) { if (e?.code !== "42703") throw e; rows = await q(sel("null::text")); }   // 0026 not run yet
+  // Only salespeople can actually receive — they're the ones with a /my inbox. Assigning
+  // to a manager/admin (no my_sales) would make the requisition invisible to everyone.
+  let list = rows.filter((u) => can({ role: u.role, permissions: u.permissions }, "my_sales"));
+  // Keep it to the requisition's own branch (+ staff with no home branch) so a cross-branch
+  // assignment can't happen (which the receive branch-scope would then block anyway).
+  if (branch) list = list.filter((u) => !u.branch || resolveBranch(u.branch) === resolveBranch(branch));
+  return list.map(({ permissions, ...r }) => r);
 }
 
 /** Assign (or clear) which salesperson receives this requisition. Only that person
