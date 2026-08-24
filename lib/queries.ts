@@ -713,16 +713,17 @@ export function salesByPerson(f: Filter = ALL) {
 /** Daily sales totals across a month for the review-page chart. $1='YYYY-MM'.
  *  Combines the live `sales` table (approved + imported history) with still-pending
  *  submissions (not yet copied to sales) so the chart shows old data too, no double-count. */
-export async function dailySalesByMonth(month: string, source: string) {
+// source = a branch code, or null = ALL branches.
+export async function dailySalesByMonth(month: string, source: string | null) {
   return q<{ d: string; total: number; orders: number; qty: number }>(`
     select d::text d, coalesce(sum(total),0)::float total,
            count(distinct billkey)::int orders, coalesce(sum(qty),0)::float qty
     from (
       select sale_date d, total, coalesce(qty,0) qty, coalesce(nullif(receipt_no,''),'s'||id::text) billkey
-      from sales where sale_date is not null and to_char(sale_date,'YYYY-MM') = $1 and source = $2
+      from sales where sale_date is not null and to_char(sale_date,'YYYY-MM') = $1 and ($2::text is null or source = $2)
       union all
       select entry_date d, total, coalesce(qty,0) qty, coalesce(nullif(receipt_no,''),'p'||s.id::text) billkey
-      from submissions s where kind = 'sale' and status = 'pending' and to_char(entry_date,'YYYY-MM') = $1 and source = $2${await aliveAnd("s")}
+      from submissions s where kind = 'sale' and status = 'pending' and to_char(entry_date,'YYYY-MM') = $1 and ($2::text is null or source = $2)${await aliveAnd("s")}
     ) t
     group by d order by d`, [month, source]);
 }

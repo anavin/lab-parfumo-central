@@ -15,10 +15,10 @@ export async function getDailyReport(date: string, source: string, mine = false)
 }
 
 /** Daily sales totals across a month (branch-wide) — review page (privileged only). */
-export async function getMonthlyDaily(month: string, source: string) {
+export async function getMonthlyDaily(month: string, source: string | null) {
   const user = await requireUser();
   if (!isPrivileged(user)) throw new Error("ไม่มีสิทธิ์ดูข้อมูลรวมของสาขา");
-  return dailySalesByMonth(month, source);
+  return dailySalesByMonth(month, source);   // source null = ทุกสาขา
 }
 
 /** Per-bill detail for one day (branch-wide) — printable report (privileged only). */

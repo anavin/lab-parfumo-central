@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ReferenceLine } from "recharts";
 import { getMonthlyDaily } from "@/lib/actions/report";
+import { BRANCHES } from "@/lib/branches";
+import { Select } from "@/components/ui/Select";
 
 const BRAND = "#a17c48";      // gold — revenue
 const HILITE = "#6f5327";     // darker gold — today
@@ -56,12 +58,14 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision, onPickDay, 
 }) {
   const thisMonth = bkkToday().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
+  const ALL = "__all";
+  const [branch, setBranch] = useState<string>(defaultSource);   // own branch control (incl. ทุกสาขา)
   const [rows, setRows] = useState<{ d: string; total: number; orders: number; qty: number }[]>([]);
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    start(async () => { try { setRows(await getMonthlyDaily(month, defaultSource)); } catch { setRows([]); } });
-  }, [month, defaultSource, revision]);
+    start(async () => { try { setRows(await getMonthlyDaily(month, branch === ALL ? null : branch)); } catch { setRows([]); } });
+  }, [month, branch, revision]);
 
   const shiftMonth = (delta: number) => {
     const [y, m] = month.split("-").map(Number);
@@ -104,12 +108,20 @@ export function MonthlyDailyChart({ defaultSource = "CTW", revision, onPickDay, 
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand-dark flex items-center justify-center shrink-0"><BarChart3 className="w-5 h-5" /></div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-ink leading-tight">ยอดขายรายวัน</h3>
+            <h3 className="text-base font-semibold text-ink leading-tight">
+              ยอดขายรายวัน
+              <span className="ml-2 align-middle chip-brand">{branch === ALL ? "ทุกสาขา" : (BRANCHES.find((b) => b.code === branch)?.name ?? branch)}</span>
+            </h3>
             <p className="text-xs text-muted truncate">คลิกแท่งเพื่อเปิดรายงานของวันนั้น</p>
           </div>
         </div>
+        {/* branch selector — ทุกสาขา or one branch (independent of the review queue) */}
+        <div className="ml-auto w-[150px]">
+          <Select value={branch} onValueChange={setBranch}
+            options={[{ value: ALL, label: "ทุกสาขา" }, ...BRANCHES.filter((b) => b.active).map((b) => ({ value: b.code, label: b.name }))]} />
+        </div>
         {/* month navigator */}
-        <div className="ml-auto flex items-center gap-1 rounded-xl border border-line bg-surface p-1">
+        <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1">
           <button onClick={() => shiftMonth(-1)} aria-label="เดือนก่อนหน้า"
             className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-canvas transition-colors"><ChevronLeft className="w-4 h-4" /></button>
           <span className="min-w-[120px] text-center text-sm font-semibold text-ink tabular-nums select-none">{monthLabel(month)}</span>
