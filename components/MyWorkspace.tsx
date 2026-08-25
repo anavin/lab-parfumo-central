@@ -122,7 +122,6 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const [edit, setEdit] = useState<SaleState | null>(null);
   const [del, setDel] = useState<SubmissionRow | null>(null);
   const [toast, setToast] = useState<string | null>(null);   // brief "saved" confirmation
-  const [lastReceipt, setLastReceipt] = useState<{ ref: string; net: number } | null>(null);   // print-receipt shortcut for the bill just saved
   const formRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
   const refresh = () => router.refresh();
@@ -152,11 +151,11 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // On SUNMI (laser) don't open the camera popup — just open an empty bill; the
   // laser then adds items continuously. Elsewhere, auto-open the camera scanner.
   const startScan = () => {
-    setLastReceipt(null); setEdit(null);
+    setEdit(null);
     if (laserMode) { setAutoScan(false); setBill(blankBill(date, false, branch)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
     setAutoScan(true); setBill(blankBill(date, false, branch));
   };
-  const startManual = () => { setLastReceipt(null); setEdit(null); setAutoScan(false); setBill(blankBill(date, true, branch)); };
+  const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(date, true, branch)); };
 
   // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
   // Once a bill is open, BillForm's own scanner listener adds subsequent items.
@@ -187,7 +186,8 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         items, attachments: bill.attachments, tenders,
       });
       setBill(null);
-      if (res?.ref) setLastReceipt({ ref: res.ref, net: net ?? 0 });
+      // go straight to the printable receipt for the bill just saved
+      if (res?.ref) { router.push(`/receipt/${encodeURIComponent(res.ref)}`); return; }
       flash(`บันทึกบิลแล้ว · ${baht(net ?? 0)}`);
       // the sale is recorded for the day being viewed (today, or a back-dated day) —
       // stay on that day so the new bill is visible
@@ -265,24 +265,6 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
           </button>
           <button onClick={startManual} className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl border border-line bg-surface text-sm font-medium hover:bg-canvas active:scale-[.99] transition">
             <Plus className="w-4 h-4" /> เพิ่มเอง
-          </button>
-        </div>
-      )}
-
-      {/* receipt shortcut for the bill just saved — tap to open the printable ใบเสร็จ */}
-      {!busy && lastReceipt && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-success/40 bg-success/5 px-3 py-2.5">
-          <Check className="w-4 h-4 text-success shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">บันทึกแล้ว · {baht(lastReceipt.net)}</div>
-            <div className="text-xs text-muted truncate">{lastReceipt.ref}</div>
-          </div>
-          <a href={`/receipt/${encodeURIComponent(lastReceipt.ref)}`} target="_blank" rel="noopener"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-surface text-sm font-semibold shrink-0">
-            <ReceiptIcon className="w-4 h-4" /> ใบเสร็จ
-          </a>
-          <button onClick={() => setLastReceipt(null)} aria-label="ปิด" className="p-1.5 text-muted hover:text-ink shrink-0">
-            <X className="w-4 h-4" />
           </button>
         </div>
       )}
