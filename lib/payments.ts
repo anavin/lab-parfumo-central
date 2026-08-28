@@ -9,6 +9,7 @@ export const PAYMENTS = [
   { v: "K Shop", label: "K Shop QR" },
   { v: "K Shop Credit Card", label: "K Shop QR Credit Card" },
   { v: "EDC Credit Card", label: "บัตรเครดิต (EDC)" },
+  { v: "EDC QR", label: "QR Code (EDC)" },
   { v: "EDC Alipay/WeChat", label: "Alipay / WeChat (EDC)" },
 ];
 
