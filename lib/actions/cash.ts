@@ -9,7 +9,7 @@ import { offloadToStorage, deleteAttachment } from "@/lib/attachments";
 
 /** Admin: save the day's opening/deposit, recompute closing from that day's cash sales,
  *  mark it confirmed, and post the bank deposit into the cash ledger — once. */
-export async function confirmDrawer(date: string, branch: string, opening: number, seed: number, deposit: number): Promise<{ ok: boolean; error?: string }> {
+export async function confirmDrawer(date: string, branch: string, opening: number, seed: number, deposit: number, counted?: number | null): Promise<{ ok: boolean; error?: string }> {
   const me = await requirePermission("cash");
   const br = normalizeBranch(branch);
   try {
@@ -20,6 +20,12 @@ export async function confirmDrawer(date: string, branch: string, opening: numbe
              on conflict (entry_date, branch) do update
                set opening=$3, seed=$4, deposit=$5, closing=$6, updated_by=$7, updated_at=now(), confirmed=true`,
       [date, br, opening, seed, deposit, closing, me.id]);
+    // counted cash → over/short reconciliation. Separate, fail-soft write so a pre-0030
+    // schema (no counted_cash column) still confirms the drawer normally.
+    try {
+      const c = counted == null || Number.isNaN(Number(counted)) ? null : Math.round(Number(counted));
+      await q(`update daily_cash set counted_cash=$3 where entry_date=$1 and branch=$2`, [date, br, c]);
+    } catch (e: any) { if (e?.code !== "42703") throw e; }
 
     // post the bank deposit into the cash ledger once (posted_cash_id guards against dupes)
     const [row] = await q<{ posted: number | null }>(`select posted_cash_id posted from daily_cash where entry_date=$1 and branch=$2`, [date, br]);

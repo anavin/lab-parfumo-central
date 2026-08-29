@@ -979,9 +979,19 @@ export async function saveDailyCash(date: string, branch: string, opening: numbe
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return { ok: false, missing: true }; throw e; }
 }
 
+/** Counted (physically-counted) cash per day for a branch. Own guard so a missing
+ *  counted_cash column (pre-0030) degrades to "not counted" without breaking the log. */
+async function countedCashByDate(branch: string): Promise<Map<string, number>> {
+  try {
+    const rows = await q<{ d: string; c: number }>(
+      `select entry_date::text d, counted_cash::float c from daily_cash where branch=$1 and counted_cash is not null`, [branch]);
+    return new Map(rows.map((r) => [r.d, r.c]));
+  } catch { return new Map(); }   // column not migrated yet → treat as uncounted
+}
+
 /** Per-day shop drawer figures for the admin cash page (review + confirm + post), one branch. */
 export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) {
-  type Row = { entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean };
+  type Row = { entry_date: string; opening: number; seed: number; deposit: number; closing: number; confirmed: boolean; posted: boolean; counted: number | null; variance: number | null };
   try {
     const drawerRows = await q<Row>(
       `select entry_date::text entry_date, opening::float, coalesce(seed,0)::float seed, deposit::float, closing::float,
@@ -1004,6 +1014,7 @@ export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) 
     if (!allDates.length) return [];
     // "คงเหลือ" is computed LIVE = ยกมา + เอาไป + เงินสดขายวันนั้น − เข้าธนาคาร; carries to the next day.
     const cashByDate = new Map<string, number>();
+    const counted = await countedCashByDate(branch);
     await Promise.all(allDates.map(async (d) => cashByDate.set(d, (await dailyReport(d, branch)).cash)));
     let prevClosing = 0;
     const built: Row[] = allDates.map((d) => {
@@ -1012,7 +1023,9 @@ export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) 
       const seed = r?.seed ?? 0, deposit = r?.deposit ?? 0;
       const closing = Math.max(0, opening + seed + (cashByDate.get(d) ?? 0) - deposit);
       prevClosing = closing;
-      return { entry_date: d, opening, seed, deposit, closing, confirmed: r?.confirmed ?? false, posted: r?.posted ?? false };
+      const c = counted.has(d) ? counted.get(d)! : null;
+      return { entry_date: d, opening, seed, deposit, closing, confirmed: r?.confirmed ?? false, posted: r?.posted ?? false,
+        counted: c, variance: c == null ? null : Math.round(c - closing) };   // over(+)/short(−) vs expected
     });
     return built.reverse().slice(0, limit);   // most recent first, capped
   } catch (e) {
@@ -1037,7 +1050,7 @@ async function dailyCashLogLegacy(limit: number) {
       r.closing = Math.max(0, r.opening + (cashByDate.get(r.entry_date) ?? 0) - r.deposit);
       prevClosing = r.closing;
     }
-    return rows;
+    return rows.map((r) => ({ ...r, counted: null as number | null, variance: null as number | null }));
   } catch (e) { if (missingDailyCash(e) || (e as any)?.code === "42703") return []; throw e; }
 }
 
