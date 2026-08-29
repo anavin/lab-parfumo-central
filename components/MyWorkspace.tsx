@@ -89,7 +89,8 @@ type BillItemPayload = { item: string; barcode: string; size: string; qty: numbe
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "", nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
+// default to the most common case (เงินสด · ลูกค้าไทย) to save taps — both still editable per bill
+const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "Cash", nation: "Thai", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
@@ -704,6 +705,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const [acOpen, setAcOpen] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);   // surfaced so WebView issues are visible
   const nameRef = useRef<HTMLInputElement>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);   // debounce product search
   // when this card was just added via "เพิ่มเอง", scroll it near the TOP (below the
   // header via scroll-mt) so the keyboard + the search dropdown below the box have
   // room, then focus the search box to start typing the next item immediately
@@ -717,13 +719,17 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const onName = (v: string) => {
     onChange({ item: v, barcode: "" });
     setSearchErr(null);
-    if (v.trim()) {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const term = v.trim();
+    if (!term) { setAcOpen(false); return; }
+    // debounce so we hit the API once the user pauses, not on every keystroke
+    searchTimer.current = setTimeout(() => {
       // plain GET JSON (WebView-friendly) instead of a server action
-      fetch(`/api/products/search?q=${encodeURIComponent(v.trim())}`, { headers: { accept: "application/json" } })
+      fetch(`/api/products/search?q=${encodeURIComponent(term)}`, { headers: { accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
         .then((r) => { setRes(Array.isArray(r) ? r : []); setAcOpen(true); })
         .catch((e) => { setRes([]); setAcOpen(true); setSearchErr(String(e?.message || e) || "ค้นหาไม่สำเร็จ"); });
-    } else setAcOpen(false);
+    }, 250);
   };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
   const is4ml = /^4\s*ml/i.test(String(it.size || "").trim());   // giveaway-eligible size
@@ -980,6 +986,7 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   const knownCodes = useKnownBarcodes();
   const [missing, setMissing] = useState<string[]>([]);
   const [qrKey, setQrKey] = useState(0);
+  const itemTimer = useRef<ReturnType<typeof setTimeout> | null>(null);   // debounce product search
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
   const s = (k: keyof SaleState, v: any) => setState({ ...state, [k]: v });
   // numeric field: select-all on focus + strip leading zeros so a default 0 disappears when typing
@@ -991,12 +998,15 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
   });
   const onItem = (v: string) => {
     s("item", v);
-    if (v.trim()) {
-      fetch(`/api/products/search?q=${encodeURIComponent(v.trim())}`, { headers: { accept: "application/json" } })
+    if (itemTimer.current) clearTimeout(itemTimer.current);
+    const term = v.trim();
+    if (!term) { setAcOpen(false); return; }
+    itemTimer.current = setTimeout(() => {
+      fetch(`/api/products/search?q=${encodeURIComponent(term)}`, { headers: { accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : []))
         .then((r) => { setRes(Array.isArray(r) ? r : []); setAcOpen(true); })
         .catch(() => setAcOpen(false));
-    } else setAcOpen(false);
+    }, 250);
   };
   const onScanned = async (code: string) => {
     setScanning(false);

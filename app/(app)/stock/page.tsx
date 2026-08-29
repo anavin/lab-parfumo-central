@@ -1,6 +1,7 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num } from "@/lib/format";
-import { stockLive, stockSummary, reorderSuggestions, negativeStock } from "@/lib/queries";
+import { stockLive, stockSummary, reorderSuggestions, negativeStock, stockValuation } from "@/lib/queries";
+import { baht } from "@/lib/format";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockTable } from "@/components/StockTable";
@@ -18,9 +19,9 @@ export const dynamic = "force-dynamic";
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
-  const [rows, s, user, adjustments, reorder, negatives] = await Promise.all([
+  const [rows, s, user, adjustments, reorder, negatives, valuation] = await Promise.all([
     stockLive(branch), stockSummary(branch), getCurrentUser(), listStockAdjustments(branch),
-    reorderSuggestions(branch), negativeStock(branch),
+    reorderSuggestions(branch), negativeStock(branch), stockValuation(branch),
   ]);
   const lowCount = (s.low ?? 0) + (s.out ?? 0);
   const canRequisition = !!user && can(user, "requisitions");
@@ -45,6 +46,13 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         <Stat label="ใกล้หมด (≤3)" value={String(s.low)} tone="brand" />
         <Stat label="หมดสต๊อก" value={String(s.out)} tone="danger" />
       </div>
+      {valuation && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+          <Stat label="มูลค่าสต๊อก (ต้นทุน)" value={baht(valuation.cost)} tone="success" />
+          <Stat label="มูลค่าสต๊อก (ราคาขาย)" value={baht(valuation.retail)} />
+          <Stat label="ยังไม่ได้ใส่ต้นทุน" value={`${valuation.uncosted} / ${valuation.skus} SKU`} tone={valuation.uncosted > 0 ? "warn" : undefined} />
+        </div>
+      )}
 
       {lowCount > 0 && (
         <div className="alert-warn mb-6 flex-wrap items-center justify-between gap-3">

@@ -367,6 +367,33 @@ export async function negativeStock(branch: string | null = null) {
   }
 }
 
+/** Inventory valuation (฿) for on-hand stock: at latest unit cost (product_costs) and at
+ *  retail (products.price). `uncosted` = in-stock SKUs with no cost on file (excluded from
+ *  the cost figure, so it reads low until costs are entered). Null branch = all branches. */
+export async function stockValuation(branch: string | null = null) {
+  type Row = { cost: number; retail: number; uncosted: number; skus: number };
+  const lc = `, lc as (
+    select distinct on (barcode) barcode, unit_cost::float uc
+    from product_costs where barcode is not null order by barcode, cost_date desc nulls last, id desc)`;
+  const where = branch ? `where s.branch = $1` : ``;
+  const tail = `select
+      coalesce(sum(s.remaining * coalesce(p.price,0)),0)::float retail,
+      coalesce(sum(s.remaining * lc.uc) filter (where lc.uc is not null),0)::float cost,
+      count(*) filter (where s.remaining > 0 and lc.uc is null)::int uncosted,
+      count(*) filter (where s.remaining > 0)::int skus
+    from stock s
+    left join products p on p.barcode = s.barcode
+    left join lc on lc.barcode = s.barcode ${where}`;
+  const args = branch ? [branch] : [];
+  const run = (cte: string) => q<Row>(`${cte}${lc} ${tail}`, args);
+  try { const [r] = await run(STOCK_CTE); return r; }
+  catch (e: any) {
+    if (e?.code === "42P01") { const [r] = await run(STOCK_CTE_NOADJ); return r; }
+    if (e?.code === "42703") { const [r] = await run(STOCK_CTE_LEGACY); return r; }
+    throw e;
+  }
+}
+
 /** Reorder intelligence: for products that are actually selling, project days of cover
  *  from the last-30-day sales velocity and surface the ones running low (< 14 days, or
  *  already out with recent demand). Helps decide what to requisition next. */

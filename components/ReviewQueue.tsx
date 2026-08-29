@@ -571,12 +571,17 @@ function AddItemAdmin({ refId, pending, onDone }: { refId: string; pending: bool
   const [price, setPrice] = useState("");
   const [disc, setDisc] = useState("");
   const [busy, setBusy] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fld = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
   const onText = (v: string) => {
     setText(v); setPicked(null);
-    if (v.trim()) fetch(`/api/products/search?q=${encodeURIComponent(v.trim())}`, { headers: { accept: "application/json" } })
-      .then((r) => (r.ok ? r.json() : [])).then((rows) => { setRes(Array.isArray(rows) ? rows : []); setAcOpen(true); }).catch(() => {});
-    else setAcOpen(false);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const term = v.trim();
+    if (!term) { setAcOpen(false); return; }
+    searchTimer.current = setTimeout(() => {   // debounce: search once the user pauses
+      fetch(`/api/products/search?q=${encodeURIComponent(term)}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : [])).then((rows) => { setRes(Array.isArray(rows) ? rows : []); setAcOpen(true); }).catch(() => {});
+    }, 250);
   };
   const pick = (p: any) => { setPicked(p); setText(`${p.scent} ${p.size}`); setPrice(String(Math.round(p.price || 0))); setAcOpen(false); };
   const add = () => {
