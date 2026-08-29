@@ -116,13 +116,13 @@ export async function setRequisitionStatus(id: number, status: string): Promise<
   try {
     // keep the lifecycle timestamps in sync with the forced status
     const stamp =
-      status === "approved" ? `, approved_at = coalesce(approved_at, now()), approved_by = coalesce(approved_by, ${me.id})`
-      : status === "received" ? `, received_at = coalesce(received_at, now()), received_by = coalesce(received_by, ${me.id})`
+      status === "approved" ? `, approved_at = coalesce(approved_at, now()), approved_by = coalesce(approved_by, $3)`
+      : status === "received" ? `, received_at = coalesce(received_at, now()), received_by = coalesce(received_by, $3)`
       : "";
-    await q(`update purchase_orders set status=$2 ${stamp} where id=$1`, [id, status]);
+    await q(`update purchase_orders set status=$2 ${stamp} where id=$1`, stamp ? [id, status, me.id] : [id, status]);
     await logAudit("update", "requisition", id, `สถานะ → ${status}`);
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions");
-    revalidatePath("/my"); revalidatePath("/stock");   // received affects branch stock
+    revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/stock");   // received affects branch stock + inbox
     return { ok: true };
   } catch (e: any) {
     if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" };
@@ -183,7 +183,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     });
     if (!res.ok) return res;
     await logAudit("update", "requisition", id, `รับของเข้าสาขา (${(lines || []).length} รายการ)`);
-    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/my/stock"); revalidatePath("/stock");
+    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/my/stock"); revalidatePath("/stock");
     return { ok: true };
   } catch (e: any) { if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" }; console.error("[receiveRequisition]", e); return { ok: false, error: "รับของไม่สำเร็จ ลองใหม่" }; }
 }
@@ -217,7 +217,7 @@ export async function assignRequisition(id: number, userId: number | null): Prom
     }
     await q(`update purchase_orders set assigned_to = $2 where id = $1`, [id, userId]);
     await logAudit("update", "requisition", id, userId ? `มอบหมายผู้รับ #${userId}` : "ยกเลิกมอบหมายผู้รับ");
-    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my");
+    revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/my/receive");
     return { ok: true };
   } catch (e: any) {
     if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0029)" };

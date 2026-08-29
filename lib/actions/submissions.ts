@@ -87,7 +87,7 @@ export async function submitBill(input: unknown) {
   await tx(async (run) => {
     for (const it of d.items) {
       const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
-      const total = it.qty * (it.unit_price ?? 0) - (it.discount ?? 0);
+      const total = Math.max(0, it.qty * (it.unit_price ?? 0) - (it.discount ?? 0));   // never negative
       const [row] = await run<{ id: number }>(
         `insert into submissions
            (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
@@ -108,8 +108,13 @@ export async function submitBill(input: unknown) {
       attachIds.push({ id: ins.id, data: a });
     }
   });
-  // move slip images to Storage after the bill is committed (network call, not part of the DB tx)
-  for (const a of attachIds) await offloadToStorage("bill_attachments", "bill", a.id, a.data);
+  // move slip images to Storage after the bill is committed (network call, not part of the DB tx).
+  // Fail-soft: base64 already persists in the row, and this must never block the {ref} return
+  // (which drives the print-receipt redirect).
+  for (const a of attachIds) {
+    try { await offloadToStorage("bill_attachments", "bill", a.id, a.data); }
+    catch (e) { console.error("[submitBill] storage offload failed (kept base64)", e); }
+  }
   await logAudit("submit", "submission", null, `บิล ${count} รายการ · ฿${Math.round(sum).toLocaleString()}${d.attachments?.length ? ` · แนบ ${d.attachments.length} รูป` : ""}`);
   revalidatePath("/my"); revalidatePath("/review");
 
