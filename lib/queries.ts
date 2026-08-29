@@ -494,7 +494,7 @@ export function loginHistory(days = 5) {
     order by created_at desc limit 500`, [days]);
 }
 
-export function auditLog(filters: { action?: string; entity?: string; user?: string } = {}, limit = 200) {
+export function auditLog(filters: { action?: string; entity?: string; user?: string; from?: string; to?: string } = {}, limit = 200) {
   // show the user's CURRENT name/role (join users) so a rename updates old entries too;
   // fall back to the stored snapshot for deleted users or name-only events (failed login).
   return q<{ id: number; user_name: string; user_role: string; action: string; entity: string; entity_id: string; detail: string; created_at: string }>(`
@@ -505,8 +505,10 @@ export function auditLog(filters: { action?: string; entity?: string; user?: str
     where ($1::text is null or a.action = $1)
       and ($2::text is null or a.entity = $2)
       and ($3::text is null or coalesce(u.full_name, a.user_name) ilike '%'||$3||'%')
+      and ($5::text is null or a.created_at::date >= $5::date)
+      and ($6::text is null or a.created_at::date <= $6::date)
     order by a.created_at desc limit $4`,
-    [filters.action || null, filters.entity || null, filters.user || null, limit]);
+    [filters.action || null, filters.entity || null, filters.user || null, limit, filters.from || null, filters.to || null]);
 }
 
 export function trashedRequisitions() {

@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search, Download, Plus, Pencil, Trash2, RotateCcw, Flame, LogIn, LogOut,
   ShieldAlert, KeyRound, Check, Send, X, Activity, Users2, CalendarClock, Dot,
@@ -47,11 +48,19 @@ function dayLabel(key: string): string {
   return fmtDateTH(key + "T00:00:00");
 }
 
-export function AuditTimeline({ rows }: { rows: Row[] }) {
+export function AuditTimeline({ rows, from = "", to = "" }: { rows: Row[]; from?: string; to?: string }) {
+  const router = useRouter();
   const [action, setAction] = useState(ALL);
   const [entity, setEntity] = useState(ALL);
   const [user, setUser] = useState(ALL);
   const [text, setText] = useState("");
+  // date range is server-side (it can reach past the default window) — changing it navigates
+  const applyRange = (nf: string, nt: string) => {
+    const p = new URLSearchParams();
+    if (nf) p.set("from", nf);
+    if (nt) p.set("to", nt);
+    router.push(p.toString() ? `/audit?${p}` : "/audit");
+  };
 
   const users = useMemo(() => [...new Set(rows.map((r) => r.user_name).filter(Boolean))].sort(), [rows]);
   const actions = useMemo(() => [...new Set(rows.map((r) => r.action))], [rows]);
@@ -145,6 +154,23 @@ export function AuditTimeline({ rows }: { rows: Row[] }) {
             <div className="w-[128px] shrink-0"><Select value={entity} onValueChange={setEntity}
               options={opt("ประเภททั้งหมด", entities.map((e) => ({ value: e, label: ENTITY[e] ?? e })))} /></div>
           </div>
+        </div>
+
+        {/* date range (server-side) */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
+          <CalendarClock className="w-4 h-4 text-muted" />
+          <span className="text-xs text-muted">ช่วงวันที่:</span>
+          <input type="date" value={from} max={to || undefined} onChange={(e) => applyRange(e.target.value, to)}
+            className="border border-line rounded-lg px-2.5 h-9 text-sm bg-canvas/40 text-ink focus:outline-none focus:border-brand" />
+          <span className="text-muted">–</span>
+          <input type="date" value={to} min={from || undefined} onChange={(e) => applyRange(from, e.target.value)}
+            className="border border-line rounded-lg px-2.5 h-9 text-sm bg-canvas/40 text-ink focus:outline-none focus:border-brand" />
+          {(from || to) && (
+            <button onClick={() => applyRange("", "")}
+              className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink px-2 py-1 rounded-md hover:bg-canvas">
+              <X className="w-3.5 h-3.5" /> ล้างช่วงวันที่
+            </button>
+          )}
         </div>
 
         {/* result count + clear + export */}

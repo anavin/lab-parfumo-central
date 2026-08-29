@@ -349,9 +349,24 @@ export async function deleteMySubmission(id: number) {
 }
 
 // Admin edits any pending submission (fix data before approving). Reviewer-only.
+// Build a compact "field: old → new" audit string for the fields that actually changed.
+function diffDetail(before: Record<string, any>, after: Record<string, any>, labels: Record<string, string>): string {
+  const parts: string[] = [];
+  for (const [k, label] of Object.entries(labels)) {
+    const a = before[k] ?? "", b = after[k] ?? "";
+    if (String(a) !== String(b)) parts.push(`${label}: ${a === "" ? "—" : a} → ${b === "" ? "—" : b}`);
+  }
+  return parts.join(", ");
+}
+
 export async function updateSubmissionByAdmin(id: number, input: unknown) {
   await requirePermission("review");
-  const [row] = await q<{ kind: string; status: string }>(`select kind, status from submissions where id = $1`, [id]);
+  const [row] = await q<any>(
+    `select kind, status, entry_date::text entry_date, source, sale_time, receipt_no, item, barcode, size,
+            qty::float qty, unit_price::float unit_price, discount::float discount, total::float total,
+            payment_channel, nation, customers::float customers, sell_amount::float sell_amount,
+            thai::float thai, foreign_cnt::float foreign_cnt
+     from submissions where id = $1`, [id]);
   if (!row) throw new Error("ไม่พบรายการ");
   if (row.status !== "pending") throw new Error("รายการนี้ถูกตรวจแล้ว แก้ไขไม่ได้");
 
@@ -372,7 +387,10 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
        d.payment_channel || null, d.nation || null]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
     await applyEditTenders(id, d, total);
-    await logAudit("update", "submission", id, `แอดมินแก้ไข: ${d.item}`);
+    const diff = diffDetail(row,
+      { item: d.item, size: d.size || "", qty: d.qty, unit_price: d.unit_price ?? 0, discount, total, payment_channel: d.payment_channel || "", nation: d.nation || "", receipt_no: d.receipt_no || "" },
+      { item: "สินค้า", size: "ขนาด", qty: "จำนวน", unit_price: "ราคา", discount: "ส่วนลด", total: "รวม", payment_channel: "ช่องทาง", nation: "สัญชาติ", receipt_no: "เลขใบเสร็จ" });
+    await logAudit("update", "submission", id, `แอดมินแก้ไข: ${d.item}${diff ? ` · ${diff}` : ""}`);
   } else {
     const parsed = customerDaySchema.safeParse(input);
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
@@ -380,7 +398,10 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
     await q(
       `update submissions set entry_date=$2, customers=$3, sell_amount=$4, thai=$5, foreign_cnt=$6, updated_at=now() where id=$1`,
       [id, d.cust_date, d.customers, d.sell_amount ?? 0, d.thai ?? null, d.foreign ?? null]);
-    await logAudit("update", "submission", id, `แอดมินแก้ไขลูกค้า: ${d.cust_date}`);
+    const diff = diffDetail(row,
+      { customers: d.customers, sell_amount: d.sell_amount ?? 0, thai: d.thai ?? "", foreign_cnt: d.foreign ?? "" },
+      { customers: "ลูกค้า", sell_amount: "ยอดขาย", thai: "ไทย", foreign_cnt: "ต่างชาติ" });
+    await logAudit("update", "submission", id, `แอดมินแก้ไขลูกค้า: ${d.cust_date}${diff ? ` · ${diff}` : ""}`);
   }
   revalidatePath("/review"); revalidatePath("/my");
 }

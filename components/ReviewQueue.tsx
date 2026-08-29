@@ -2,8 +2,8 @@
 import { useState, useMemo, useTransition, useEffect, useContext, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ReviewDayContext } from "@/components/review-day-context";
-import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Plus, Receipt as ReceiptIcon } from "lucide-react";
-import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin } from "@/lib/actions/submissions";
+import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Plus, Receipt as ReceiptIcon, AlertTriangle, Undo2 } from "lucide-react";
+import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin, rejectMany } from "@/lib/actions/submissions";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -41,6 +41,24 @@ const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/
 
 type Bill = { key: string; ref: string; author: string; rows: SubmissionRow[] };
 type Day = { date: string; bills: Bill[] };
+
+// Cheap heuristics that flag a bill worth a second look before approving — free items,
+// deep discounts, missing barcodes, or oddly large quantities. Pure display; never blocks.
+function billAnomalies(bill: Bill): string[] {
+  const out: string[] = [];
+  for (const r of bill.rows) {
+    if (r.kind !== "sale") continue;
+    const qty = Number(r.qty) || 0, price = Number(r.unit_price) || 0, disc = Number(r.discount) || 0;
+    const sub = qty * price;
+    const name = r.item || "รายการ";
+    if (price === 0) out.push(`${name}: ราคา 0`);
+    else if (sub > 0 && disc >= sub) out.push(`${name}: ส่วนลดเต็มจำนวน`);
+    else if (sub > 0 && disc / sub > 0.5) out.push(`${name}: ส่วนลด >50%`);
+    if (!r.barcode) out.push(`${name}: ไม่มีบาร์โค้ด`);
+    if (qty > 50) out.push(`${name}: จำนวนสูงผิดปกติ (${qty})`);
+  }
+  return [...new Set(out)];
+}
 
 // group rows by DAY, then by BILL (shared receipt/ref), preserving order
 function groupDays(rows: SubmissionRow[]): Day[] {
@@ -183,6 +201,17 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
       } catch { alert("ลบไม่สำเร็จ ลองใหม่อีกครั้ง"); } finally { setBusy(null); }
     });
   };
+  const rejectBill = (bill: Bill) => {
+    const note = prompt("ตีกลับบิลนี้ให้พนักงานแก้ไข\nใส่หมายเหตุ (เหตุผล) ให้พนักงานเห็น:", "");
+    if (note === null) return;   // cancelled
+    start(async () => {
+      setBusy(bill.key);
+      try {
+        const n = await rejectMany(bill.rows.map((r) => r.id), note.trim());
+        if (n > 0) refresh(); else alert("ตีกลับไม่สำเร็จ");
+      } catch (e: any) { alert(e?.message ?? "ตีกลับไม่สำเร็จ"); } finally { setBusy(null); }
+    });
+  };
   const approveDay = (day: Day) => {
     const ids = day.bills.flatMap((b) => b.rows.map((r) => r.id));
     if (!confirm(`อนุมัติทั้งวัน ${fmtThaiDay(day.date)} · ${day.bills.length} บิล?`)) return;
@@ -266,8 +295,9 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                 const total = bill.rows.reduce((s, r) => s + (r.total ?? 0), 0);
                 const photos = attachments[bill.ref] || [];
                 const isSale = first.kind === "sale";
+                const anomalies = billAnomalies(bill);
                 return (
-                  <div key={bill.key} className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
+                  <div key={bill.key} className={`rounded-xl border bg-surface shadow-sm overflow-hidden ${anomalies.length ? "border-warn/50" : "border-line"}`}>
                     {/* bill header */}
                     <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-canvas/70 border-b border-line">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -285,6 +315,12 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                       <span className="text-sm font-bold text-ink tabular-nums shrink-0">{baht(total)}</span>
                     </div>
 
+                    {anomalies.length > 0 && (
+                      <div className="flex items-start gap-1.5 px-3.5 py-1.5 bg-warn-soft/60 border-b border-warn/20 text-[11px] text-warn">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span className="min-w-0"><b>ตรวจสอบ:</b> {anomalies.join(" · ")}</span>
+                      </div>
+                    )}
                     {/* items */}
                     <div className="px-3.5 py-2.5">
                       <ul className="space-y-1.5">
@@ -333,6 +369,10 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                         <button onClick={() => trashBill(bill)} disabled={pending}
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-danger text-sm font-medium hover:bg-danger-soft disabled:opacity-50">
                           <Trash2 className="w-4 h-4" /> ลบ
+                        </button>
+                        <button onClick={() => rejectBill(bill)} disabled={pending} title="ส่งบิลกลับให้พนักงานแก้ไข พร้อมหมายเหตุ"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-warn text-sm font-medium hover:bg-warn-soft disabled:opacity-50">
+                          {busy === bill.key ? <Clock className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />} ตีกลับ
                         </button>
                         <button onClick={() => approveBill(bill)} disabled={pending}
                           className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
