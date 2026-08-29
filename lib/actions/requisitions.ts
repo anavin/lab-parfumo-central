@@ -6,7 +6,7 @@ import { requisitionSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { requirePermission, requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
-import { resolveBranch } from "@/lib/branches";
+import { resolveBranch, isBranch } from "@/lib/branches";
 
 export type ReqItemInput = { barcode: string; scent: string; size: string; qty: number; product_id?: number | null };
 export type ReqInput = {
@@ -168,9 +168,13 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
       const [po] = await run<{ status: string; branch_label: string | null }>(`select status, branch_label from purchase_orders where id=$1 and deleted_at is null for update`, [id]);
       if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
       if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
-      // a salesperson (my_sales, not an admin with `requisitions`) may only receive their own branch's PO
-      if (!can(me, "requisitions") && me.branch && resolveBranch(po.branch_label) !== resolveBranch(me.branch)) {
-        return { ok: false, error: "รับได้เฉพาะใบเบิกของสาขาตัวเอง" };
+      // a salesperson (my_sales, not an admin with `requisitions`) may only receive their own branch's PO.
+      // Guard against a PO whose branch_label is missing/unrecognized (resolveBranch would silently
+      // fall back to CTW and leak such POs to CTW staff) — require an explicit known-branch match.
+      if (!can(me, "requisitions") && me.branch) {
+        if (!isBranch(po.branch_label) || resolveBranch(po.branch_label) !== resolveBranch(me.branch)) {
+          return { ok: false, error: "รับได้เฉพาะใบเบิกของสาขาตัวเอง" };
+        }
       }
       for (const l of lines || []) {
         // cap received at the ordered qty so a fat-finger can't inflate branch stock
@@ -210,10 +214,21 @@ export async function assignRequisition(id: number, userId: number | null): Prom
   await requirePermission("requisitions");
   try {
     if (userId != null) {   // only an active salesperson can be the receiver (they have the /my inbox)
-      const [u] = await q<{ role: string; permissions: string[] | null; is_active: boolean }>(
-        `select role, permissions, is_active from users where id = $1`, [userId]);
+      let u: { role: string; permissions: string[] | null; is_active: boolean; branch: string | null } | undefined;
+      try {
+        [u] = await q(`select role, permissions, is_active, branch from users where id = $1`, [userId]);
+      } catch (e: any) {   // users.branch not migrated yet → validate without the branch check
+        if (e?.code !== "42703") throw e;
+        [u] = await q(`select role, permissions, is_active, null::text as branch from users where id = $1`, [userId]);
+      }
       if (!u || !u.is_active) return { ok: false, error: "ไม่พบผู้ใช้ หรือถูกปิดใช้งาน" };
       if (!can({ role: u.role, permissions: u.permissions }, "my_sales")) return { ok: false, error: "มอบหมายได้เฉพาะพนักงานขาย" };
+      if (u.branch) {   // receiver must belong to the same branch as the requisition
+        const [po] = await q<{ branch_label: string | null }>(`select branch_label from purchase_orders where id = $1`, [id]);
+        if (po?.branch_label && resolveBranch(po.branch_label) !== resolveBranch(u.branch)) {
+          return { ok: false, error: "ผู้รับต้องเป็นพนักงานสาขาเดียวกับใบเบิก" };
+        }
+      }
     }
     await q(`update purchase_orders set assigned_to = $2 where id = $1`, [id, userId]);
     await logAudit("update", "requisition", id, userId ? `มอบหมายผู้รับ #${userId}` : "ยกเลิกมอบหมายผู้รับ");

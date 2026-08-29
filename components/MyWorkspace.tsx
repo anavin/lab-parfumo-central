@@ -142,8 +142,12 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // scary alert; only show real (client-visible) messages.
   const onActionError = (e: any, close?: () => void) => {
     console.error("[action]", e?.digest, e?.message, e);
-    if (e?.digest || /Server Components render/i.test(String(e?.message || ""))) { close?.(); refresh(); }
-    else alert(e?.message ?? "ทำรายการไม่สำเร็จ");
+    // Only Next.js control-flow (redirect / notFound) should silently close+refresh.
+    // A real server error also carries a digest in production — DON'T swallow it, or the
+    // user thinks the action succeeded when it failed.
+    const digest = String(e?.digest || "");
+    if (digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_NOT_FOUND")) { close?.(); refresh(); }
+    else alert(e?.message?.startsWith("An error occurred in the Server Components render") ? "ทำรายการไม่สำเร็จ กรุณาลองใหม่" : (e?.message ?? "ทำรายการไม่สำเร็จ"));
   };
 
   // new bills record for the day being VIEWED (today, or a back-dated day picked
@@ -185,9 +189,11 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
         items, attachments: bill.attachments, tenders,
       });
+      if (!res.ok) { alert(res.error); return; }   // keep the bill open so nothing is lost
       setBill(null);
-      // go straight to the printable receipt for the bill just saved
-      if (res?.ref) { router.push(`/receipt/${encodeURIComponent(res.ref)}`); return; }
+      // go straight to the printable receipt — but only for a today's sale. When back-dating
+      // (viewing an older day) stay put so the salesperson can keep re-keying that day.
+      if (res.ref && !viewingPast) { router.push(`/receipt/${encodeURIComponent(res.ref)}`); return; }
       flash(`บันทึกบิลแล้ว · ${baht(net ?? 0)}`);
       // the sale is recorded for the day being viewed (today, or a back-dated day) —
       // stay on that day so the new bill is visible

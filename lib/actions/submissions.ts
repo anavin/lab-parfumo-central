@@ -47,44 +47,50 @@ export async function submitSale(input: unknown) {
 // single bill/customer, plus shared payment/nationality/time.
 // Standard, human-readable bill ref when staff leaves เลขใบเสร็จ blank:
 //   {BRANCH}-{YYMMDD}-{running}  e.g. CTW-260806-001  (sortable, self-explanatory)
-async function genBillRef(saleDate: string, source: string): Promise<string> {
+// Runs INSIDE the bill transaction and takes a per-(branch,day) advisory lock first,
+// so two salespeople saving at the same second can't compute the same running number
+// (which would merge two customers' bills under one receipt).
+async function genBillRefTx(run: TxRun, saleDate: string, source: string): Promise<string> {
   const [y, m, dd] = saleDate.split("-");
   const src = branchPrefix(source);
   const prefix = `${src}-${(y || "").slice(2)}${(m || "").padStart(2, "0")}${(dd || "").padStart(2, "0")}-`;
-  // max running number already used for this branch+day (only our generated refs)
-  const [mx] = await q<{ n: number }>(
+  await run(`select pg_advisory_xact_lock(hashtext($1))`, [prefix]);   // serialize concurrent generation
+  const [mx] = await run<{ n: number }>(
     `select coalesce(max(substring(receipt_no from '[0-9]+$')::int), 0) n
      from submissions where receipt_no ~ $1`, [`^${prefix}[0-9]+$`]);
   return prefix + String((mx?.n ?? 0) + 1).padStart(3, "0");
 }
 
-export async function submitBill(input: unknown) {
+type SubmitResult = { ok: true; ref: string } | { ok: false; error: string };
+export async function submitBill(input: unknown): Promise<SubmitResult> {
   const user = await requirePermission("my_sales");
   const parsed = billSchema.safeParse(input);
-  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" };
   const d = parsed.data;
-  if (!d.nation?.trim()) throw new Error("กรุณาเลือกสัญชาติลูกค้า");
+  if (!d.nation?.trim()) return { ok: false, error: "กรุณาเลือกสัญชาติลูกค้า" };
   const billPc = d.payment_channel?.trim() || "";
   const split = isSplit(billPc);
   // each line's channel = its own override, else the bill default; all required
-  if (!split && d.items.some((it) => !((it.payment_channel?.trim() || billPc)))) throw new Error("กรุณาเลือกช่องทางชำระให้ครบทุกชิ้น");
+  if (!split && d.items.some((it) => !((it.payment_channel?.trim() || billPc)))) return { ok: false, error: "กรุณาเลือกช่องทางชำระให้ครบทุกชิ้น" };
 
   // split tender: the per-channel amounts must add up to the bill total
   const billTotal = d.items.reduce((s, it) => s + (it.qty * (it.unit_price ?? 0) - (it.discount ?? 0)), 0);
   const tenders = split ? (d.tenders ?? []).filter((t) => t.channel?.trim() && t.amount > 0) : [];
   if (split) {
-    if (tenders.length < 2) throw new Error("จ่าย 2 ทาง: เลือกช่องทางและใส่ยอดให้ครบอย่างน้อย 2 ช่องทาง");
+    if (tenders.length < 2) return { ok: false, error: "จ่าย 2 ทาง: เลือกช่องทางและใส่ยอดให้ครบอย่างน้อย 2 ช่องทาง" };
     const tsum = Math.round(tenders.reduce((s, t) => s + t.amount, 0));
-    if (tsum !== Math.round(billTotal)) throw new Error(`ยอดชำระรวม ฿${tsum.toLocaleString()} ไม่เท่ากับยอดบิล ฿${Math.round(billTotal).toLocaleString()}`);
+    if (tsum !== Math.round(billTotal)) return { ok: false, error: `ยอดชำระรวม ฿${tsum.toLocaleString()} ไม่เท่ากับยอดบิล ฿${Math.round(billTotal).toLocaleString()}` };
   }
 
-  const ref = d.receipt_no?.trim() || (await genBillRef(d.sale_date, resolveBranch(d.source)));
+  let ref = d.receipt_no?.trim() || "";
   let count = 0, sum = 0;
-  // Whole bill in ONE transaction: line rows + split tenders + attachment rows all
-  // commit together, so a mid-loop failure can't leave a half-saved bill (which the
-  // salesperson would re-submit → duplicate). Storage offload runs AFTER commit.
+  try {
+  // Whole bill in ONE transaction: the ref is generated here (under an advisory lock)
+  // and line rows + split tenders + attachment rows all commit together, so a mid-loop
+  // failure can't leave a half-saved bill (re-submit → duplicate). Offload runs AFTER commit.
   const attachIds: { id: number; data: string }[] = [];
   await tx(async (run) => {
+    if (!ref) ref = await genBillRefTx(run, d.sale_date, resolveBranch(d.source));
     for (const it of d.items) {
       const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
       const total = Math.max(0, it.qty * (it.unit_price ?? 0) - (it.discount ?? 0));   // never negative
@@ -135,7 +141,11 @@ export async function submitBill(input: unknown) {
     await pushLine(lines.join("\n"));
   } catch (e) { console.error("[submitBill] line notify failed", e); }
 
-  return { ref };   // so the UI can offer a "print receipt" link for the bill just saved
+    return { ok: true, ref };   // so the UI can offer a "print receipt" link for the bill just saved
+  } catch (e: any) {
+    console.error("[submitBill]", e);
+    return { ok: false, error: "บันทึกบิลไม่สำเร็จ กรุณาลองใหม่" };
+  }
 }
 
 // ------- add item(s) to an EXISTING pending bill (same receipt_no) -------
