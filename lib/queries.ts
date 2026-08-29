@@ -348,6 +348,51 @@ export async function stockForBarcodes(branch: string, barcodes: string[]): Prom
   return new Map(rows.map((r) => [r.barcode, Number(r.remaining) || 0]));
 }
 
+/** Negative-stock exceptions: products where a branch sold/returned MORE than it was
+ *  ever shipped (+adjustments) — i.e. the live remaining hit its 0 floor and the true
+ *  balance is negative. Signals untracked shipments, mis-scanned barcodes, or a missing
+ *  opening-stock entry. `net` is the un-floored balance (always < 0 here). */
+export async function negativeStock(branch: string | null = null) {
+  type Row = { barcode: string; scent: string; size: string; branch: string; shipped: number; sold: number; returned: number; adjusted: number; net: number };
+  const cols = `barcode, scent, size, branch, shipped, sold, returned, adjusted, (shipped + adjusted - sold - returned)::float net`;
+  const sel = (cte: string) => branch
+    ? `${cte} select ${cols} from stock where branch = $1 and (shipped + adjusted - sold - returned) < 0 order by net asc`
+    : `${cte} select ${cols} from stock where (shipped + adjusted - sold - returned) < 0 order by net asc`;
+  const args = branch ? [branch] : [];
+  try { return await q<Row>(sel(STOCK_CTE), args); }
+  catch (e: any) {
+    if (e?.code === "42P01") return q<Row>(sel(STOCK_CTE_NOADJ), args);
+    if (e?.code === "42703") return q<Row>(sel(STOCK_CTE_LEGACY), args);
+    throw e;
+  }
+}
+
+/** Reorder intelligence: for products that are actually selling, project days of cover
+ *  from the last-30-day sales velocity and surface the ones running low (< 14 days, or
+ *  already out with recent demand). Helps decide what to requisition next. */
+export async function reorderSuggestions(branch: string | null = null, coverDays = 14) {
+  type Row = { barcode: string; scent: string; size: string; branch: string; remaining: number; sold30: number; velocity: number; days_cover: number | null };
+  const velCte = `, vel as (
+    select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
+    from sales where barcode is not null and sale_date::date >= current_date - interval '30 days' group by 1, 2)`;
+  const bfilter = branch ? `and s.branch = $2` : ``;
+  const tail = `select s.barcode, s.scent, s.size, s.branch, s.remaining,
+       coalesce(v.q,0)::float sold30,
+       round((coalesce(v.q,0)/30.0)::numeric, 2)::float velocity,
+       case when coalesce(v.q,0) > 0 then round((s.remaining / nullif(v.q/30.0,0))::numeric, 1)::float else null end days_cover
+     from stock s left join vel v on v.barcode = s.barcode and v.branch = s.branch
+     where coalesce(v.q,0) > 0 and (s.remaining / nullif(v.q/30.0,0)) < $1 ${bfilter}
+     order by days_cover asc nulls last, s.remaining asc`;
+  const args: any[] = branch ? [coverDays, branch] : [coverDays];
+  const run = (cte: string) => q<Row>(`${cte}${velCte} ${tail}`, args);
+  try { return await run(STOCK_CTE); }
+  catch (e: any) {
+    if (e?.code === "42P01") return run(STOCK_CTE_NOADJ);
+    if (e?.code === "42703") return run(STOCK_CTE_LEGACY);
+    throw e;
+  }
+}
+
 type ProdRow = { id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number; remaining: number | null };
 /** Product search for the sale form. A stock-gated branch (isStockGated) only returns
  *  products in stock at that branch and includes `remaining` (so the qty picker can cap

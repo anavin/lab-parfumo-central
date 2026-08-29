@@ -1,6 +1,6 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num } from "@/lib/format";
-import { stockLive, stockSummary } from "@/lib/queries";
+import { stockLive, stockSummary, reorderSuggestions, negativeStock } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockTable } from "@/components/StockTable";
@@ -18,7 +18,10 @@ export const dynamic = "force-dynamic";
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
-  const [rows, s, user, adjustments] = await Promise.all([stockLive(branch), stockSummary(branch), getCurrentUser(), listStockAdjustments(branch)]);
+  const [rows, s, user, adjustments, reorder, negatives] = await Promise.all([
+    stockLive(branch), stockSummary(branch), getCurrentUser(), listStockAdjustments(branch),
+    reorderSuggestions(branch), negativeStock(branch),
+  ]);
   const lowCount = (s.low ?? 0) + (s.out ?? 0);
   const canRequisition = !!user && can(user, "requisitions");
 
@@ -61,6 +64,71 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         <BranchStockClose branch={branch} branchLabel={branchName(branch)} remainingUnits={Math.round(s.remaining)} skus={rows.length} />
       )}
       {canRequisition && <StockAdjust defaultBranch={branch} adjustments={adjustments} />}
+
+      {reorder.length > 0 && (
+        <Card title={`ควรเติมสต๊อก (${reorder.length}) · เหลือ < 14 วันตามยอดขาย 30 วันล่าสุด`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-muted border-b border-line">
+                <th className="py-2 pr-3">สินค้า</th>
+                {!branch && <th className="py-2 pr-3">สาขา</th>}
+                <th className="py-2 pr-3 text-right">คงเหลือ</th>
+                <th className="py-2 pr-3 text-right">ขาย/วัน</th>
+                <th className="py-2 pr-3 text-right">เหลือกี่วัน</th>
+              </tr></thead>
+              <tbody>
+                {reorder.map((r, i) => (
+                  <tr key={`${r.barcode}-${r.branch}-${i}`} className="border-b border-line/60">
+                    <td className="py-2 pr-3">{r.scent}{r.size ? <span className="text-muted"> · {r.size}</span> : null}</td>
+                    {!branch && <td className="py-2 pr-3 text-muted">{branchName(r.branch)}</td>}
+                    <td className="py-2 pr-3 text-right tabular-nums">{num(r.remaining)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{r.velocity}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">
+                      <span className={(r.days_cover ?? 99) <= 7 ? "chip-danger" : "chip-warn"}>
+                        {r.days_cover == null ? "—" : `${r.days_cover} วัน`}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {negatives.length > 0 && (
+        <Card title={`สต๊อกติดลบ (${negatives.length}) · ขาย/คืนเกินที่รับเข้า — ตรวจสอบข้อมูล`}>
+          <div className="alert-warn mb-3 text-sm">
+            รายการเหล่านี้ขายหรือคืนมากกว่าที่ส่งเข้าสาขา อาจมีของที่ยังไม่ได้บันทึกรับ, สแกนบาร์โค้ดผิด หรือยังไม่ได้ตั้งสต๊อกยกมา
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-muted border-b border-line">
+                <th className="py-2 pr-3">สินค้า</th>
+                {!branch && <th className="py-2 pr-3">สาขา</th>}
+                <th className="py-2 pr-3 text-right">รับเข้า</th>
+                <th className="py-2 pr-3 text-right">ปรับ</th>
+                <th className="py-2 pr-3 text-right">ขาย</th>
+                <th className="py-2 pr-3 text-right">คืน</th>
+                <th className="py-2 pr-3 text-right">คงเหลือจริง</th>
+              </tr></thead>
+              <tbody>
+                {negatives.map((r, i) => (
+                  <tr key={`${r.barcode}-${r.branch}-${i}`} className="border-b border-line/60">
+                    <td className="py-2 pr-3">{r.scent}{r.size ? <span className="text-muted"> · {r.size}</span> : null}</td>
+                    {!branch && <td className="py-2 pr-3 text-muted">{branchName(r.branch)}</td>}
+                    <td className="py-2 pr-3 text-right tabular-nums">{num(r.shipped)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{num(r.adjusted)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{num(r.sold)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{num(r.returned)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-danger font-semibold">{num(r.net)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Card title={`รายการสินค้า (${rows.length} SKU) · คลิกหัวคอลัมน์เพื่อเรียง`}>
         <StockTable rows={rows} />
