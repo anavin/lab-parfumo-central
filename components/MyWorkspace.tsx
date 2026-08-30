@@ -89,8 +89,8 @@ type BillItemPayload = { item: string; barcode: string; size: string; qty: numbe
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-// default to the most common case (เงินสด · ลูกค้าไทย) to save taps — both still editable per bill
-const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "Cash", nation: "Thai", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
+// default to the most common case (เงินสด · ลูกค้าต่างชาติ) to save taps — both still editable per bill
+const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "Cash", nation: "Foreign", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
