@@ -89,14 +89,15 @@ type BillItemPayload = { item: string; barcode: string; size: string; qty: numbe
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-// default to the most common case (เงินสด · ลูกค้าต่างชาติ) to save taps — both still editable per bill
-const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: "Cash", nation: "Foreign", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
+// default nationality = ต่างชาติ (majority of customers); default channel = the branch's
+// most-used channel (passed in), falling back to เงินสด. Both still editable per bill.
+const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH, defaultPay = "Cash"): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: defaultPay, nation: "Foreign", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
-export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null }:
-  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null, defaultPay = "Cash" }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null; defaultPay?: string }) {
   const router = useRouter();
   const viewingPast = date !== today;   // browsing an older day; new sales still go to today
   // Which shop the salesperson is working at today (Central World / Seacon …).
@@ -157,10 +158,10 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   // laser then adds items continuously. Elsewhere, auto-open the camera scanner.
   const startScan = () => {
     setEdit(null);
-    if (laserMode) { setAutoScan(false); setBill(blankBill(date, false, branch)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
-    setAutoScan(true); setBill(blankBill(date, false, branch));
+    if (laserMode) { setAutoScan(false); setBill(blankBill(date, false, branch, defaultPay)); flash("ยิง laser ที่บาร์โค้ดได้เลย"); return; }
+    setAutoScan(true); setBill(blankBill(date, false, branch, defaultPay));
   };
-  const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(date, true, branch)); };
+  const startManual = () => { setEdit(null); setAutoScan(false); setBill(blankBill(date, true, branch, defaultPay)); };
 
   // hardware (Bluetooth/USB) scanner while idle → open a fresh bill with the item.
   // Once a bill is open, BillForm's own scanner listener adds subsequent items.
@@ -169,7 +170,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       const p = await lookupBarcode(code);
       const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
                    : newItem({ barcode: code });
-      setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false, branch), items: [it] });
+      setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false, branch, defaultPay), items: [it] });
       beep("ok"); try { navigator.vibrate?.(40); } catch {}
     } catch (e: any) { onActionError(e); }
   });

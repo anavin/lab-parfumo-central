@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { isBranch, DEFAULT_BRANCH, isStockGated } from "@/lib/branches";
-import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts, stockLive } from "@/lib/queries";
+import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts, stockLive, topPaymentChannels } from "@/lib/queries";
 import { ReceivingPanel } from "@/components/ReceivingPanel";
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
@@ -43,12 +43,15 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const [bCode, bDate] = (jar.get("my_branch")?.value || "").split(":");
   const branch = bDate === today && isBranch(bCode) ? bCode : homeBranch;
 
-  const [kpi, rows, trendRows, receipts] = await Promise.all([
+  const [kpi, rows, trendRows, receipts, payRank] = await Promise.all([
     myDayKpis(user.id, date),
     mySubmissions(user.id, date),
     myTrend(user.id, 14),
     pendingReceipts(user.id, branch),   // assigned to this person (falls back to branch pre-0029)
+    topPaymentChannels(branch),         // default the sale form to this branch's most-used channel
   ]);
+  // default payment channel = the branch's most-used channel that's still offered; else เงินสด
+  const defaultPay = payRank.map((r) => r.channel).find((c) => PAYMENTS.some((p) => p.v === c)) ?? "Cash";
   // Fill every day in the 14-day window (including zero-sale days) so the chart
   // is a true timeline, not just the scattered days that had sales. UTC math so
   // the day keys never drift across the timezone boundary.
@@ -78,7 +81,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       <ReceivingPanel pending={receipts} />
 
       {/* data entry first */}
-      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} stockMap={stockMap} />
+      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} stockMap={stockMap} defaultPay={defaultPay} />
 
       {/* daily summary — below the entry */}
       <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>

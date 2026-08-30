@@ -394,6 +394,22 @@ export async function stockValuation(branch: string | null = null) {
   }
 }
 
+/** Payment channels ranked by how often they were used, most-used first, over the last
+ *  `days` of sales (optionally for one branch). Split-tender and blanks excluded. Used to
+ *  pick the default channel on the sale form. Empty on no data / missing table. */
+export async function topPaymentChannels(branch: string | null = null, days = 90) {
+  try {
+    return await q<{ channel: string; n: number }>(
+      `select payment_channel channel, count(*)::int n
+       from sales
+       where payment_channel is not null and payment_channel <> '' and payment_channel <> $2
+         and sale_date::date >= current_date - ($3 || ' days')::interval
+         and ($1::text is null or source = $1)
+       group by 1 order by n desc, channel limit 8`,
+      [branch, SPLIT2, String(days)]);
+  } catch { return []; }
+}
+
 /** Reorder intelligence: for products that are actually selling, project days of cover
  *  from the last-30-day sales velocity and surface the ones running low (< 14 days, or
  *  already out with recent demand). Helps decide what to requisition next. */
