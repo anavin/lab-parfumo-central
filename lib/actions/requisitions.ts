@@ -194,7 +194,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     // When the central-warehouse integration is on, the AUTHORITATIVE received quantities come
     // from the SKUs the warehouse actually dispatched (not the requested qty, and not the branch's
     // manual count). Pull them, require the warehouse to have dispatched, and map SKUs→lines by
-    // normalized (product name + size). The warehouse is closed AFTER stock is committed (per CTW_API.md).
+    // barcode (name+size only as a legacy fallback). The warehouse is closed AFTER stock commits (per CTW_API.md).
     let ctwLines: { id: number; received_qty: number; remark?: string }[] | null = null;
     let poNumber = "";
     let ctwWarn: string | undefined;
@@ -207,14 +207,25 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
         if (wh.status !== "dispatched" && wh.status !== "received") {
           return { ok: false, error: `คลังกลางยังไม่จัดส่ง (สถานะ: ${wh.status ?? "-"}) — รับไม่ได้` };
         }
+        // count shipped SKUs by BARCODE (authoritative — barcodes match 1:1 across both systems);
+        // fall back to normalized name+size only for legacy SKUs that carry no barcode.
         const norm = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9ก-๙]/g, "");
-        const cnt = new Map<string, number>();
-        for (const s of wh.skus || []) { const k = `${norm(s.product)}|${norm(s.size)}`; cnt.set(k, (cnt.get(k) || 0) + 1); }
-        const poItems = await q<{ id: number; scent: string | null; size: string | null }>(`select id, scent, size from po_items where po_id=$1`, [id]);
-        ctwLines = poItems.map((it) => ({ id: it.id, received_qty: cnt.get(`${norm(it.scent || "")}|${norm(it.size || "")}`) ?? 0 }));
+        const byBarcode = new Map<string, number>();
+        const byName = new Map<string, number>();
+        for (const s of wh.skus || []) {
+          const bc = String(s.barcode || "").trim();
+          if (bc) byBarcode.set(bc, (byBarcode.get(bc) || 0) + 1);
+          else { const k = `${norm(s.product)}|${norm(s.size)}`; byName.set(k, (byName.get(k) || 0) + 1); }
+        }
+        const poItems = await q<{ id: number; barcode: string | null; scent: string | null; size: string | null }>(`select id, barcode, scent, size from po_items where po_id=$1`, [id]);
+        ctwLines = poItems.map((it) => {
+          const bc = String(it.barcode || "").trim();
+          const qty = bc && byBarcode.has(bc) ? byBarcode.get(bc)! : (byName.get(`${norm(it.scent || "")}|${norm(it.size || "")}`) ?? 0);
+          return { id: it.id, received_qty: qty };
+        });
         const matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
         const shipped = (wh.skus || []).length;
-        if (shipped > 0 && matched !== shipped) ctwWarn = `จับคู่ SKU คลังไม่ครบ: เข้าสต๊อก ${matched}/${shipped} ชิ้น — ตรวจสอบชื่อ/ขนาดสินค้า`;
+        if (shipped > 0 && matched !== shipped) ctwWarn = `จับคู่ SKU คลังไม่ครบ: เข้าสต๊อก ${matched}/${shipped} ชิ้น — ตรวจสอบบาร์โค้ด/ชื่อสินค้า`;
       }
     }
     const useLines = ctwLines ?? lines;

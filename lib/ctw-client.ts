@@ -53,7 +53,7 @@ export type CtwStatus = "created" | "issued" | "dispatched" | "received";
 // (B) fetch warehouse status + the real per-piece SKUs it shipped.
 export async function ctwGetRequisition(
   poNo: string,
-): Promise<CtwResult<{ order_no: string; branch: string; status: CtwStatus; issued_at: string | null; dispatched_at: string | null; received_at: string | null; items: { product: string; size: string; qty: number }[]; skus: { sku: string; product: string; size: string }[] }>> {
+): Promise<CtwResult<{ order_no: string; branch: string; status: CtwStatus; issued_at: string | null; dispatched_at: string | null; received_at: string | null; items: { product: string; size: string; qty: number }[]; skus: { sku: string; product: string; size: string; barcode: string | null }[] }>> {
   return call(`/api/ctw/requisition/${encodeURIComponent(poNo)}`, { method: "GET" });
 }
 
