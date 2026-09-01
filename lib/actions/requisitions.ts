@@ -110,6 +110,24 @@ export async function updateRequisition(id: number, input: ReqInput) {
   redirect(`/requisitions/${id}`);
 }
 
+/** (A) Push a requisition into the central warehouse (stockflow) so it can pick + dispatch.
+ *  Best-effort — returns a warn string on any problem (never throws); a warehouse outage must
+ *  not block the local status change. Idempotent on po_no upstream (safe to call repeatedly).
+ *  Called from BOTH approveRequisition and setRequisitionStatus (issue/approve). */
+async function pushRequisitionToCtw(id: number): Promise<string | undefined> {
+  if (!ctwEnabled()) return undefined;
+  const [po] = await q<{ po_number: string; branch_label: string | null }>(`select po_number, branch_label from purchase_orders where id=$1`, [id]);
+  if (!po?.po_number) return undefined;
+  const items = await q<{ barcode: string | null; qty: number }>(`select barcode, qty::float qty from po_items where po_id=$1`, [id]);
+  const send = items.filter((i) => i.barcode?.trim()).map((i) => ({ barcode: i.barcode!, qty: i.qty }));
+  const res = await ctwSendRequisition(po.po_number, po.branch_label, send);
+  let warn: string | undefined;
+  if (!res.ok) warn = `ส่งเข้าคลังกลางไม่สำเร็จ: ${res.error || `HTTP ${res.httpStatus}`}`;
+  else if (res.unmatched?.length) warn = `ส่งคลังกลางแล้ว แต่บาร์โค้ดไม่รู้จัก ${res.unmatched.length} รายการ`;
+  await logAudit("update", "requisition", id, `ส่งคลังกลาง ${po.po_number}${warn ? ` · ${warn}` : ` · ${res.saved ?? 0} รายการ`}`);
+  return warn;
+}
+
 /** Admin override: force a requisition to any status. Stamps approved/received
  *  timestamps so downstream logic (stock, sync) stays consistent. */
 export async function setRequisitionStatus(id: number, status: string): Promise<{ ok: boolean; error?: string; warn?: string }> {
@@ -123,21 +141,7 @@ export async function setRequisitionStatus(id: number, status: string): Promise<
     await q(`update purchase_orders set status=$2 ${stamp} where id=$1`, stamp ? [id, status, me.id] : [id, status]);
     await logAudit("update", "requisition", id, `สถานะ → ${status}`);
 
-    // (A) once issued/approved, push the requisition to the central warehouse (stockflow) so
-    // it can pick + dispatch. Best-effort: a warehouse outage must not block the status change,
-    // so failures come back as a warn (the requisition is idempotent on po_no → safe to re-issue).
-    let warn: string | undefined;
-    if (ctwEnabled() && (status === "issued" || status === "approved")) {
-      const [po] = await q<{ po_number: string; branch_label: string | null }>(`select po_number, branch_label from purchase_orders where id=$1`, [id]);
-      if (po?.po_number) {
-        const items = await q<{ barcode: string | null; qty: number }>(`select barcode, qty::float qty from po_items where po_id=$1`, [id]);
-        const send = items.filter((i) => i.barcode?.trim()).map((i) => ({ barcode: i.barcode!, qty: i.qty }));
-        const res = await ctwSendRequisition(po.po_number, po.branch_label, send);
-        if (!res.ok) warn = `ส่งเข้าคลังกลางไม่สำเร็จ: ${res.error || `HTTP ${res.httpStatus}`}`;
-        else if (res.unmatched?.length) warn = `ส่งคลังกลางแล้ว แต่บาร์โค้ดไม่รู้จัก ${res.unmatched.length} รายการ`;
-        await logAudit("update", "requisition", id, `ส่งคลังกลาง ${po.po_number}${warn ? ` · ${warn}` : ` · ${res.saved ?? 0} รายการ`}`);
-      }
-    }
+    const warn = (status === "issued" || status === "approved") ? await pushRequisitionToCtw(id) : undefined;
 
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions");
     revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/stock");   // received affects branch stock + inbox
@@ -150,14 +154,15 @@ export async function setRequisitionStatus(id: number, status: string): Promise<
 }
 
 /** Admin approves a requisition → status 'approved', sent to the branch to receive. */
-export async function approveRequisition(id: number): Promise<{ ok: boolean; error?: string }> {
+export async function approveRequisition(id: number): Promise<{ ok: boolean; error?: string; warn?: string }> {
   const me = await requirePermission("requisitions");
   try {
     await q(`update purchase_orders set status='approved', approved_at=now(), approved_by=$2
              where id=$1 and coalesce(status,'') in ('draft','issued','delivered')`, [id, me.id]);
     await logAudit("update", "requisition", id, "อนุมัติใบเบิก");
+    const warn = await pushRequisitionToCtw(id);   // (A) send to central warehouse on approve
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my");
-    return { ok: true };
+    return { ok: true, warn };
   } catch (e: any) { if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" }; console.error("[approveRequisition]", e); return { ok: false, error: "อนุมัติไม่สำเร็จ" }; }
 }
 

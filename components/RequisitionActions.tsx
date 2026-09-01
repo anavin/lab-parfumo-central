@@ -19,7 +19,7 @@ export function RequisitionActions({ id, status }: { id: number; status: string 
   const [pending, start] = useTransition();
   const [editing, setEditing] = useState(false);
   const router = useRouter();
-  const run = (fn: () => Promise<any>) => start(async () => { const r = await fn(); if (r && !r.ok) alert(r.error ?? "ทำรายการไม่สำเร็จ"); router.refresh(); });
+  const run = (fn: () => Promise<any>) => start(async () => { const r = await fn(); if (r && !r.ok) alert(r.error ?? "ทำรายการไม่สำเร็จ"); else if (r?.warn) alert(r.warn); router.refresh(); });
   const preApprove = ["draft", "issued"].includes(status);
 
   const changeStatus = (v: string) => {
