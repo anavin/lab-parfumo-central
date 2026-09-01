@@ -1,10 +1,15 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
-import { PackageCheck, ChevronDown, Loader2, ScanLine } from "lucide-react";
-import { receiveRequisition } from "@/lib/actions/requisitions";
+import { PackageCheck, ChevronDown, Loader2, ScanLine, Warehouse } from "lucide-react";
+import { receiveRequisition, ctwRequisitionStatus } from "@/lib/actions/requisitions";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
+
+const CTW_STATUS_LABEL: Record<string, string> = {
+  created: "คลังรับใบเบิกแล้ว รอตัดสต๊อก", issued: "คลังตัดสต๊อกแล้ว รอจัดส่ง",
+  dispatched: "คลังจัดส่งแล้ว — รับได้", received: "รับแล้ว",
+};
 
 type Line = { id: number; scent: string; size: string; qty: number; barcode: string };
 type PR = { id: number; po_number: string; order_date: string; units: number; lines: Line[] };
@@ -34,6 +39,12 @@ function ReceiveCard({ po }: { po: PR }) {
   const [err, setErr] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [ctw, setCtw] = useState<{ enabled: boolean; ok?: boolean; status?: string; dispatched?: boolean; error?: string } | null>(null);
+  // lazily check central-warehouse status when the card is opened (avoids N API calls on page load)
+  useEffect(() => {
+    if (!open || ctw) return;
+    ctwRequisitionStatus(po.id).then(setCtw).catch(() => setCtw({ enabled: false }));
+  }, [open]);
   const setRow = (i: number, patch: Partial<(typeof rows)[number]>) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const anyDiff = rows.some((r) => (Number(r.recv) || 0) !== Math.round(r.qty));
 
@@ -55,8 +66,11 @@ function ReceiveCard({ po }: { po: PR }) {
     setErr(null);
     const lines = rows.map((r) => ({ id: r.id, received_qty: Number(r.recv) || 0, remark: r.remark }));
     const res = await receiveRequisition(po.id, lines, remark);
-    if (res.ok) router.refresh(); else setErr(res.error ?? "รับไม่สำเร็จ");
+    if (res.ok) { if (res.warn) alert(`รับของแล้ว แต่:\n${res.warn}`); router.refresh(); }
+    else setErr(res.error ?? "รับไม่สำเร็จ");
   });
+  // when the warehouse integration is on, block receiving until the warehouse has dispatched
+  const ctwBlocks = !!ctw?.enabled && ctw.ok === true && ctw.dispatched === false;
 
   return (
     <div className="rounded-xl border border-line bg-surface shadow-sm overflow-hidden">
@@ -71,6 +85,12 @@ function ReceiveCard({ po }: { po: PR }) {
       </button>
       {open && (
         <div className="px-3.5 pb-3.5 border-t border-line-soft pt-2 space-y-2">
+          {ctw?.enabled && (
+            <div className={`flex items-center gap-1.5 text-[11px] rounded-lg px-2.5 py-1.5 ${ctw.ok === false ? "bg-danger-soft text-danger" : ctw.dispatched ? "bg-success-soft text-success" : "bg-warn-soft text-warn"}`}>
+              <Warehouse className="w-3.5 h-3.5 shrink-0" />
+              {ctw.ok === false ? `คลังกลาง: ${ctw.error}` : `คลังกลาง: ${CTW_STATUS_LABEL[ctw.status || ""] ?? ctw.status ?? "-"}`}
+            </div>
+          )}
           {rows.map((r, i) => {
             const diff = (Number(r.recv) || 0) !== Math.round(r.qty);
             return (
@@ -94,10 +114,10 @@ function ReceiveCard({ po }: { po: PR }) {
           </div>
           <input value={remark} placeholder="หมายเหตุรวม (ถ้ามี)" onChange={(e) => setRemark(e.target.value)} className={inp + " w-full"} />
           {err && <div className="text-xs text-danger">{err}</div>}
-          <button onClick={receive} disabled={saving}
+          <button onClick={receive} disabled={saving || ctwBlocks}
             className="btn btn-brand w-full">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4" />}
-            {anyDiff ? "ยืนยันรับ (มีส่วนต่าง)" : "รับของเข้าสต๊อก"}
+            {ctwBlocks ? "รอคลังกลางจัดส่งก่อน" : anyDiff ? "ยืนยันรับ (มีส่วนต่าง)" : "รับของเข้าสต๊อก"}
           </button>
         </div>
       )}

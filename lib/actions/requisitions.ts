@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { requirePermission, requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
 import { resolveBranch, isBranch } from "@/lib/branches";
+import { ctwEnabled, ctwSendRequisition, ctwGetRequisition, ctwReceive } from "@/lib/ctw-client";
 
 export type ReqItemInput = { barcode: string; scent: string; size: string; qty: number; product_id?: number | null };
 export type ReqInput = {
@@ -111,7 +112,7 @@ export async function updateRequisition(id: number, input: ReqInput) {
 
 /** Admin override: force a requisition to any status. Stamps approved/received
  *  timestamps so downstream logic (stock, sync) stays consistent. */
-export async function setRequisitionStatus(id: number, status: string): Promise<{ ok: boolean; error?: string }> {
+export async function setRequisitionStatus(id: number, status: string): Promise<{ ok: boolean; error?: string; warn?: string }> {
   const me = await requirePermission("requisitions");
   try {
     // keep the lifecycle timestamps in sync with the forced status
@@ -121,9 +122,26 @@ export async function setRequisitionStatus(id: number, status: string): Promise<
       : "";
     await q(`update purchase_orders set status=$2 ${stamp} where id=$1`, stamp ? [id, status, me.id] : [id, status]);
     await logAudit("update", "requisition", id, `สถานะ → ${status}`);
+
+    // (A) once issued/approved, push the requisition to the central warehouse (stockflow) so
+    // it can pick + dispatch. Best-effort: a warehouse outage must not block the status change,
+    // so failures come back as a warn (the requisition is idempotent on po_no → safe to re-issue).
+    let warn: string | undefined;
+    if (ctwEnabled() && (status === "issued" || status === "approved")) {
+      const [po] = await q<{ po_number: string; branch_label: string | null }>(`select po_number, branch_label from purchase_orders where id=$1`, [id]);
+      if (po?.po_number) {
+        const items = await q<{ barcode: string | null; qty: number }>(`select barcode, qty::float qty from po_items where po_id=$1`, [id]);
+        const send = items.filter((i) => i.barcode?.trim()).map((i) => ({ barcode: i.barcode!, qty: i.qty }));
+        const res = await ctwSendRequisition(po.po_number, po.branch_label, send);
+        if (!res.ok) warn = `ส่งเข้าคลังกลางไม่สำเร็จ: ${res.error || `HTTP ${res.httpStatus}`}`;
+        else if (res.unmatched?.length) warn = `ส่งคลังกลางแล้ว แต่บาร์โค้ดไม่รู้จัก ${res.unmatched.length} รายการ`;
+        await logAudit("update", "requisition", id, `ส่งคลังกลาง ${po.po_number}${warn ? ` · ${warn}` : ` · ${res.saved ?? 0} รายการ`}`);
+      }
+    }
+
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions");
     revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/stock");   // received affects branch stock + inbox
-    return { ok: true };
+    return { ok: true, warn };
   } catch (e: any) {
     if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" };
     console.error("[setRequisitionStatus]", e);
@@ -158,9 +176,49 @@ export async function unapproveRequisition(id: number): Promise<{ ok: boolean; e
 
 /** Branch staff confirms receipt → records received qty per line + remark, marks
  *  the requisition 'received' (which is what makes it count toward branch stock). */
-export async function receiveRequisition(id: number, lines: { id: number; received_qty: number; remark?: string }[], remark?: string): Promise<{ ok: boolean; error?: string }> {
+/** (B) Central-warehouse status for a requisition (created→issued→dispatched→received) plus the
+ *  per-piece SKUs it shipped. Returns { enabled:false } when the integration isn't configured. */
+export async function ctwRequisitionStatus(id: number): Promise<{ enabled: boolean; ok?: boolean; error?: string; status?: string; dispatched?: boolean; shipped?: number }> {
+  await requireAnyPermission(["my_sales", "requisitions"]);
+  if (!ctwEnabled()) return { enabled: false };
+  const [head] = await q<{ po_number: string }>(`select po_number from purchase_orders where id=$1`, [id]);
+  if (!head?.po_number) return { enabled: true, ok: false, error: "ไม่พบเลขใบเบิก" };
+  const wh = await ctwGetRequisition(head.po_number);
+  if (!wh.ok) return { enabled: true, ok: false, error: wh.error || `HTTP ${wh.httpStatus}` };
+  return { enabled: true, ok: true, status: wh.status, dispatched: wh.status === "dispatched" || wh.status === "received", shipped: (wh.skus || []).length };
+}
+
+export async function receiveRequisition(id: number, lines: { id: number; received_qty: number; remark?: string }[], remark?: string): Promise<{ ok: boolean; error?: string; warn?: string }> {
   const me = await requireAnyPermission(["my_sales", "requisitions"]);
   try {
+    // When the central-warehouse integration is on, the AUTHORITATIVE received quantities come
+    // from the SKUs the warehouse actually dispatched (not the requested qty, and not the branch's
+    // manual count). Pull them, require the warehouse to have dispatched, and map SKUs→lines by
+    // normalized (product name + size). The warehouse is closed AFTER stock is committed (per CTW_API.md).
+    let ctwLines: { id: number; received_qty: number; remark?: string }[] | null = null;
+    let poNumber = "";
+    let ctwWarn: string | undefined;
+    if (ctwEnabled()) {
+      const [head] = await q<{ po_number: string }>(`select po_number from purchase_orders where id=$1`, [id]);
+      poNumber = head?.po_number || "";
+      if (poNumber) {
+        const wh = await ctwGetRequisition(poNumber);
+        if (!wh.ok) return { ok: false, error: `อ่านสถานะคลังกลางไม่สำเร็จ: ${wh.error || `HTTP ${wh.httpStatus}`}` };
+        if (wh.status !== "dispatched" && wh.status !== "received") {
+          return { ok: false, error: `คลังกลางยังไม่จัดส่ง (สถานะ: ${wh.status ?? "-"}) — รับไม่ได้` };
+        }
+        const norm = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9ก-๙]/g, "");
+        const cnt = new Map<string, number>();
+        for (const s of wh.skus || []) { const k = `${norm(s.product)}|${norm(s.size)}`; cnt.set(k, (cnt.get(k) || 0) + 1); }
+        const poItems = await q<{ id: number; scent: string | null; size: string | null }>(`select id, scent, size from po_items where po_id=$1`, [id]);
+        ctwLines = poItems.map((it) => ({ id: it.id, received_qty: cnt.get(`${norm(it.scent || "")}|${norm(it.size || "")}`) ?? 0 }));
+        const matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
+        const shipped = (wh.skus || []).length;
+        if (shipped > 0 && matched !== shipped) ctwWarn = `จับคู่ SKU คลังไม่ครบ: เข้าสต๊อก ${matched}/${shipped} ชิ้น — ตรวจสอบชื่อ/ขนาดสินค้า`;
+      }
+    }
+    const useLines = ctwLines ?? lines;
+
     // FOR UPDATE + conditional status flip in one tx: two concurrent receives can't
     // both pass the status check, and the per-line updates commit all-or-nothing with
     // the status change (no half-received PO skewing branch stock).
@@ -176,7 +234,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
           return { ok: false, error: "รับได้เฉพาะใบเบิกของสาขาตัวเอง" };
         }
       }
-      for (const l of lines || []) {
+      for (const l of useLines || []) {
         // cap received at the ordered qty so a fat-finger can't inflate branch stock
         await run(`update po_items set received_qty = least($2, qty), line_remark=$3 where id=$1 and po_id=$4`,
           [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
@@ -186,9 +244,17 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
       return { ok: true };
     });
     if (!res.ok) return res;
-    await logAudit("update", "requisition", id, `รับของเข้าสาขา (${(lines || []).length} รายการ)`);
+
+    // (C) close the requisition on the warehouse AFTER branch stock is committed. Best-effort:
+    // a failure here means "received locally but warehouse not closed" — surfaced as a warn to retry.
+    let warn = ctwWarn;
+    if (ctwEnabled() && poNumber) {
+      const done = await ctwReceive(poNumber, me.full_name || "CTW");
+      if (!done.ok) warn = [warn, `ปิดใบเบิกที่คลังกลางไม่สำเร็จ: ${done.error || `HTTP ${done.httpStatus}`}`].filter(Boolean).join(" · ");
+    }
+    await logAudit("update", "requisition", id, `รับของเข้าสาขา (${(useLines || []).length} รายการ)${warn ? ` · ${warn}` : ""}`);
     revalidatePath(`/requisitions/${id}`); revalidatePath("/requisitions"); revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/my/stock"); revalidatePath("/stock");
-    return { ok: true };
+    return { ok: true, warn };
   } catch (e: any) { if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)" }; console.error("[receiveRequisition]", e); return { ok: false, error: "รับของไม่สำเร็จ ลองใหม่" }; }
 }
 
