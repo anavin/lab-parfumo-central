@@ -16,6 +16,7 @@ type PO = {
   branch_label: string; store_no: string; delivery_number: string | null;
   phone: string | null; shipping_name: string | null; address: string | null; remark: string | null;
   assigned_to?: number | null;   // salesperson chosen to receive (0029)
+  shipped_skus?: { sku: string | null; product: string | null; size: string | null; barcode: string | null }[] | null;  // serials the warehouse shipped (0031)
 };
 type Item = { line_no: number; barcode: string; scent: string; size: string; qty: number; grade: string | null; sku: string | null; received_qty: number | null; line_remark: string | null };
 
@@ -29,6 +30,17 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
            i.received_qty::float received_qty, i.line_remark, p.grade, p.sku
     from po_items i left join products p on p.id = i.product_id
     where i.po_id = $1 order by i.line_no nulls last, i.id`, [Number(id)]);
+
+  // attach the warehouse-shipped serial SKUs to each line (match by barcode, else name+size)
+  // so staff can check the exact pieces on screen without printing.
+  const nrm = (s: string | null) => String(s || "").toLowerCase().replace(/[^a-z0-9ก-๙]/g, "");
+  const shipped = po.shipped_skus ?? [];
+  const itemsWithSkus = items.map((it) => ({
+    ...it,
+    serials: shipped
+      .filter((s) => (s.barcode && it.barcode && s.barcode.trim() === it.barcode.trim()) || (!s.barcode && nrm(s.product) === nrm(it.scent) && nrm(s.size) === nrm(it.size)))
+      .map((s) => s.sku).filter(Boolean) as string[],
+  }));
 
   const attachments = await getPoAttachments(po.id);
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
@@ -69,7 +81,7 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
         </div>
 
         {/* ใบเบิกสินค้า — เอกสารจริง (ต้นฉบับ + สำเนา) */}
-        <RequisitionSheet po={po} items={items} />
+        <RequisitionSheet po={po} items={itemsWithSkus} />
       </div>
     </div>
   );

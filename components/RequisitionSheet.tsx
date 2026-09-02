@@ -13,6 +13,7 @@ export type SheetPO = {
 export type SheetItem = {
   barcode: string | null; scent: string | null; size: string | null; qty: number;
   grade: string | null; sku: string | null; received_qty: number | null; line_remark: string | null;
+  serials?: string[] | null;   // per-piece SKUs the warehouse shipped (for on-screen checking)
 };
 
 // rows per A4 page (kept conservative so a page never overflows to a blank one). Page 1
@@ -44,7 +45,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
   // Render a page's tbody with a full-width GRADE separator before each new type (and a
   // "(ต่อ)" band when a type carries over to the top of the next page) so the picker can't
   // mix up types. Numbering stays continuous across the whole document.
-  const colCount = received ? 8 : 7;
+  const showSkus = items.some((i) => (i.serials?.length ?? 0) > 0);   // only when the warehouse shipped serials
+  const colCount = (received ? 8 : 7) + (showSkus ? 1 : 0);
   const gradeLabel = (g: string | null) => (g && g.trim() ? g : "อื่นๆ");
   // bags are counted in ใบ, perfume bottles in ขวด
   const unitOf = (g: string | null) => ((g ?? "").trim().toLowerCase() === "bag" ? "ใบ" : "ขวด");
@@ -76,7 +78,14 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
           <td className="py-2 pr-3 whitespace-nowrap">{it.size}</td>
           <td className="py-2 pr-3 text-right font-medium tabular-nums">{num(it.qty)}</td>
           {received && <td className={`py-2 pr-3 text-center font-medium tabular-nums ${diff ? "text-warn-dark" : ""}`}>{num(rq)}</td>}
-          <td className="py-2 whitespace-nowrap">{unitOf(it.grade)}</td>
+          <td className="py-2 pr-3 whitespace-nowrap">{unitOf(it.grade)}</td>
+          {showSkus && (
+            <td className="py-2 text-[11px] text-neutral-700">
+              {it.serials?.length ? (
+                <div className="flex flex-wrap gap-x-2 gap-y-0.5">{it.serials.map((s, k) => <span key={k} className="tabular-nums whitespace-nowrap">{s}</span>)}</div>
+              ) : <span className="text-black/30">—</span>}
+            </td>
+          )}
         </tr>);
     });
     return out;
@@ -182,7 +191,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                 <th className="pb-1.5 pr-3 font-semibold whitespace-nowrap">ขนาด</th>
                 <th className="pb-1.5 pr-3 font-semibold text-right">เบิก</th>
                 {received && <th className="pb-1.5 pr-3 font-semibold text-center">จ่ายจริง</th>}
-                <th className="pb-1.5 font-semibold">หน่วย</th>
+                <th className="pb-1.5 pr-3 font-semibold">หน่วย</th>
+                {showSkus && <th className="pb-1.5 font-semibold whitespace-nowrap">SKU ที่ส่งมา</th>}
               </tr>
             </thead>
             <tbody>
@@ -194,7 +204,8 @@ export function RequisitionSheet({ po, items }: { po: SheetPO; items: SheetItem[
                   <td colSpan={5} className="py-2 pr-3 text-right">รวมทั้งสิ้น</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{num(totalQty)}</td>
                   {received && <td className="py-2 pr-3 text-center tabular-nums">{num(totalRecv)}</td>}
-                  <td className="py-2 whitespace-nowrap">ชิ้น</td>
+                  <td className="py-2 pr-3 whitespace-nowrap">ชิ้น</td>
+                  {showSkus && <td className="py-2" />}
                 </tr>
               </tfoot>
             )}
