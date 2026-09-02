@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/require-user";
 import { resolveBranch, branchName } from "@/lib/branches";
 import { logAudit } from "@/lib/audit";
-import { stockLive } from "@/lib/queries";
+import { stockLive, stockRawForBarcodes } from "@/lib/queries";
 
 export type StockAdjustment = {
   id: number; branch: string; barcode: string; scent: string; size: string;
@@ -69,6 +69,52 @@ export async function returnBranchStock(branchInput: string, dateStr: string): P
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (รัน SQL 0023)" };
     console.error("[returnBranchStock]", e);
     return { ok: false, error: "คืนสต๊อกไม่สำเร็จ" };
+  }
+}
+
+/** Admin: SET a product's remaining at a branch to an exact number (inline edit on /stock).
+ *  Posts a signed adjustment = target − RAW balance so remaining lands exactly on `target`
+ *  even for negative-stock products (sold > shipped). */
+export async function setStockQty(branchInput: string, barcode: string, target: number): Promise<{ ok: boolean; error?: string }> {
+  const me = await requirePermission("requisitions");
+  const branch = resolveBranch(branchInput);
+  const bc = (barcode || "").trim();
+  const t = Math.max(0, Math.round(Number(target) || 0));
+  if (!bc) return { ok: false, error: "ไม่มีบาร์โค้ด" };
+  try {
+    const raw = Math.round((await stockRawForBarcodes(branch, [bc])).get(bc) ?? 0);
+    const delta = t - raw;
+    if (delta !== 0) {
+      const [p] = await q<{ id: number; scent: string; size: string }>(`select id, scent, size from products where barcode = $1 limit 1`, [bc]);
+      await q(`insert into stock_adjustments (branch, product_id, barcode, scent, size, qty, note, created_by)
+               values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [branch, p?.id ?? null, bc, p?.scent ?? null, p?.size ?? null, delta, `ตั้งคงเหลือ = ${t}`, me.id]);
+    }
+    await logAudit("update", "stock", null, `ตั้งคงเหลือ ${branchName(branch)} · ${bc} = ${t}`);
+    revalidatePath("/stock"); revalidatePath("/my");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (รัน SQL 0023)" };
+    console.error("[setStockQty]", e);
+    return { ok: false, error: "ตั้งคงเหลือไม่สำเร็จ" };
+  }
+}
+
+/** Admin: activate / deactivate a whole scent ("ปิดกลิ่น"). Inactive scents sink to the
+ *  bottom of the stock matrix (and can later be hidden from the sale form). */
+export async function setScentActive(scent: string, active: boolean): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("requisitions");
+  const s = (scent || "").trim();
+  if (!s) return { ok: false, error: "ไม่มีชื่อกลิ่น" };
+  try {
+    await q(`update products set active = $2 where scent = $1`, [s, active]);
+    await logAudit("update", "product", null, `${active ? "เปิด" : "ปิด"}กลิ่น ${s}`);
+    revalidatePath("/stock"); revalidatePath("/products");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0032)" };
+    console.error("[setScentActive]", e);
+    return { ok: false, error: "เปลี่ยนสถานะกลิ่นไม่สำเร็จ" };
   }
 }
 
