@@ -9,7 +9,9 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   // cron endpoints authenticate themselves via CRON_SECRET (Bearer), not a session
   // cookie — so they must bypass the cookie gate or the scheduler gets redirected to /login.
-  if (PUBLIC.has(pathname) || pathname.startsWith("/_next/") || pathname.startsWith("/api/cron/") || pathname === "/favicon.ico") {
+  // inbound webhooks (from the central warehouse) authenticate via CTW_API_KEY (Bearer),
+  // not a session cookie — bypass the cookie gate like cron does.
+  if (PUBLIC.has(pathname) || pathname.startsWith("/_next/") || pathname.startsWith("/api/cron/") || pathname.startsWith("/api/inbound/") || pathname === "/favicon.ico") {
     return NextResponse.next();
   }
   const token = req.cookies.get(SESSION_COOKIE)?.value;
