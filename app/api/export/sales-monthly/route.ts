@@ -57,6 +57,16 @@ export async function GET(req: Request) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Lab Parfumo";
 
+  // some items were saved with the size stuck onto the name ("Secret of Peach30 ml.");
+  // strip it so the สินค้า column is just the name (size lives in its own column).
+  const cleanItem = (item: string | null, size: string | null) => {
+    let s = (item || "").trim();
+    const sz = (size || "").trim();
+    if (sz && s.endsWith(sz)) s = s.slice(0, -sz.length).trim();
+    else s = s.replace(/\s*\d+(\.\d+)?\s*ml\.?\s*$/i, "").trim();   // fallback: trailing "NN ml."
+    return s || (item || "").trim();
+  };
+
   // ---- Sheet 1: รายละเอียด (every sale line) ----
   const d = wb.addWorksheet("รายละเอียด");
   d.columns = [
@@ -75,7 +85,7 @@ export async function GET(req: Request) {
     { header: "ช่องทางขาย", key: "source", width: 12 },
   ];
   for (const r of rows) {
-    d.addRow({ ...r, sale_time: (r.sale_time || "").slice(0, 5), nation: nation(r.nation) });
+    d.addRow({ ...r, item: cleanItem(r.item, r.size), sale_time: (r.sale_time || "").slice(0, 5), nation: nation(r.nation) });
   }
   // totals row
   const totQty = rows.reduce((s, r) => s + r.qty, 0);
@@ -131,7 +141,7 @@ export async function GET(req: Request) {
   // ---- Sheet 4: สรุปสินค้า (top sellers) — สินค้า กับ ขนาด แยกคอลัมน์ ----
   const byItem = new Map<string, { item: string; size: string; qty: number; net: number }>();
   for (const r of rows) {
-    const item = r.item || "-";
+    const item = cleanItem(r.item, r.size) || "-";
     const size = r.size || "";
     const k = `${item}|${size}`;
     const g = byItem.get(k) || { item, size, qty: 0, net: 0 };
