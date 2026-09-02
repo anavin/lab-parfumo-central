@@ -1,14 +1,15 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Check, X, Loader2, ClipboardCheck } from "lucide-react";
+import { ChevronDown, Check, X, Loader2, ClipboardCheck, RotateCcw } from "lucide-react";
 import { branchName } from "@/lib/branches";
-import { getStockCountLines, approveStockCount, rejectStockCount, type StockCount, type CountLine } from "@/lib/actions/stock-count";
+import { getStockCountLines, approveStockCount, rejectStockCount, reverseStockCount, type StockCount, type CountLine } from "@/lib/actions/stock-count";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: "รอตรวจ", cls: "bg-warn-soft text-warn-dark" },
   approved: { label: "อนุมัติแล้ว", cls: "bg-success-soft text-success" },
   rejected: { label: "ปฏิเสธ", cls: "bg-danger-soft text-danger" },
+  reversed: { label: "ย้อนแล้ว", cls: "bg-line text-muted" },
 };
 
 export function StockCountReview({ counts }: { counts: StockCount[] }) {
@@ -91,6 +92,14 @@ function Card({ c }: { c: StockCount }) {
                   <button onClick={() => { if (confirm("ปฏิเสธผลนับนี้?")) run(() => rejectStockCount(c.id)); }} disabled={saving}
                     className="btn btn-danger-outline">
                     <X className="w-4 h-4" /> ปฏิเสธ
+                  </button>
+                </div>
+              )}
+              {c.status === "approved" && (
+                <div className="mt-3">
+                  <button onClick={() => { if (confirm("ย้อนผลนับนี้?\nจะลบการปรับสต๊อกที่ใบนี้โพสต์ไว้ (สต๊อกกลับไปเท่าก่อนอนุมัติ) — ใช้กรณีอนุมัติผิด/ซ้ำ")) run(() => reverseStockCount(c.id)); }} disabled={saving}
+                    className="btn btn-danger-outline">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} ย้อนผลนับ (ลบการปรับ)
                   </button>
                 </div>
               )}

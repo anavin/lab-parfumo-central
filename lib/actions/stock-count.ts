@@ -106,6 +106,29 @@ export async function approveStockCount(id: number, reviewNote?: string): Promis
   }
 }
 
+/** Reverse an APPROVED count: delete the stock_adjustments it posted (note "นับสต๊อก #id")
+ *  and mark it reversed. Used to undo a mistaken/duplicate approval — stock returns to what it
+ *  was before, since remaining is computed live. */
+export async function reverseStockCount(id: number): Promise<{ ok: boolean; error?: string; removed?: number }> {
+  const me = await requirePermission("requisitions");
+  try {
+    const res = await tx<{ ok: boolean; error?: string; removed?: number; branch?: string }>(async (run) => {
+      const [c] = await run<{ status: string; branch: string }>(`select status, branch from stock_counts where id=$1 for update`, [id]);
+      if (!c) return { ok: false, error: "ไม่พบรายการนับ" };
+      if (c.status !== "approved") return { ok: false, error: "ย้อนได้เฉพาะใบที่อนุมัติแล้ว" };
+      const del = await run<{ n: number }>(
+        `with d as (delete from stock_adjustments where note = $1 returning 1) select count(*)::int n from d`, [`นับสต๊อก #${id}`]);
+      await run(`update stock_counts set status='reversed', reviewed_by=$2, reviewed_at=now(),
+                 review_note = coalesce(nullif(review_note,''),'') || ' · ย้อนผลนับ' where id=$1`, [id, me.id]);
+      return { ok: true, removed: del[0]?.n ?? 0, branch: c.branch };
+    });
+    if (!res.ok) return { ok: false, error: res.error };
+    await logAudit("update", "stock", id, `ย้อนผลนับ #${id} ${branchName(res.branch!)} · ลบการปรับ ${res.removed} รายการ`);
+    revalidatePath("/stock/counts"); revalidatePath("/stock"); revalidatePath("/my/stock");
+    return { ok: true, removed: res.removed };
+  } catch (e: any) { console.error("[reverseStockCount]", e); return { ok: false, error: "ย้อนไม่สำเร็จ" }; }
+}
+
 export async function rejectStockCount(id: number, reviewNote?: string): Promise<{ ok: boolean; error?: string }> {
   const me = await requirePermission("requisitions");
   try {
