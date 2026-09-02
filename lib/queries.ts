@@ -348,6 +348,26 @@ export async function stockForBarcodes(branch: string, barcodes: string[]): Prom
   return new Map(rows.map((r) => [r.barcode, Number(r.remaining) || 0]));
 }
 
+/** RAW (un-floored) balance per barcode at a branch = shipped + adjusted − sold − returned.
+ *  Can be negative when a branch sold more than it received. Needed to compute the correct
+ *  stock-count adjustment: to set remaining = counted, post delta = counted − raw (NOT
+ *  counted − flooredRemaining, which under-corrects negative-stock products). */
+export async function stockRawForBarcodes(branch: string, barcodes: string[]): Promise<Map<string, number>> {
+  const codes = [...new Set((barcodes || []).filter(Boolean))];
+  if (!codes.length) return new Map();
+  const b = normalizeBranch(branch);
+  const sel = (cte: string) => `${cte} select barcode, (shipped + adjusted - sold - returned)::float net from stock where branch = $1 and barcode = any($2)`;
+  type R = { barcode: string; net: number };
+  let rows: R[];
+  try { rows = await q<R>(sel(STOCK_CTE), [b, codes]); }
+  catch (e: any) {
+    if (e?.code === "42P01") rows = await q<R>(sel(STOCK_CTE_NOADJ), [b, codes]);
+    else if (e?.code === "42703") rows = await q<R>(sel(STOCK_CTE_LEGACY), [b, codes]);
+    else throw e;
+  }
+  return new Map(rows.map((r) => [r.barcode, Number(r.net) || 0]));
+}
+
 /** Negative-stock exceptions: products where a branch sold/returned MORE than it was
  *  ever shipped (+adjustments) — i.e. the live remaining hit its 0 floor and the true
  *  balance is negative. Signals untracked shipments, mis-scanned barcodes, or a missing

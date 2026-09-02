@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser, requirePermission, requireAnyPermission } from "@/lib/auth/require-user";
 import { resolveBranch, branchName } from "@/lib/branches";
 import { logAudit } from "@/lib/audit";
+import { stockRawForBarcodes } from "@/lib/queries";
 
 export type CountLineInput = { barcode: string; scent: string; size: string; expected: number; counted: number };
 export type CountLine = CountLineInput & { id: number };
@@ -74,29 +75,38 @@ export async function getStockCountLines(id: number): Promise<CountLine[]> {
 export async function approveStockCount(id: number, reviewNote?: string): Promise<{ ok: boolean; error?: string }> {
   const me = await requirePermission("requisitions");
   try {
-    // One transaction + FOR UPDATE on the count row: serializes concurrent approves
-    // and makes the variance postings + status flip all-or-nothing, so a mid-loop
-    // failure or a double-click can't post the adjustments twice.
-    const res = await tx<{ ok: boolean; error?: string; branch?: string }>(async (run) => {
-      const [c] = await run<{ branch: string; status: string }>(`select branch, status from stock_counts where id=$1 for update`, [id]);
+    // Read header + lines + RAW balance BEFORE the tx — stockRawForBarcodes uses its own DB
+    // connection, so it must NOT run inside tx() (would clash on PGlite's single connection).
+    const [head] = await q<{ branch: string; status: string }>(`select branch, status from stock_counts where id=$1`, [id]);
+    if (!head) return { ok: false, error: "ไม่พบรายการนับ" };
+    if (head.status !== "pending") return { ok: false, error: "รายการนี้ถูกตรวจแล้ว" };
+    const lines = await q<{ barcode: string; scent: string | null; size: string | null; counted: number }>(
+      `select barcode, scent, size, counted::float counted from stock_count_lines where count_id=$1`, [id]);
+    // delta = counted − RAW balance (un-floored) so remaining truly becomes `counted`, even for
+    // products that sold more than they received (raw < 0). Using the floored current stock would
+    // under-correct those and leave them stuck at 0.
+    const raw = await stockRawForBarcodes(head.branch, lines.map((l) => l.barcode).filter(Boolean));
+
+    // The tx re-checks status under FOR UPDATE (guards a double-click) and posts atomically.
+    const res = await tx<{ ok: boolean; error?: string }>(async (run) => {
+      const [c] = await run<{ status: string }>(`select status from stock_counts where id=$1 for update`, [id]);
       if (!c) return { ok: false, error: "ไม่พบรายการนับ" };
       if (c.status !== "pending") return { ok: false, error: "รายการนี้ถูกตรวจแล้ว" };
-      const lines = await run<CountLine>(`select barcode, scent, size, expected::float expected, counted::float counted
-        from stock_count_lines where count_id=$1`, [id]);
       for (const l of lines) {
-        const delta = Math.round(Number(l.counted) - Number(l.expected));
-        if (!delta || !l.barcode) continue;   // no variance → nothing to post
+        if (!l.barcode) continue;
+        const delta = Math.round(Number(l.counted) - (raw.get(l.barcode) ?? 0));
+        if (!delta) continue;   // already at target → nothing to post
         const [p] = await run<{ id: number }>(`select id from products where barcode=$1 limit 1`, [l.barcode]);
         await run(`insert into stock_adjustments (branch, product_id, barcode, scent, size, qty, note, created_by)
                  values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [c.branch, p?.id ?? null, l.barcode, l.scent, l.size, delta, `นับสต๊อก #${id}`, me.id]);
+          [head.branch, p?.id ?? null, l.barcode, l.scent, l.size, delta, `นับสต๊อก #${id}`, me.id]);
       }
       await run(`update stock_counts set status='approved', reviewed_by=$2, reviewed_at=now(), review_note=$3 where id=$1`,
         [id, me.id, (reviewNote || "").trim() || null]);
-      return { ok: true, branch: c.branch };
+      return { ok: true };
     });
     if (!res.ok) return { ok: false, error: res.error };
-    await logAudit("approve", "stock", id, `อนุมัติผลนับ ${branchName(res.branch!)}`);
+    await logAudit("approve", "stock", id, `อนุมัติผลนับ ${branchName(head.branch)}`);
     revalidatePath("/stock/counts"); revalidatePath("/stock"); revalidatePath("/my/stock");
     return { ok: true };
   } catch (e: any) {
