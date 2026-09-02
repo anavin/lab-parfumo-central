@@ -128,22 +128,25 @@ export async function GET(req: Request) {
   }
   styleHeader(sP);
 
-  // ---- Sheet 4: สรุปสินค้า (top sellers) ----
-  const byItem = new Map<string, { qty: number; net: number }>();
+  // ---- Sheet 4: สรุปสินค้า (top sellers) — สินค้า กับ ขนาด แยกคอลัมน์ ----
+  const byItem = new Map<string, { item: string; size: string; qty: number; net: number }>();
   for (const r of rows) {
-    const k = `${r.item || "-"}${r.size ? ` ${r.size}` : ""}`;
-    const g = byItem.get(k) || { qty: 0, net: 0 };
+    const item = r.item || "-";
+    const size = r.size || "";
+    const k = `${item}|${size}`;
+    const g = byItem.get(k) || { item, size, qty: 0, net: 0 };
     g.qty += r.qty; g.net += r.total; byItem.set(k, g);
   }
   const sI = wb.addWorksheet("สรุปสินค้า");
   sI.columns = [
     { header: "อันดับ", key: "rank", width: 8, style: { numFmt: INT } },
-    { header: "สินค้า", key: "item", width: 32 },
+    { header: "สินค้า", key: "item", width: 28 },
+    { header: "ขนาด", key: "size", width: 10 },
     { header: "จำนวนชิ้น", key: "qty", width: 11, style: { numFmt: INT } },
     { header: "ยอดขาย", key: "net", width: 14, style: { numFmt: MONEY } },
   ];
-  [...byItem.entries()].sort((a, b) => b[1].net - a[1].net).forEach(([item, g], i) => {
-    sI.addRow({ rank: i + 1, item, qty: g.qty, net: g.net });
+  [...byItem.values()].sort((a, b) => b.net - a.net).forEach((g, i) => {
+    sI.addRow({ rank: i + 1, item: g.item, size: g.size, qty: g.qty, net: g.net });
   });
   styleHeader(sI);
 
