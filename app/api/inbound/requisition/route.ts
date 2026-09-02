@@ -76,12 +76,20 @@ export async function POST(req: Request) {
       await run(`select pg_advisory_xact_lock(hashtext($1))`, [`inbound-${poNo}`]);   // serialize concurrent webhooks
       let poId = po?.id;
 
+      // the exact per-piece SKUs the warehouse shipped — stored so the branch can check them
+      const shippedJson = JSON.stringify(skus.map((s) => ({ sku: s.sku ?? null, product: s.product ?? null, size: s.size ?? null, barcode: s.barcode ?? null })));
+      const setShipped = async (id: number) => {
+        try { await run(`update purchase_orders set shipped_skus = $2::jsonb where id=$1`, [id, shippedJson]); }
+        catch (e: any) { if (e?.code !== "42703") throw e; }   // column not migrated (pre-0031) → skip
+      };
+
       if (poId) {
         const [cur] = await run<{ status: string }>(`select status from purchase_orders where id=$1 for update`, [poId]);
         if (cur?.status === "received") { created = false; return; }   // already received — leave it
         // mark "delivered" (ส่งของแล้ว) — stock is NOT added here; the assigned salesperson
         // confirms receipt at /my which adds stock (pulls the real SKUs) and flips to received.
         await run(`update purchase_orders set status='delivered' where id=$1`, [poId]);
+        await setShipped(poId);
       } else {
         // stockflow-originated requisition CTW hasn't seen → create it as "delivered" (awaiting branch receipt)
         created = true;
@@ -99,6 +107,7 @@ export async function POST(req: Request) {
              select $1,$2,$3,(select id from products where barcode=$3 limit 1),$4,$5,$6`,
             [poId, line, l.barcode, l.product, l.size, l.qty]);
         }
+        await setShipped(poId);
       }
     });
 
