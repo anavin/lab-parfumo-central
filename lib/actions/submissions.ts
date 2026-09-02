@@ -410,14 +410,14 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
 // Approving copies the row into the live table (created_by preserved) so the
 // dashboard aggregates it and can break it down by salesperson.
 
-async function copyToLive(id: number) {
-  const [s] = await q<any>(`select * from submissions where id = $1`, [id]);
+async function copyToLive(id: number, run: TxRun = q) {
+  const [s] = await run<any>(`select * from submissions where id = $1`, [id]);
   if (!s) throw new Error("ไม่พบรายการ");
   // Idempotent: submission_id is UNIQUE, so a retry/re-approve DOES NOTHING
   // instead of inserting a duplicate live row (double-counted revenue).
   let approvedId: number | null = null;
   if (s.kind === "sale") {
-    const [ins] = await q<{ id: number }>(
+    const [ins] = await run<{ id: number }>(
       `insert into sales (source, month, sale_date, sale_time, ba, receipt_no, item, barcode, product_id, grade, size, qty, unit_price, discount, total, paid, payment_channel, nation, note, created_by, submission_id)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9, coalesce($10,(select grade from products where id=$9)), $11,$12,$13,$14,$15,$15,$16,$17,$18,$19,$20)
        on conflict (submission_id) do nothing
@@ -425,7 +425,7 @@ async function copyToLive(id: number) {
       [s.source, monthLabel(s.entry_date), s.entry_date, s.sale_time, s.ba, s.receipt_no, s.item,
        s.barcode, s.product_id, s.grade ?? null, s.size, s.qty, s.unit_price, s.discount, s.total,
        s.payment_channel, s.nation, s.note, s.created_by, s.id]);
-    approvedId = ins?.id ?? (await q<{ id: number }>(`select id from sales where submission_id = $1`, [s.id]))[0]?.id ?? null;
+    approvedId = ins?.id ?? (await run<{ id: number }>(`select id from sales where submission_id = $1`, [s.id]))[0]?.id ?? null;
   } else {
     // `source` (branch) added in 0025; fall back to the pre-0025 insert if prod
     // hasn't run the migration yet so approving a customer-day never fails.
@@ -448,12 +448,30 @@ async function copyToLive(id: number) {
   return { s, approvedId };
 }
 
+/** Approve ONE submission atomically for the sale kind: the live-row insert + the status
+ *  flip commit together in a single tx, so a crash between them can't leave the row counted
+ *  in BOTH subsold (still pending) and sold (live row exists) = permanent double-count.
+ *  The customer-day kind (no stock impact) keeps the pre-existing two-step + 42703 fallback. */
+async function approveOne(id: number, adminId: number) {
+  const [head] = await q<{ kind: string }>(`select kind from submissions where id = $1`, [id]);
+  if (!head) throw new Error("ไม่พบรายการ");
+  if (head.kind === "sale") {
+    return await tx(async (run) => {
+      const { s, approvedId } = await copyToLive(id, run);
+      await run(`update submissions set status='approved', reviewed_by=$2, reviewed_at=now(), approved_id=$3, updated_at=now() where id=$1 and status <> 'approved'`,
+        [id, adminId, approvedId]);
+      return s;
+    });
+  }
+  const { s, approvedId } = await copyToLive(id);
+  await q(`update submissions set status='approved', reviewed_by=$2, reviewed_at=now(), approved_id=$3, updated_at=now() where id=$1 and status <> 'approved'`,
+    [id, adminId, approvedId]);
+  return s;
+}
+
 export async function approveSubmission(id: number) {
   const admin = await requirePermission("review");
-  const { s, approvedId } = await copyToLive(id);
-  await q(
-    `update submissions set status='approved', reviewed_by=$2, reviewed_at=now(), approved_id=$3, updated_at=now() where id=$1`,
-    [id, admin.id, approvedId]);
+  const s = await approveOne(id, admin.id);
   const label = s.kind === "sale" ? `${s.item} · ${s.qty} ชิ้น` : `ลูกค้า ${s.customers} ราย (${s.entry_date})`;
   await logAudit("approve", "submission", id, `อนุมัติของ ${s.ba || "-"}: ${label}`);
   revalidatePath("/review"); revalidatePath("/my"); revalidatePath("/sales"); revalidatePath("/");
@@ -478,9 +496,7 @@ export async function approveMany(ids: number[]) {
   const failed: number[] = [];
   for (const id of ids) {
     try {
-      const { approvedId } = await copyToLive(id);
-      await q(`update submissions set status='approved', reviewed_by=$2, reviewed_at=now(), approved_id=$3, updated_at=now() where id=$1 and status <> 'approved'`,
-        [id, admin.id, approvedId]);
+      await approveOne(id, admin.id);   // sale kind commits insert + status flip atomically
       ok++;
     } catch (e) {
       // Don't silently swallow real DB errors — log them and report the count.
@@ -509,12 +525,16 @@ export async function unapproveMany(ids: number[]) {
       // remove the live sale/customer row this approval created (restores stock & dashboard).
       // approved_id points at the exact inserted row (most precise); submission_id is a
       // belt-and-suspenders fallback. `tbl` is a fixed literal chosen by kind — not user input.
+      // Atomic: the row deletes + status flip commit together, so a crash between them can't
+      // leave the unit deducted from NEITHER leg (sale gone + submission no longer pending).
       const tbl = s.kind === "sale" ? "sales" : "daily_customers";
-      if (s.approved_id != null) await q(`delete from ${tbl} where id = $1`, [s.approved_id]);
-      await q(`delete from ${tbl} where submission_id = $1`, [id]);
-      const res = await q<{ id: number }>(
-        `update submissions set status='pending', reviewed_by=null, reviewed_at=null, approved_id=null, review_note=null, updated_at=now()
-         where id=$1 and status='approved' returning id`, [id]);
+      const res = await tx<{ id: number }[]>(async (run) => {
+        if (s.approved_id != null) await run(`delete from ${tbl} where id = $1`, [s.approved_id]);
+        await run(`delete from ${tbl} where submission_id = $1`, [id]);
+        return run<{ id: number }>(
+          `update submissions set status='pending', reviewed_by=null, reviewed_at=null, approved_id=null, review_note=null, updated_at=now()
+           where id=$1 and status='approved' returning id`, [id]);
+      });
       if (res.length) ok++;
     } catch (e) { console.error("[unapproveMany] failed", id, e); failed.push(id); }
   }

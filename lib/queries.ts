@@ -244,7 +244,7 @@ const SHIP_RECEIVED = `
            sum(coalesce(i.received_qty, i.qty))::float q
     from po_items i
     join purchase_orders po on po.id = i.po_id
-    where i.barcode is not null and po.deleted_at is null
+    where coalesce(i.barcode,'') <> '' and po.deleted_at is null
       and po.status in ('received', '${ALLOC_STATUS}') group by 1, 2`;
 // legacy: every non-deleted PO by ordered qty (pre-receipt-workflow) — used as a
 // fallback when the received_qty column (0021) hasn't been migrated yet.
@@ -254,7 +254,7 @@ const SHIP_LEGACY = `
            sum(i.qty)::float q
     from po_items i
     join purchase_orders po on po.id = i.po_id
-    where i.barcode is not null and po.deleted_at is null group by 1, 2`;
+    where coalesce(i.barcode,'') <> '' and po.deleted_at is null group by 1, 2`;
 
 // branch a sale belongs to (canonical code)
 const SOLD_BRANCH = `upper(case when source = 'EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end)`;
@@ -272,19 +272,21 @@ const stockCte = (ship: string, adj: boolean) => `
   with ship as (${ship}),
   sold as (
     select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
-    from sales where barcode is not null ${stockCutoff("sale_date")} group by 1, 2),
+    from sales where coalesce(barcode,'') <> '' ${stockCutoff("sale_date")} group by 1, 2),
   subsold as (
     select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
-    from submissions where barcode is not null and kind = 'sale' and status = 'pending'
+    from submissions where coalesce(barcode,'') <> '' and kind = 'sale' and status = 'pending'
       and deleted_at is null ${stockCutoff("entry_date")} group by 1, 2),
   ret as (
-    select serial as barcode,
-           ${branchFromLabel("branch_label")} branch,
+    select r.serial as barcode,
+           ${branchFromLabel("r.branch_label")} branch,
            count(*)::float q
-    from return_items where serial is not null and receive_status='Returned' group by 1, 2),
+    from return_items r
+    where coalesce(r.serial,'') <> '' and r.receive_status='Returned'
+      and exists (select 1 from products p where p.barcode = r.serial) group by 1, 2),
   ${adj ? `adj as (
     select barcode, upper(branch) branch, sum(qty)::float q
-    from stock_adjustments where barcode is not null group by 1, 2),` : ``}
+    from stock_adjustments where coalesce(barcode,'') <> '' group by 1, 2),` : ``}
   keys as (
     select barcode, branch from ship
     union select barcode, branch from sold
