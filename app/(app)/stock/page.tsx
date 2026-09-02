@@ -4,7 +4,7 @@ import { stockLive, stockSummary, reorderSuggestions, negativeStock, stockValuat
 import { baht } from "@/lib/format";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
-import { StockTable } from "@/components/StockTable";
+import { StockMatrix } from "@/components/StockMatrix";
 import { StockAdjust } from "@/components/StockAdjust";
 import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -138,8 +138,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         </Card>
       )}
 
-      <Card title={`รายการสินค้า (${rows.length} SKU) · คลิกหัวคอลัมน์เพื่อเรียง`}>
-        <StockTable rows={rows} />
+      <Card title={`คงเหลือแต่ละกลิ่น · ${rows.length} SKU`}>
+        <StockMatrix rows={rows} />
       </Card>
     </div>
   );
