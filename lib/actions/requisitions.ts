@@ -196,42 +196,53 @@ export async function ctwRequisitionStatus(id: number): Promise<{ enabled: boole
 export async function receiveRequisition(id: number, lines: { id: number; received_qty: number; remark?: string }[], remark?: string): Promise<{ ok: boolean; error?: string; warn?: string }> {
   const me = await requireAnyPermission(["my_sales", "requisitions"]);
   try {
-    // When the central-warehouse integration is on, the AUTHORITATIVE received quantities come
-    // from the SKUs the warehouse actually dispatched (not the requested qty, and not the branch's
-    // manual count). Pull them, require the warehouse to have dispatched, and map SKUs→lines by
-    // barcode (name+size only as a legacy fallback). The warehouse is closed AFTER stock commits (per CTW_API.md).
+    // Received quantities come from the SKUs the warehouse shipped. In the push model those are
+    // already stored on the PO (shipped_skus) — the goods are here, so use them directly and DON'T
+    // re-gate on the warehouse status. Only when nothing was pushed do we pull from the warehouse
+    // (which then requires it to have dispatched). Match SKUs→lines by barcode (name+size fallback).
     let ctwLines: { id: number; received_qty: number; remark?: string }[] | null = null;
     let poNumber = "";
     let ctwWarn: string | undefined;
-    if (ctwEnabled()) {
+    let shipped: { barcode?: string | null; product?: string | null; size?: string | null }[] = [];
+    let fromPush = false;   // goods pushed to us → warehouse already closed its side (don't call back)
+
+    try {
+      const [head] = await q<{ po_number: string; shipped_skus: any }>(`select po_number, shipped_skus from purchase_orders where id=$1`, [id]);
+      poNumber = head?.po_number || "";
+      shipped = Array.isArray(head?.shipped_skus) ? head!.shipped_skus : [];
+      fromPush = shipped.length > 0;
+    } catch (e: any) {
+      if (e?.code !== "42703") throw e;   // shipped_skus not migrated (pre-0031)
       const [head] = await q<{ po_number: string }>(`select po_number from purchase_orders where id=$1`, [id]);
       poNumber = head?.po_number || "";
-      if (poNumber) {
-        const wh = await ctwGetRequisition(poNumber);
-        if (!wh.ok) return { ok: false, error: `อ่านสถานะคลังกลางไม่สำเร็จ: ${wh.error || `HTTP ${wh.httpStatus}`}` };
-        if (wh.status !== "dispatched" && wh.status !== "received") {
-          return { ok: false, error: `คลังกลางยังไม่จัดส่ง (สถานะ: ${wh.status ?? "-"}) — รับไม่ได้` };
-        }
-        // count shipped SKUs by BARCODE (authoritative — barcodes match 1:1 across both systems);
-        // fall back to normalized name+size only for legacy SKUs that carry no barcode.
-        const norm = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9ก-๙]/g, "");
-        const byBarcode = new Map<string, number>();
-        const byName = new Map<string, number>();
-        for (const s of wh.skus || []) {
-          const bc = String(s.barcode || "").trim();
-          if (bc) byBarcode.set(bc, (byBarcode.get(bc) || 0) + 1);
-          else { const k = `${norm(s.product)}|${norm(s.size)}`; byName.set(k, (byName.get(k) || 0) + 1); }
-        }
-        const poItems = await q<{ id: number; barcode: string | null; scent: string | null; size: string | null }>(`select id, barcode, scent, size from po_items where po_id=$1`, [id]);
-        ctwLines = poItems.map((it) => {
-          const bc = String(it.barcode || "").trim();
-          const qty = bc && byBarcode.has(bc) ? byBarcode.get(bc)! : (byName.get(`${norm(it.scent || "")}|${norm(it.size || "")}`) ?? 0);
-          return { id: it.id, received_qty: qty };
-        });
-        const matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
-        const shipped = (wh.skus || []).length;
-        if (shipped > 0 && matched !== shipped) ctwWarn = `จับคู่ SKU คลังไม่ครบ: เข้าสต๊อก ${matched}/${shipped} ชิ้น — ตรวจสอบบาร์โค้ด/ชื่อสินค้า`;
+    }
+
+    // nothing pushed yet → pull from the warehouse (must be dispatched)
+    if (!shipped.length && ctwEnabled() && poNumber) {
+      const wh = await ctwGetRequisition(poNumber);
+      if (wh.ok && (wh.status === "dispatched" || wh.status === "received")) shipped = wh.skus || [];
+      else if (wh.ok) return { ok: false, error: `คลังกลางยังไม่จัดส่ง (สถานะ: ${wh.status ?? "-"}) — รับไม่ได้` };
+      // wh not reachable → fall through to the branch's manual lines
+    }
+
+    if (shipped.length) {
+      // count shipped SKUs by BARCODE (1:1 across both systems); name+size only for SKUs w/o barcode
+      const norm = (s: any) => String(s || "").toLowerCase().replace(/[^a-z0-9ก-๙]/g, "");
+      const byBarcode = new Map<string, number>();
+      const byName = new Map<string, number>();
+      for (const s of shipped) {
+        const bc = String(s.barcode || "").trim();
+        if (bc) byBarcode.set(bc, (byBarcode.get(bc) || 0) + 1);
+        else { const k = `${norm(s.product)}|${norm(s.size)}`; byName.set(k, (byName.get(k) || 0) + 1); }
       }
+      const poItems = await q<{ id: number; barcode: string | null; scent: string | null; size: string | null }>(`select id, barcode, scent, size from po_items where po_id=$1`, [id]);
+      ctwLines = poItems.map((it) => {
+        const bc = String(it.barcode || "").trim();
+        const qty = bc && byBarcode.has(bc) ? byBarcode.get(bc)! : (byName.get(`${norm(it.scent || "")}|${norm(it.size || "")}`) ?? 0);
+        return { id: it.id, received_qty: qty };
+      });
+      const matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
+      if (shipped.length > 0 && matched !== shipped.length) ctwWarn = `จับคู่ SKU คลังไม่ครบ: เข้าสต๊อก ${matched}/${shipped.length} ชิ้น — ตรวจสอบบาร์โค้ด/ชื่อสินค้า`;
     }
     const useLines = ctwLines ?? lines;
 
@@ -261,10 +272,10 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     });
     if (!res.ok) return res;
 
-    // (C) close the requisition on the warehouse AFTER branch stock is committed. Best-effort:
-    // a failure here means "received locally but warehouse not closed" — surfaced as a warn to retry.
+    // (C) close the requisition on the warehouse AFTER branch stock is committed — ONLY in the pull
+    // flow. In the push flow the warehouse already closed its side when it sent, so skip the callback.
     let warn = ctwWarn;
-    if (ctwEnabled() && poNumber) {
+    if (ctwEnabled() && poNumber && !fromPush) {
       const done = await ctwReceive(poNumber, me.full_name || "CTW");
       if (!done.ok) warn = [warn, `ปิดใบเบิกที่คลังกลางไม่สำเร็จ: ${done.error || `HTTP ${done.httpStatus}`}`].filter(Boolean).join(" · ");
     }

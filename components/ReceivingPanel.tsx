@@ -62,7 +62,9 @@ function ReceiveCard({ po }: { po: ReceiptPR }) {
     say(`✓ ${hit}`); beep("ok"); try { navigator.vibrate?.(30); } catch {}
   });
 
-  const ctwBlocks = !!ctw?.enabled && ctw.ok === true && ctw.dispatched === false;
+  // block only when the warehouse hasn't dispatched AND nothing was pushed to us yet.
+  // If the SKUs are already here (pushed), the goods arrived — never block.
+  const ctwBlocks = !!ctw?.enabled && ctw.ok === true && ctw.dispatched === false && allSkus.length === 0;
   const receive = () => start(async () => {
     setErr(null);
     // when the integration is on the server uses the warehouse's real SKUs; these are the fallback
