@@ -62,20 +62,15 @@ export async function POST(req: Request) {
   if (!poNo) return bad("ต้องมี po_no", 400);
   if (!skus.length && !items.length) return bad("ต้องมี skus หรือ items", 400);
 
-  const { byBarcode, byName, total: shipped } = desiredQty(skus, items);
-  const qtyFor = (barcode: string | null, product: string | null, size: string | null) => {
-    const bc = String(barcode || "").trim();
-    if (bc && byBarcode.has(bc)) return byBarcode.get(bc)!;
-    return byName.get(`${norm(product)}|${norm(size)}`) ?? 0;
-  };
+  const { total: shipped } = desiredQty(skus, items);
 
   try {
     const [po] = await q<{ id: number; status: string }>(
       `select id, status from purchase_orders where po_number = $1 and deleted_at is null order by id desc limit 1`, [poNo]);
-    if (po?.status === "received") return Response.json({ ok: true, already: true, order_no: poNo });
+    // already received/dispatched at the branch → don't reopen it
+    if (po?.status === "received") return Response.json({ ok: true, already: true, order_no: poNo, status: "received" });
 
     let created = false;
-    let matched = 0;
 
     await tx(async (run) => {
       await run(`select pg_advisory_xact_lock(hashtext($1))`, [`inbound-${poNo}`]);   // serialize concurrent webhooks
@@ -83,40 +78,33 @@ export async function POST(req: Request) {
 
       if (poId) {
         const [cur] = await run<{ status: string }>(`select status from purchase_orders where id=$1 for update`, [poId]);
-        if (cur?.status === "received") { matched = -1; return; }   // another webhook won
-        const its = await run<{ id: number; barcode: string | null; scent: string | null; size: string | null }>(
-          `select id, barcode, scent, size from po_items where po_id=$1`, [poId]);
-        for (const it of its) {
-          const qty = qtyFor(it.barcode, it.scent, it.size);
-          matched += qty;
-          await run(`update po_items set received_qty = least($2, qty) where id=$1`, [it.id, qty]);
-        }
+        if (cur?.status === "received") { created = false; return; }   // already received — leave it
+        // mark "delivered" (ส่งของแล้ว) — stock is NOT added here; the assigned salesperson
+        // confirms receipt at /my which adds stock (pulls the real SKUs) and flips to received.
+        await run(`update purchase_orders set status='delivered' where id=$1`, [poId]);
       } else {
-        // stockflow-originated requisition CTW hasn't seen → create it, lines from the payload
+        // stockflow-originated requisition CTW hasn't seen → create it as "delivered" (awaiting branch receipt)
         created = true;
         const lines = buildLinesFromPayload(skus, items);
         const [ins] = await run<{ id: number }>(
-          `insert into purchase_orders (po_number, version, order_date, branch_label, status, received_at)
-           values ($1,$2,$3,$4,'received', now()) returning id`,
+          `insert into purchase_orders (po_number, version, order_date, branch_label, status)
+           values ($1,$2,$3,$4,'delivered') returning id`,
           [poNo, `${poNo}-ctw`, docDate, branch]);
         poId = ins.id;
         let line = 0;
         for (const l of lines) {
-          line += 1;
-          matched += l.qty;
+          line += 1;   // ordered qty from the shipment; received_qty stays 0 until the branch confirms
           await run(
-            `insert into po_items (po_id, line_no, barcode, product_id, scent, size, qty, received_qty)
-             select $1,$2,$3,(select id from products where barcode=$3 limit 1),$4,$5,$6,$6`,
+            `insert into po_items (po_id, line_no, barcode, product_id, scent, size, qty)
+             select $1,$2,$3,(select id from products where barcode=$3 limit 1),$4,$5,$6`,
             [poId, line, l.barcode, l.product, l.size, l.qty]);
         }
       }
-      if (poId && !created) await run(`update purchase_orders set status='received', received_at=now() where id=$1`, [poId]);
     });
 
-    if (matched === -1) return Response.json({ ok: true, already: true, order_no: poNo });
-    await logAudit("update", "requisition", null, `${created ? "สร้าง+รับ" : "รับ"}อัตโนมัติจากคลังกลาง ${poNo} · เข้าสต๊อก ${matched}/${shipped} ชิ้น`);
-    revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/stock"); revalidatePath("/requisitions");
-    return Response.json({ ok: true, order_no: poNo, received: matched, shipped, unmatched: Math.max(0, shipped - matched), created });
+    await logAudit("update", "requisition", null, `คลังกลางส่งของ ${poNo} · ${shipped} ชิ้น · รอสาขารับ`);
+    revalidatePath("/my"); revalidatePath("/my/receive"); revalidatePath("/requisitions");
+    return Response.json({ ok: true, order_no: poNo, status: "delivered", shipped, created });
   } catch (e: any) {
     if (e?.code === "42703") return bad("ยังไม่ได้ติดตั้งคอลัมน์ (รัน SQL 0021)", 500);
     console.error("[inbound/requisition]", e);
