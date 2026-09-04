@@ -987,6 +987,33 @@ export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;
 // ---- daily cash drawer (opening float carries forward) --------------------
 const missingDailyCash = (e: any) => e?.code === "42P01" || /relation "?daily_cash"? does not exist/i.test(String(e?.message || ""));
 
+/** Cash-on-hand per day for a whole branch, in ONE query (replaces the per-date dailyReport
+ *  N+1 in carryInFor/dailyCashLog). Must return the SAME number as dailyReport(d,branch,null).cash:
+ *  single-channel 'Cash' line totals + the Cash tender of split ("จ่าย 2 ทาง") bills, over
+ *  sales ∪ pending submissions (alive). Falls back to line-only if bill_payments is absent. */
+async function branchCashByDate(branch: string): Promise<Map<string, number>> {
+  const aliveS = await aliveAnd("s");
+  const rowsCte = `
+    with rows as (
+      select sale_date::text d, receipt_no, payment_channel, total::float total from sales where source = $1
+      union all
+      select entry_date::text d, receipt_no, payment_channel, total::float total
+        from submissions s where kind='sale' and status='pending' and source=$1${aliveS})`;
+  const withSplit = `${rowsCte},
+    line as (select d, sum(total) c from rows where payment_channel='Cash' group by d),
+    srefs as (select distinct d, receipt_no from rows where payment_channel=$2 and coalesce(receipt_no,'') <> ''),
+    split as (select sr.d, coalesce(sum(bp.amount),0)::float c
+      from srefs sr join bill_payments bp on bp.bill_ref = sr.receipt_no and bp.channel='Cash' group by sr.d)
+    select d, (coalesce(l.c,0) + coalesce(sp.c,0))::float cash
+    from (select d from line union select d from split) dd
+    left join line l using (d) left join split sp using (d)`;
+  const lineOnly = `${rowsCte} select d, sum(total)::float cash from rows where payment_channel='Cash' group by d`;
+  let rows: { d: string; cash: number }[];
+  try { rows = await q<{ d: string; cash: number }>(withSplit, [branch, SPLIT2]); }
+  catch (e) { if (!missingTable(e)) throw e; rows = await q<{ d: string; cash: number }>(lineOnly, [branch]); }
+  return new Map(rows.map((r) => [r.d, Number(r.cash) || 0]));
+}
+
 /** Carry-in ("ยกมา") for `date`: the live closing of the whole prior-day chain, reconstructed
  *  the SAME way dailyCashLog does (confirmed days anchor their stored opening; unconfirmed days
  *  carry the running closing). Using one grouped reconstruction — not just the single prior row —
@@ -1010,8 +1037,7 @@ async function carryInFor(date: string, branch: string): Promise<number> {
      ) t`, [date, branch, SPLIT2]);
   const dates = [...new Set([...drawer.keys(), ...cashDates.map((r) => r.d)])].sort();
   if (!dates.length) return 0;
-  const cashByDate = new Map<string, number>();
-  await Promise.all(dates.map(async (d) => cashByDate.set(d, (await dailyReport(d, branch)).cash)));
+  const cashByDate = await branchCashByDate(branch);   // one query for all dates (was N+1)
   let prevClosing = 0;
   for (const d of dates) {           // oldest → newest
     const r = drawer.get(d);
@@ -1104,9 +1130,8 @@ export async function dailyCashLog(limit = 90, branch: string = DEFAULT_BRANCH) 
     const allDates = [...new Set([...drawer.keys(), ...cashDates.map((r) => r.d)])].sort();   // oldest → newest
     if (!allDates.length) return [];
     // "คงเหลือ" is computed LIVE = ยกมา + เอาไป + เงินสดขายวันนั้น − เข้าธนาคาร; carries to the next day.
-    const cashByDate = new Map<string, number>();
+    const cashByDate = await branchCashByDate(branch);   // one query for all dates (was N+1)
     const counted = await countedCashByDate(branch);
-    await Promise.all(allDates.map(async (d) => cashByDate.set(d, (await dailyReport(d, branch)).cash)));
     let prevClosing = 0;
     const built: Row[] = allDates.map((d) => {
       const r = drawer.get(d);
@@ -1133,8 +1158,7 @@ async function dailyCashLogLegacy(limit: number) {
       `select entry_date::text entry_date, opening::float, 0::float seed, deposit::float, closing::float,
               confirmed, (posted_cash_id is not null) posted
        from daily_cash order by entry_date desc limit $1`, [limit]);
-    const cashByDate = new Map<string, number>();
-    await Promise.all(rows.map(async (r) => cashByDate.set(r.entry_date, (await dailyReport(r.entry_date, DEFAULT_BRANCH)).cash)));
+    const cashByDate = await branchCashByDate(DEFAULT_BRANCH);   // one query for all dates (was N+1)
     let prevClosing = 0;
     for (const r of [...rows].reverse()) {
       if (!r.confirmed) r.opening = prevClosing;
