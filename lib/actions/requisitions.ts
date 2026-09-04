@@ -256,8 +256,10 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
       // a salesperson (my_sales, not an admin with `requisitions`) may only receive their own branch's PO.
       // Guard against a PO whose branch_label is missing/unrecognized (resolveBranch would silently
       // fall back to CTW and leak such POs to CTW staff) — require an explicit known-branch match.
-      if (!can(me, "requisitions") && me.branch) {
-        if (!isBranch(po.branch_label) || resolveBranch(po.branch_label) !== resolveBranch(me.branch)) {
+      if (!can(me, "requisitions")) {
+        // a salesperson must have a home branch that matches the (known) PO branch —
+        // a branchless salesperson can't receive anything (else they'd inflate any branch)
+        if (!me.branch || !isBranch(po.branch_label) || resolveBranch(po.branch_label) !== resolveBranch(me.branch)) {
           return { ok: false, error: "รับได้เฉพาะใบเบิกของสาขาตัวเอง" };
         }
       }

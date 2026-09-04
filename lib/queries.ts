@@ -786,9 +786,16 @@ export async function myDayKpis(userId: number, date: string) {
     group by 1`, [userId, date, SPLIT2]);
   let tenderCh: { channel: string; revenue: number }[] = [];
   try {
+    // only split-tenders whose bill still exists (not rejected/trashed) — else a rejected
+    // split bill's Cash/QR legs would keep showing in the channel summary (> revenue).
+    const aliveS = await aliveAnd("s");
     tenderCh = await q<{ channel: string; revenue: number }>(`
-      select channel, sum(amount)::float revenue
-      from bill_payments where created_by=$1 and entry_date=$2 group by 1`, [userId, date]);
+      select bp.channel, sum(bp.amount)::float revenue
+      from bill_payments bp
+      where bp.created_by=$1 and bp.entry_date=$2
+        and exists (select 1 from submissions s where s.receipt_no = bp.bill_ref
+                    and s.created_by=$1 and s.entry_date=$2 and s.kind='sale' and s.status<>'rejected'${aliveS})
+      group by 1`, [userId, date]);
   } catch (e) { if (!missingTable(e)) throw e; }
 
   const map = new Map<string, number>();

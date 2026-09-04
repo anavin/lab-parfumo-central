@@ -120,6 +120,7 @@ export async function setScentActive(scent: string, active: boolean): Promise<{ 
 
 /** Recent adjustments (optionally for one branch) for the admin list. */
 export async function listStockAdjustments(branch: string | null = null): Promise<StockAdjustment[]> {
+  await requirePermission("requisitions");
   try {
     const where = branch ? `where a.branch = $1` : ``;
     const args = branch ? [resolveBranch(branch)] : [];

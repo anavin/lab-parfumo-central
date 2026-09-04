@@ -1,8 +1,10 @@
 "use server";
 import { q } from "@/lib/db";
+import { requireUser } from "@/lib/auth/require-user";
 import { PRODUCT_SEARCH_ORDER } from "@/lib/product-order";
 
 export async function searchProducts(term: string) {
+  await requireUser();   // logged-in only (these return catalog / PO / branch data)
   // prefix match ("ขึ้นต้นด้วย" — ตรงจากตัวอักษรแรกตามตำแหน่ง): พิมพ์ B → Bu → Buo
   // เจอเฉพาะกลิ่นที่ขึ้นต้นด้วยตัวนั้น (ไม่ใช่มีอยู่กลางคำ) · เรียง featured ก่อน
   const t = `${(term ?? "").trim()}%`;
@@ -15,6 +17,7 @@ export async function searchProducts(term: string) {
 
 /** Exact-match a product by scanned barcode (for the sale form scanner). */
 export async function findProductByBarcode(barcode: string) {
+  await requireUser();
   const code = (barcode ?? "").trim();
   if (!code) return null;
   const [p] = await q<{ id: number; barcode: string; scent: string; grade: string; size: string; sku: string; price: number }>(`
@@ -26,11 +29,13 @@ export async function findProductByBarcode(barcode: string) {
 /** All product barcodes — the scanner cross-checks a decoded value against this so a
  *  real product is accepted instantly and a misread (that matches nothing) is caught. */
 export async function productBarcodes() {
+  await requireUser();
   const rows = await q<{ barcode: string }>(`select barcode from products where barcode is not null`);
   return rows.map((r) => r.barcode);
 }
 
 export async function listPOs() {
+  await requireUser();
   return q<{ po_number: string; order_date: string; branch_label: string; lines: number; qty: number }>(`
     select po.po_number, po.order_date, po.branch_label,
            count(i.id)::int lines, coalesce(sum(i.qty),0)::float qty
@@ -41,6 +46,7 @@ export async function listPOs() {
 }
 
 export async function getPoItems(poNumber: string) {
+  await requireUser();
   return q<{ barcode: string; scent: string; size: string; qty: number; grade: string }>(`
     select i.barcode, i.scent, i.size, i.qty::float, p.grade
     from po_items i
@@ -50,6 +56,7 @@ export async function getPoItems(poNumber: string) {
 }
 
 export async function listBranches() {
+  await requireUser();
   return q<{ id: number; branch_code: string; store_no: string; receiver: string; phone: string; address: string }>(`
     select id, branch_code, store_no, receiver, tel as phone, address
     from branches order by branch_code`);

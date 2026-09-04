@@ -46,6 +46,7 @@ export async function submitStockCount(branch: string, lines: CountLineInput[], 
 
 /** Count sessions for the admin review list (optionally by status). */
 export async function listStockCounts(status: string | null = null): Promise<StockCount[]> {
+  await requireUser();
   try {
     const where = status ? `where c.status = $1` : ``;
     const args = status ? [status] : [];
@@ -65,6 +66,7 @@ export async function listStockCounts(status: string | null = null): Promise<Sto
 }
 
 export async function getStockCountLines(id: number): Promise<CountLine[]> {
+  await requireUser();
   try {
     return await q<CountLine>(`select id, barcode, scent, size, expected::float expected, counted::float counted
       from stock_count_lines where count_id = $1 order by scent, size`, [Number(id)]);

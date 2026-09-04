@@ -79,6 +79,18 @@ export const customerDaySchema = z.object({
 });
 
 // One bill = one customer, one or more item lines sharing payment/nationality/receipt.
+// one item appended to an existing pending bill (addMyBillItems / addBillItemsByAdmin).
+// Same bounds as billSchema.items so the add path can't bypass qty/price/discount validation
+// (e.g. a negative qty, which would ADD stock via subsold).
+export const addItemSchema = z.object({
+  item: z.string().trim().min(1, "กรุณาระบุสินค้า").max(200),
+  barcode: z.string().trim().max(64).optional(),
+  size: z.string().trim().max(40).optional(),
+  qty: z.coerce.number().int().min(1, "จำนวนต้องอย่างน้อย 1").max(999999),
+  unit_price: z.coerce.number().min(0).max(99999999),
+  discount: z.coerce.number().min(0).max(99999999).optional().default(0),
+});
+
 export const billSchema = z.object({
   sale_date: dateStr,
   sale_time: z.string().trim().max(8).optional(),

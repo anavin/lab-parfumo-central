@@ -1,5 +1,5 @@
 "use server";
-import { q } from "@/lib/db";
+import { q, tx } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { requirePermission, requireUser, isAdmin, requireAnyPermission } from "@/lib/auth/require-user";
 import { dailyReport, cashAttachmentsForDate, type CashAttachment } from "@/lib/queries";
@@ -27,13 +27,17 @@ export async function confirmDrawer(date: string, branch: string, opening: numbe
       await q(`update daily_cash set counted_cash=$3 where entry_date=$1 and branch=$2`, [date, br, c]);
     } catch (e: any) { if (e?.code !== "42703") throw e; }
 
-    // post the bank deposit into the cash ledger once (posted_cash_id guards against dupes)
-    const [row] = await q<{ posted: number | null }>(`select posted_cash_id posted from daily_cash where entry_date=$1 and branch=$2`, [date, br]);
-    if (!row?.posted && deposit > 0) {
-      const [ins] = await q<{ id: number }>(
-        `insert into cash_entries (cash_date, description, amount, type) values ($1,$2,$3,$4) returning id`,
-        [date, `ฝากธนาคาร · เงินสดหน้าร้าน ${branchName(br)}`, deposit, "ฝากธนาคาร"]);
-      await q(`update daily_cash set posted_cash_id=$3 where entry_date=$1 and branch=$2`, [date, br, ins.id]);
+    // post the bank deposit into the cash ledger ONCE. FOR UPDATE serializes concurrent
+    // confirms (two admins / retry / strict-mode) so the guard can't be raced into a double-post.
+    if (deposit > 0) {
+      await tx(async (run) => {
+        const [row] = await run<{ posted: number | null }>(`select posted_cash_id posted from daily_cash where entry_date=$1 and branch=$2 for update`, [date, br]);
+        if (row?.posted) return;   // already posted — skip
+        const [ins] = await run<{ id: number }>(
+          `insert into cash_entries (cash_date, description, amount, type) values ($1,$2,$3,$4) returning id`,
+          [date, `ฝากธนาคาร · เงินสดหน้าร้าน ${branchName(br)}`, deposit, "ฝากธนาคาร"]);
+        await run(`update daily_cash set posted_cash_id=$3 where entry_date=$1 and branch=$2`, [date, br, ins.id]);
+      });
     }
     await logAudit("update", "cash", date, `ยืนยันเงินสดหน้าร้าน ${branchName(br)} ${date} · เข้าธนาคาร ฿${Math.round(deposit).toLocaleString()}`);
     revalidatePath("/cash"); revalidatePath("/my");

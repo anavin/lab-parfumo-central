@@ -1,7 +1,8 @@
 "use server";
 import { q, tx, type TxRun } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { saleSchema, customerDaySchema, billSchema } from "./schemas";
+import { z } from "zod";
+import { saleSchema, customerDaySchema, billSchema, addItemSchema } from "./schemas";
 import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
@@ -73,8 +74,9 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
   // each line's channel = its own override, else the bill default; all required
   if (!split && d.items.some((it) => !((it.payment_channel?.trim() || billPc)))) return { ok: false, error: "กรุณาเลือกช่องทางชำระให้ครบทุกชิ้น" };
 
-  // split tender: the per-channel amounts must add up to the bill total
-  const billTotal = d.items.reduce((s, it) => s + (it.qty * (it.unit_price ?? 0) - (it.discount ?? 0)), 0);
+  // split tender: the per-channel amounts must add up to the bill total (discount capped at
+  // each line's subtotal so billTotal matches the stored, floored line totals)
+  const billTotal = d.items.reduce((s, it) => { const sub = it.qty * (it.unit_price ?? 0); return s + (sub - Math.min(sub, it.discount ?? 0)); }, 0);
   const tenders = split ? (d.tenders ?? []).filter((t) => t.channel?.trim() && t.amount > 0) : [];
   if (split) {
     if (tenders.length < 2) return { ok: false, error: "จ่าย 2 ทาง: เลือกช่องทางและใส่ยอดให้ครบอย่างน้อย 2 ช่องทาง" };
@@ -93,14 +95,16 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
     if (!ref) ref = await genBillRefTx(run, d.sale_date, resolveBranch(d.source));
     for (const it of d.items) {
       const pc = split ? SPLIT2 : (it.payment_channel?.trim() || billPc);
-      const total = Math.max(0, it.qty * (it.unit_price ?? 0) - (it.discount ?? 0));   // never negative
+      const sub = it.qty * (it.unit_price ?? 0);
+      const disc = Math.min(sub, it.discount ?? 0);                 // cap discount at subtotal
+      const total = Math.max(0, sub - disc);                        // never negative
       const [row] = await run<{ id: number }>(
         `insert into submissions
            (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
          values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          returning id`,
         [user.id, user.full_name, d.sale_date, resolveBranch(d.source), d.sale_time || null, ref,
-         it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, it.discount ?? 0, total,
+         it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, disc, total,
          pc, d.nation]);
       await run(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
       count++; sum += total;
@@ -153,14 +157,16 @@ type AddItem = { item: string; barcode?: string; size?: string; qty: number; uni
 
 async function insertBillItems(run: TxRun, ref: string, shared: { source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null }, items: AddItem[], userId: number, ba: string) {
   for (const it of items) {
-    const qty = Number(it.qty) || 0;
-    const total = Math.max(0, qty * (Number(it.unit_price) || 0) - (Number(it.discount) || 0));
+    const qty = Math.max(0, Math.round(Number(it.qty) || 0));
+    const price = Number(it.unit_price) || 0;
+    const disc = Math.min(qty * price, Math.max(0, Number(it.discount) || 0));   // cap discount at line subtotal
+    const total = Math.max(0, qty * price - disc);
     const [row] = await run<{ id: number }>(
       `insert into submissions
          (kind, status, created_by, ba, entry_date, source, sale_time, receipt_no, item, barcode, size, qty, unit_price, discount, total, payment_channel, nation)
        values ('sale','pending',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
       [userId, ba, shared.entry_date, shared.source, shared.sale_time, ref,
-       it.item, it.barcode || null, it.size || null, qty, Number(it.unit_price) || 0, Number(it.discount) || 0, total,
+       it.item, it.barcode || null, it.size || null, qty, price, disc, total,
        shared.payment_channel, shared.nation]);
     await run(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
   }
@@ -170,7 +176,9 @@ async function insertBillItems(run: TxRun, ref: string, shared: { source: string
 export async function addMyBillItems(billRef: string, items: AddItem[]) {
   const user = await requirePermission("my_sales");
   const ref = String(billRef || "").trim();
-  const rows = (items || []).filter((it) => String(it?.item || "").trim());
+  const parsed = z.array(addItemSchema).safeParse((items || []).filter((it) => String(it?.item || "").trim()));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลสินค้าไม่ถูกต้อง" };
+  const rows = parsed.data;
   if (!ref || !rows.length) return { ok: false, error: "ไม่มีสินค้าที่จะเพิ่ม" };
   const [b] = await q<{ source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null }>(
     `select source, entry_date::text entry_date, sale_time, nation, payment_channel
@@ -191,7 +199,9 @@ export async function addMyBillItems(billRef: string, items: AddItem[]) {
 export async function addBillItemsByAdmin(billRef: string, items: AddItem[]) {
   const admin = await requirePermission("review");
   const ref = String(billRef || "").trim();
-  const rows = (items || []).filter((it) => String(it?.item || "").trim());
+  const parsed = z.array(addItemSchema).safeParse((items || []).filter((it) => String(it?.item || "").trim()));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "ข้อมูลสินค้าไม่ถูกต้อง" };
+  const rows = parsed.data;
   if (!ref || !rows.length) return { ok: false, error: "ไม่มีสินค้าที่จะเพิ่ม" };
   const [b] = await q<{ source: string; entry_date: string; sale_time: string | null; nation: string; payment_channel: string | null; created_by: number }>(
     `select source, entry_date::text entry_date, sale_time, nation, payment_channel, created_by

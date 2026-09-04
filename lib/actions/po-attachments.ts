@@ -11,6 +11,7 @@ export type PoAttachment = { id: number; data?: string };
 
 /** Files attached to a requisition (packing slip photos, etc.). */
 export async function getPoAttachments(poId: number): Promise<PoAttachment[]> {
+  await requirePermission("requisitions");
   try {
     return await q<PoAttachment>(`select id from po_attachments where po_id = $1 order by id`, [poId]);
   } catch (e: any) { if (e?.code === "42P01") return []; throw e; }
