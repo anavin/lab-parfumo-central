@@ -15,6 +15,25 @@ const SW = `($1::text[] is null or month = any($1)) and ($2::text is null or sou
 // same but for an aliased sales table (s.)
 const SWs = `($1::text[] is null or s.month = any($1)) and ($2::text is null or s.source = $2)`;
 
+/** Sale lines for the headline totals/trends = approved `sales` PLUS still-pending
+ *  submissions (excl. rejected/trashed) — so every page's REVENUE/CUSTOMER total agrees
+ *  (dashboard, review, daily report all include pending). Exposes exactly the columns the
+ *  total/trend queries need (total, qty, receipt_no, order_no, month, source, sale_date,
+ *  billkey). Filter with `${SW}` ($1 months[], $2 source). billkey is table-prefixed so a
+ *  sales id and a submission id can't merge two distinct bills. */
+async function saleLines(): Promise<string> {
+  const aliveS = await aliveAnd("s");
+  return `(
+    select total, qty, receipt_no, order_no::text order_no, month, source, sale_date,
+           coalesce(nullif(receipt_no,''), 's'||id::text) billkey
+    from sales
+    union all
+    select total, qty, receipt_no, null::text order_no, to_char(entry_date,'Mon-YY') as "month", source, entry_date as sale_date,
+           coalesce(nullif(receipt_no,''), 'p'||id::text) billkey
+    from submissions s where kind='sale' and status='pending'${aliveS}
+  ) sl`;
+}
+
 /** Ordered month labels (oldest→newest) — used to resolve period presets. */
 export function getMonths() {
   return q<{ month: string }>(
@@ -35,11 +54,11 @@ export async function kpis(f: Filter = ALL) {
   const [rev] = await q<{ revenue: number; qty: number; receipts: number; customers: number; revReceipted: number; qtyReceipted: number }>(`
     select coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float   qty,
-           count(distinct receipt_no)    receipts,
-           count(distinct coalesce(receipt_no::text, order_no::text)) customers,
-           coalesce(sum(total) filter (where receipt_no is not null),0)::float "revReceipted",
-           coalesce(sum(qty)   filter (where receipt_no is not null),0)::float "qtyReceipted"
-    from sales where ${SW}`, [f.months, f.source]);
+           count(distinct nullif(receipt_no,''))    receipts,
+           count(distinct coalesce(nullif(receipt_no,''), order_no, billkey)) customers,
+           coalesce(sum(total) filter (where coalesce(receipt_no,'') <> ''),0)::float "revReceipted",
+           coalesce(sum(qty)   filter (where coalesce(receipt_no,'') <> ''),0)::float "qtyReceipted"
+    from ${await saleLines()} where ${SW}`, [f.months, f.source]);
   const cust = { customers: rev.customers };
   const [cash] = await q<{ total: number }>(
     `select coalesce(sum(amount),0)::float total from cash_entries
@@ -54,38 +73,38 @@ export async function kpis(f: Filter = ALL) {
 }
 
 // ---- monthly trend --------------------------------------------------------
-export function monthlyRevenue(f: Filter = ALL) {
+export async function monthlyRevenue(f: Filter = ALL) {
   return q<{ month: string; revenue: number; qty: number; receipts: number }>(`
     select month, sum(total)::float revenue, sum(qty)::float qty,
-           count(distinct receipt_no) receipts
-    from sales where month is not null and ${SW}
+           count(distinct nullif(receipt_no,'')) receipts
+    from ${await saleLines()} where month is not null and ${SW}
     group by month order by min(sale_date)`, [f.months, f.source]);
 }
 
-export function monthlyCustomers(f: Filter = ALL) {
+export async function monthlyCustomers(f: Filter = ALL) {
   // customers = distinct bills per month — see kpis() note for the bill-id rule.
   return q<{ month: string; customers: number; sell: number }>(`
-    select month, count(distinct coalesce(receipt_no::text, order_no::text))::int customers,
+    select month, count(distinct coalesce(nullif(receipt_no,''), order_no, billkey))::int customers,
            sum(total)::float sell
-    from sales where month is not null and ${SW}
+    from ${await saleLines()} where month is not null and ${SW}
     group by month order by min(sale_date)`, [f.months, f.source]);
 }
 
 // ---- daily trend (for a single selected month) ----------------------------
-export function dailyRevenue(month: string, source: string | null) {
+export async function dailyRevenue(month: string, source: string | null) {
   return q<{ label: string; revenue: number; qty: number }>(`
     select to_char(sale_date,'FMDD') label, sum(total)::float revenue, sum(qty)::float qty
-    from sales
+    from ${await saleLines()}
     where sale_date is not null and month = $1 and ($2::text is null or source = $2)
     group by sale_date order by sale_date`, [month, source]);
 }
 
-export function dailyCustomers(month: string, source: string | null = null) {
+export async function dailyCustomers(month: string, source: string | null = null) {
   // customers = distinct bills per day — see kpis() note for the bill-id rule.
   return q<{ label: string; customers: number }>(`
     select to_char(sale_date,'FMDD') label,
-           count(distinct coalesce(receipt_no::text, order_no::text))::int customers
-    from sales
+           count(distinct coalesce(nullif(receipt_no,''), order_no, billkey))::int customers
+    from ${await saleLines()}
     where sale_date is not null and month = $1 and ($2::text is null or source = $2)
     group by sale_date order by sale_date`, [month, source]);
 }
@@ -871,8 +890,8 @@ export async function monthlySalesTotals(source: string | null = null, limit = 1
     select to_char(sale_date,'YYYY-MM') as ym,
            coalesce(sum(total),0)::float revenue,
            coalesce(sum(qty),0)::float qty,
-           count(distinct coalesce(nullif(receipt_no,''),'s'||id::text))::int bills
-    from sales
+           count(distinct billkey)::int bills
+    from ${await saleLines()}
     where sale_date is not null and ($1::text is null or source = $1)
     group by 1 order by 1 desc limit $2`, [source, limit]);
 }
