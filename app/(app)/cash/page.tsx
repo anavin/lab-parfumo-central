@@ -21,7 +21,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
     cashAttachmentsByDate(branch),
     q<{ cash_date: string; description: string; amount: number; type: string }>(`
       select cash_date, description, amount::float, type
-      from cash_entries order by cash_date desc nulls last, id desc`),
+      from cash_entries order by cash_date desc nulls last, id desc limit 1000`),
     q<{ total: number; n: number }>(
       `select coalesce(sum(amount),0)::float total, count(*)::int n from cash_entries`),
     q<{ type: string; total: number }>(`

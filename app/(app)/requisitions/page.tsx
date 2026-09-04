@@ -21,7 +21,7 @@ export default async function Requisitions() {
     left join po_items i on i.po_id = po.id
     where po.deleted_at is null and coalesce(po.status,'') <> $1
     group by po.id
-    order by po.order_date desc nulls last, po.po_number desc`;
+    order by po.order_date desc nulls last, po.po_number desc limit 500`;
   let rows: Row[];
   try { rows = await q<Row>(sel("po.assigned_to"), [ALLOC_STATUS]); }
   catch (e: any) { if (e?.code !== "42703") throw e; rows = await q<Row>(sel("null::bigint"), [ALLOC_STATUS]); }   // 0029 not run yet

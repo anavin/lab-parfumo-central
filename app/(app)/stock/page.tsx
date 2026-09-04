@@ -1,7 +1,7 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num, baht } from "@/lib/format";
 import { q } from "@/lib/db";
-import { stockLive, stockSummary, reorderSuggestions, negativeStock, stockValuation } from "@/lib/queries";
+import { stockLive, reorderSuggestions, negativeStock, stockValuation } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockMatrix } from "@/components/StockMatrix";
@@ -19,11 +19,20 @@ export const dynamic = "force-dynamic";
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
-  const [rows, s, user, adjustments, reorder, negatives, valuation] = await Promise.all([
-    stockLive(branch), stockSummary(branch), getCurrentUser(), listStockAdjustments(branch),
+  const [rows, user, adjustments, reorder, negatives, valuation] = await Promise.all([
+    stockLive(branch), getCurrentUser(), listStockAdjustments(branch),
     reorderSuggestions(branch), negativeStock(branch), stockValuation(branch),
   ]);
-  const lowCount = (s.low ?? 0) + (s.out ?? 0);
+  // derive the summary from the rows we already fetched (saves one full STOCK_CTE recompute)
+  const s = {
+    shipped: rows.reduce((a, r) => a + (r.shipped || 0), 0),
+    sold: rows.reduce((a, r) => a + (r.sold || 0), 0),
+    remaining: rows.reduce((a, r) => a + (r.remaining || 0), 0),
+    skus: rows.length,
+    out: rows.filter((r) => r.remaining <= 0).length,
+    low: rows.filter((r) => r.remaining > 0 && r.remaining <= 3).length,
+  };
+  const lowCount = s.low + s.out;
   const canRequisition = !!user && can(user, "requisitions");
 
   // scents that are fully deactivated ("ปิดกลิ่น") → the matrix sinks them to the bottom.

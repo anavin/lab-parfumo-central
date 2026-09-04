@@ -629,7 +629,7 @@ export function shipmentSummary() {
            count(*) filter (where receive_status='Returned')::int returned,
            max(branch_label) branch_label
     from shipment_items where po_number is not null
-    group by po_number order by max(ship_date) desc nulls last, po_number desc`);
+    group by po_number order by max(ship_date) desc nulls last, po_number desc limit 500`);
 }
 
 // ============================================================================
