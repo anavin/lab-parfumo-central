@@ -5,7 +5,8 @@
 /* Theme tokens as RGB channels (so Tailwind opacity modifiers keep working and
    the whole app flips light/dark by swapping these values). */
 :root {
-  --font-sans: "IBM Plex Sans Thai", "Sarabun", system-ui, sans-serif;
+  /* Sarabun เป็นหลัก (ตรงกับระบบเบิกสินค้า/stockflow) · IBM Plex Sans Thai สำรอง */
+  --font-sans: "Sarabun", "IBM Plex Sans Thai", system-ui, sans-serif;
   color-scheme: light;
   --canvas: 245 246 248;
   --surface: 255 255 255;
