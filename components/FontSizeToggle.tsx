@@ -27,12 +27,12 @@ export function FontSizeToggle() {
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2">
-      <span className="text-[13px] text-white/55">ขนาดตัวอักษร</span>
-      <div className="ml-auto flex overflow-hidden rounded-lg border border-white/15" role="group" aria-label="ขนาดตัวอักษร">
+    <div className="flex items-center gap-2 px-3 py-1.5">
+      <span className="text-[12px] text-white/40">ขนาดตัวอักษร</span>
+      <div className="ml-auto flex overflow-hidden rounded-md border border-white/10" role="group" aria-label="ขนาดตัวอักษร">
         {LEVELS.map((l) => (
           <button key={l.key} type="button" onClick={() => apply(l.key)} title={l.title} aria-pressed={level === l.key}
-            className={`px-2.5 py-1 font-medium leading-none transition-colors ${level === l.key ? "bg-brand text-white" : "text-white/55 hover:bg-white/[0.08] hover:text-white/80"}`}
+            className={`px-2 py-0.5 leading-none transition-colors ${level === l.key ? "bg-white/[0.12] text-white/90" : "text-white/40 hover:bg-white/[0.06] hover:text-white/70"}`}
             style={{ fontSize: l.fs }}>
             {l.label}
           </button>
