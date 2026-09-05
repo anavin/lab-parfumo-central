@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { FontSizeToggle } from "@/components/FontSizeToggle";
 import type { User } from "@/lib/auth/constants";
 import { effectivePermissions, ROLE_LABEL, type PermKey } from "@/lib/auth/permissions";
 
@@ -133,6 +134,7 @@ export function Sidebar({ user, pending = 0 }: { user: User; pending?: number })
             <div className="text-[10.5px] text-white/40 truncate">{ROLE_LABEL[user.role] ?? user.role} · @{user.username}</div>
           </div>
         </div>
+        <FontSizeToggle />
         <ThemeToggle className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-white/55 hover:bg-white/[0.05] hover:text-white/80 transition-colors" />
         <form action={signOut}>
           <button className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-white/55 hover:bg-white/[0.05] hover:text-white/80 transition-colors">

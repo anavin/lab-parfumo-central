@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* App-wide text size (ก / กก / กกก) — FontSizeToggle sets data-fontsize on <html>.
+   rem-based text scales with this base; print keeps a fixed base so A4 docs don't shift. */
+html { font-size: 16px; }
+html[data-fontsize="sm"] { font-size: 14px; }
+html[data-fontsize="md"] { font-size: 16px; }
+html[data-fontsize="lg"] { font-size: 18px; }
+@media print { html { font-size: 16px !important; } }
+
 /* Theme tokens as RGB channels (so Tailwind opacity modifiers keep working and
    the whole app flips light/dark by swapping these values). */
 :root {
