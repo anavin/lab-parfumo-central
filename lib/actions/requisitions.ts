@@ -6,7 +6,7 @@ import { requisitionSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { requirePermission, requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
-import { resolveBranch, isBranch } from "@/lib/branches";
+import { resolveBranch } from "@/lib/branches";
 import { ctwEnabled, ctwSendRequisition, ctwGetRequisition, ctwReceive } from "@/lib/ctw-client";
 
 export type ReqItemInput = { barcode: string; scent: string; size: string; qty: number; product_id?: number | null };
@@ -250,18 +250,16 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     // both pass the status check, and the per-line updates commit all-or-nothing with
     // the status change (no half-received PO skewing branch stock).
     const res = await tx<{ ok: boolean; error?: string }>(async (run) => {
-      const [po] = await run<{ status: string; branch_label: string | null }>(`select status, branch_label from purchase_orders where id=$1 and deleted_at is null for update`, [id]);
+      const [po] = await run<{ status: string; branch_label: string | null; assigned_to: number | null }>(
+        `select status, branch_label, assigned_to from purchase_orders where id=$1 and deleted_at is null for update`, [id]);
       if (!po) return { ok: false, error: "ไม่พบใบเบิก" };
       if (!["delivered", "approved"].includes(po.status)) return { ok: false, error: "ใบเบิกนี้รับไม่ได้ (ยังไม่ส่ง/อนุมัติ หรือรับแล้ว)" };
-      // a salesperson (my_sales, not an admin with `requisitions`) may only receive their own branch's PO.
-      // Guard against a PO whose branch_label is missing/unrecognized (resolveBranch would silently
-      // fall back to CTW and leak such POs to CTW staff) — require an explicit known-branch match.
-      if (!can(me, "requisitions")) {
-        // a salesperson must have a home branch that matches the (known) PO branch —
-        // a branchless salesperson can't receive anything (else they'd inflate any branch)
-        if (!me.branch || !isBranch(po.branch_label) || resolveBranch(po.branch_label) !== resolveBranch(me.branch)) {
-          return { ok: false, error: "รับได้เฉพาะใบเบิกของสาขาตัวเอง" };
-        }
+      // a salesperson (my_sales, not an admin with `requisitions`) may only receive a PO ASSIGNED
+      // to them — the same scope as their /my inbox (pendingReceipts filters by assigned_to). This
+      // works regardless of the user's home branch (which may be unset). Unassigned POs must be
+      // assigned by an admin first. Admins/managers (with `requisitions`) can receive any PO.
+      if (!can(me, "requisitions") && po.assigned_to !== me.id) {
+        return { ok: false, error: "รับได้เฉพาะใบเบิกที่มอบหมายให้คุณ (ให้แอดมินมอบหมายก่อน)" };
       }
       for (const l of useLines || []) {
         // cap received at the ordered qty so a fat-finger can't inflate branch stock
