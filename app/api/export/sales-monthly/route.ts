@@ -19,7 +19,8 @@ const thMonth = (m: string) => {
   const names = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
   return `${names[mm] || mm} ${y + 543}`;
 };
-const nation = (n: string | null) => (n === "Foreign" ? "ต่างชาติ" : n === "Thai" ? "ไทย" : (n || ""));
+const nation = (n: string | null) =>
+  n === "Thai" ? "ไทย" : n === "Chinese" ? "จีน" : n === "Western" ? "ฝรั่ง" : n === "Foreign" ? "ต่างชาติ" : (n || "");
 
 // Style a sheet's header row (row 1) consistently.
 function styleHeader(ws: ExcelJS.Worksheet) {

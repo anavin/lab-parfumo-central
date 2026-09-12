@@ -11,9 +11,9 @@ import { SplitTenders } from "@/components/SplitTenders";
 import { Select } from "@/components/ui/Select";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 import { branchOptions } from "@/lib/branches";
+import { NATION_OPTIONS, natLabel } from "@/lib/nation";
 
 const SOURCE_OPTIONS = branchOptions();
-const NATION_OPTIONS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
 
 const payEditOptions = (cur?: string) => {
   const base = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
@@ -307,7 +307,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <BillTime bill={bill} onSaved={refresh} />
                             {first.payment_channel && <span>· {payLabel(first.payment_channel)}</span>}
-                            {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
+                            {first.nation && <span>· {natLabel(first.nation)}</span>}
                             {isSale && <span>· {bill.rows.length} รายการ</span>}
                           </div>
                         </div>
@@ -440,7 +440,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                   <div className="text-[11px] text-muted flex flex-wrap gap-x-2">
                                     {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
                                     {first.payment_channel && <span>· {payLabel(first.payment_channel)}</span>}
-                                    {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
+                                    {first.nation && <span>· {natLabel(first.nation)}</span>}
                                     {isSale && <span>· {bill.rows.length} รายการ</span>}
                                     {first.reviewer && <span>· โดย {first.reviewer}</span>}
                                   </div>

@@ -3,6 +3,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { Badge } from "@/components/ui";
 import { baht, num, fmtDate } from "@/lib/format";
 import { PAYMENTS } from "@/lib/payments";
+import { natLabel, isForeignNation } from "@/lib/nation";
 
 const CH_LABEL: Record<string, string> = Object.fromEntries(PAYMENTS.map((p) => [p.v, p.label.replace(/\s*\(.*\)$/, "")]));
 const chLabel = (c: string) => CH_LABEL[c] ?? c;
@@ -19,7 +20,7 @@ const monthlyCols: Column<Monthly>[] = [
 
 const recentCols: Column<Recent>[] = [
   { key: "sale_date", header: "วันที่", sortValue: (r) => r.sale_date, render: (r) => <span className="text-muted whitespace-nowrap">{fmtDate(r.sale_date)}</span> },
-  { key: "item", header: "รายการ", sortValue: (r) => r.item, render: (r) => <span>{r.item} <span className="text-muted-soft">{r.size}</span>{r.nation && <> <Badge tone={r.nation === "Foreign" ? "info" : "gray"}>{r.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</Badge></>}</span> },
+  { key: "item", header: "รายการ", sortValue: (r) => r.item, render: (r) => <span>{r.item} <span className="text-muted-soft">{r.size}</span>{r.nation && <> <Badge tone={isForeignNation(r.nation) ? "info" : "gray"}>{natLabel(r.nation)}</Badge></>}</span> },
   { key: "ba", header: "BA", sortValue: (r) => r.ba, render: (r) => <span className="text-muted whitespace-nowrap">{r.ba || "-"}</span> },
   { key: "channel", header: "ช่องทาง", sortValue: (r) => r.payment_channel, render: (r) => <span className="text-muted whitespace-nowrap">{r.payment_channel ? chLabel(r.payment_channel) : "-"}</span> },
   { key: "qty", header: "จำนวน", align: "right", sortValue: (r) => r.qty, render: (r) => <span className="text-muted tabular-nums">{num(r.qty)}</span> },

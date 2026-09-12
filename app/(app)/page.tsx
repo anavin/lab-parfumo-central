@@ -11,6 +11,7 @@ import { BAList } from "@/components/BAList";
 import { LowStockList } from "@/components/LowStockList";
 import { DashboardFilters } from "@/components/DashboardFilters";
 import { baht, num, compactBaht } from "@/lib/format";
+import { natLabel, isForeignNation } from "@/lib/nation";
 import {
   kpis, monthlyRevenue, monthlyCustomers, topScents, sizeMix,
   paymentMix, nationMix, byBA, stockSummary, getMonths,
@@ -194,7 +195,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   <tr key={n.nation} className="border-b border-line-soft last:border-0">
                     <td className="py-2.5">
                       {unspec ? <span className="text-[11px] text-muted-soft">ไม่ระบุ</span>
-                        : <Badge tone={n.nation === "Foreign" ? "info" : "brand"}>{n.nation}</Badge>}
+                        : <Badge tone={isForeignNation(n.nation) ? "info" : "brand"}>{natLabel(n.nation)}</Badge>}
                     </td>
                     <td className={`py-2.5 text-right tabular-nums ${unspec ? "text-muted" : "font-semibold"}`}>{baht(n.revenue)}</td>
                     <td className="py-2.5 text-right text-muted tabular-nums">{baht(n.receipts ? n.revReceipted / n.receipts : 0)}</td>

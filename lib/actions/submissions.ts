@@ -7,6 +7,7 @@ import { SPLIT2, isSplit } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
 import { branchPrefix, resolveBranch } from "@/lib/branches";
+import { natLabel } from "@/lib/nation";
 import { requirePermission } from "@/lib/auth/require-user";
 import { pushLine, siteBaseUrl } from "@/lib/line";
 import { offloadToStorage, deleteAttachment } from "@/lib/attachments";
@@ -134,7 +135,7 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
   try {
     const pieces = d.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
     const pay = split ? "จ่าย 2 ช่องทาง" : billPc;
-    const nation = d.nation === "Foreign" ? "🌏 ต่างชาติ" : d.nation === "Thai" ? "🇹🇭 ไทย" : d.nation;
+    const nation = natLabel(d.nation);
     const base = siteBaseUrl();
     const lines = [
       `🧾 บิลใหม่ · ${user.full_name}`,

@@ -990,15 +990,18 @@ export async function dailyReport(date: string, source: string, userId: number |
     e.bills.add(billKey(r)); e.amt += r.total || 0;
     nat.set(key, e);
   }
-  const thai = nat.get("Thai"), foreign = nat.get("Foreign");
-  let otherCount = 0, otherAmt = 0;
-  for (const [k, e] of nat) if (k !== "Thai" && k !== "Foreign") { otherCount += e.bills.size; otherAmt += e.amt; }
+  // ไทย = Thai · ต่างชาติ = ทุกสัญชาติที่ระบุแล้วและไม่ใช่ไทย (จีน/ฝรั่ง + "Foreign" ข้อมูลเดิม)
+  // · อื่นๆ = ไม่ระบุสัญชาติ
+  let thaiCount = 0, thaiAmt = 0, foreignCount = 0, foreignAmt = 0, otherCount = 0, otherAmt = 0;
+  for (const [k, e] of nat) {
+    if (k === "Thai") { thaiCount += e.bills.size; thaiAmt += e.amt; }
+    else if (k === "ไม่ระบุ") { otherCount += e.bills.size; otherAmt += e.amt; }
+    else { foreignCount += e.bills.size; foreignAmt += e.amt; }
+  }
 
   return {
     orders, total, cash, nonCash, branchCash,
-    thaiCount: thai?.bills.size ?? 0, thaiAmt: thai?.amt ?? 0,
-    foreignCount: foreign?.bills.size ?? 0, foreignAmt: foreign?.amt ?? 0,
-    otherCount, otherAmt,
+    thaiCount, thaiAmt, foreignCount, foreignAmt, otherCount, otherAmt,
   };
 }
 export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;

@@ -31,6 +31,7 @@ import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { branchOptions, DEFAULT_BRANCH } from "@/lib/branches";
+import { NATION_BUTTONS, natLabel } from "@/lib/nation";
 import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
@@ -89,9 +90,10 @@ type BillItemPayload = { item: string; barcode: string; size: string; qty: numbe
 const DEFAULT_DISCOUNT_PCT = 0;
 let itemKey = 0;
 const newItem = (patch: Partial<BillItem> = {}): BillItem => ({ key: ++itemKey, item: "", barcode: "", size: "", qty: 1, unit_price: 0, discount: 0, ...patch });
-// default nationality = ต่างชาติ (majority of customers); default channel = the branch's
-// most-used channel (passed in), falling back to เงินสด. Both still editable per bill.
-const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH, defaultPay = "Cash"): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: defaultPay, nation: "Foreign", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
+// nationality = staff picks ไทย/จีน/ฝรั่ง per bill (no auto-default — "ต่างชาติ" now splits
+// into จีน/ฝรั่ง, so no single sensible default). default channel = the branch's
+// most-used channel (passed in), falling back to เงินสด. Both editable per bill.
+const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRANCH, defaultPay = "Cash"): BillState => ({ sale_date: date, sale_time: nowHM(), source: branch, receipt_no: "", payment_channel: defaultPay, nation: "", discount_pct: DEFAULT_DISCOUNT_PCT, discount_baht: 0, items: withItem ? [newItem()] : [], attachments: [], splitPay: false, tenders: [] });
 
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
@@ -539,8 +541,8 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* nationality — big toggle */}
       <div className="mb-3" data-field="สัญชาติ">
         <div className="text-xs text-muted mb-1">สัญชาติลูกค้า *</div>
-        <div className={"grid grid-cols-2 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-danger rounded-lg p-0.5" : "")}>
-          {([["Thai", "🇹🇭 ไทย"], ["Foreign", "🌏 ต่างชาติ"]] as const).map(([v, l]) => (
+        <div className={"grid grid-cols-3 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-danger rounded-lg p-0.5" : "")}>
+          {NATION_BUTTONS.map(([v, l]) => (
             <button key={v} onClick={() => { set({ nation: v }); clearMiss("สัญชาติ"); }} className={"py-3 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
           ))}
         </div>
@@ -881,7 +883,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
           <div className="text-[11px] text-muted flex flex-wrap items-center gap-x-2 min-w-0">
             {first.sale_time && <span>{first.sale_time.slice(0, 5)}</span>}
             {first.payment_channel && <span>· {first.payment_channel}</span>}
-            {first.nation && <span>· {first.nation === "Foreign" ? "ต่างชาติ" : "ไทย"}</span>}
+            {first.nation && <span>· {natLabel(first.nation)}</span>}
             <span>· {rows.length} รายการ</span>
           </div>
         </div>
@@ -1075,8 +1077,8 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
             className={"py-2.5" + (split ? "" : errRing("ช่องทางชำระ"))} />
         </Field>
         <Field label="สัญชาติลูกค้า *">
-          <div className={"grid grid-cols-2 gap-2 rounded-lg" + errRing("สัญชาติลูกค้า")}>
-            {([["Thai", "🇹🇭 ไทย"], ["Foreign", "🌏 ต่างชาติ"]] as const).map(([v, l]) => (
+          <div className={"grid grid-cols-3 gap-2 rounded-lg" + errRing("สัญชาติลูกค้า")}>
+            {NATION_BUTTONS.map(([v, l]) => (
               <button key={v} type="button" onClick={() => { s("nation", v); clearMiss("สัญชาติลูกค้า"); }}
                 className={"py-2.5 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
             ))}

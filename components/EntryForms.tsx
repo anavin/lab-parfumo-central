@@ -6,12 +6,13 @@ import { createSale, createCashEntry, createCustomerDay } from "@/lib/actions/en
 import { Select } from "@/components/ui/Select";
 import { PAYMENTS } from "@/lib/payments";
 import { branchOptions } from "@/lib/branches";
+import { NATION_OPTIONS } from "@/lib/nation";
 
 const inp = "w-full border border-line rounded-lg px-2.5 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
 const today = () => new Date().toISOString().slice(0, 10);
 
 const SOURCE_OPTS = branchOptions();
-const NATION_OPTS = [{ value: "Thai", label: "ไทย" }, { value: "Foreign", label: "ต่างชาติ" }];
+const NATION_OPTS = NATION_OPTIONS;
 const PAY_OPTS = PAYMENTS.map((p) => ({ value: p.v, label: p.label }));
 
 // Presentational panel — no hooks. `open`/`onToggle` are owned by the parent so

@@ -6,11 +6,11 @@
 import type { DailyReport as ReportData, DaySaleRow } from "@/lib/queries";
 import { PAYMENTS } from "@/lib/payments";
 import { branchName } from "@/lib/branches";
+import { natLabel } from "@/lib/nation";
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 const thaiDate = (iso: string) =>
   new Date(iso + "T00:00:00").toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 const payLabel = (v: string) => PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v || "-";
-const natLabel = (n: string) => (n === "Foreign" ? "ต่างชาติ" : n === "Thai" ? "ไทย" : "-");
 
 type Bill = { key: string; no: number; time: string; author: string; nation: string; pay: string; rows: DaySaleRow[]; total: number };
 function groupBills(rows: DaySaleRow[]): Bill[] {
