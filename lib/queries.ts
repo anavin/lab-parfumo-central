@@ -990,18 +990,27 @@ export async function dailyReport(date: string, source: string, userId: number |
     e.bills.add(billKey(r)); e.amt += r.total || 0;
     nat.set(key, e);
   }
-  // ไทย = Thai · ต่างชาติ = ทุกสัญชาติที่ระบุแล้วและไม่ใช่ไทย (จีน/ฝรั่ง + "Foreign" ข้อมูลเดิม)
-  // · อื่นๆ = ไม่ระบุสัญชาติ
-  let thaiCount = 0, thaiAmt = 0, foreignCount = 0, foreignAmt = 0, otherCount = 0, otherAmt = 0;
+  // แยกเป็น ไทย / จีน / ฝรั่ง · อื่นๆ = ไม่ระบุ + "Foreign" ข้อมูลเดิม (ก่อนแยกจีน/ฝรั่ง) + ค่าอื่น
+  // foreignCount/foreignAmt = รวมต่างชาติทั้งหมด (จีน+ฝรั่ง+Foreign เดิม) — คงไว้เพื่อความเข้ากันได้
+  let thaiCount = 0, thaiAmt = 0, chineseCount = 0, chineseAmt = 0, westernCount = 0, westernAmt = 0,
+      foreignLegacyCount = 0, foreignLegacyAmt = 0, unspecCount = 0, unspecAmt = 0;
   for (const [k, e] of nat) {
     if (k === "Thai") { thaiCount += e.bills.size; thaiAmt += e.amt; }
-    else if (k === "ไม่ระบุ") { otherCount += e.bills.size; otherAmt += e.amt; }
-    else { foreignCount += e.bills.size; foreignAmt += e.amt; }
+    else if (k === "Chinese") { chineseCount += e.bills.size; chineseAmt += e.amt; }
+    else if (k === "Western") { westernCount += e.bills.size; westernAmt += e.amt; }
+    else if (k === "ไม่ระบุ") { unspecCount += e.bills.size; unspecAmt += e.amt; }
+    else { foreignLegacyCount += e.bills.size; foreignLegacyAmt += e.amt; } // "Foreign" เดิม + ค่าอื่น
   }
+  // "อื่นๆ" ในใบรายงาน = ไม่ระบุ + Foreign เดิม (ข้อมูลก่อนแยกจีน/ฝรั่ง)
+  const otherCount = unspecCount + foreignLegacyCount, otherAmt = unspecAmt + foreignLegacyAmt;
+  // รวมต่างชาติทั้งหมด (จีน + ฝรั่ง + Foreign เดิม) — สำหรับผู้ใช้เดิมที่ยังอ้าง foreignCount
+  const foreignCount = chineseCount + westernCount + foreignLegacyCount;
+  const foreignAmt = chineseAmt + westernAmt + foreignLegacyAmt;
 
   return {
     orders, total, cash, nonCash, branchCash,
-    thaiCount, thaiAmt, foreignCount, foreignAmt, otherCount, otherAmt,
+    thaiCount, thaiAmt, chineseCount, chineseAmt, westernCount, westernAmt,
+    foreignCount, foreignAmt, otherCount, otherAmt,
   };
 }
 export type DailyReport = Awaited<ReturnType<typeof dailyReport>>;

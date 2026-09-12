@@ -90,7 +90,8 @@ export function DailyReportSheet({ date, source, data, rows, showDetail = true, 
             <div>
               <SecTitle>สัญชาติลูกค้า</SecTitle>
               <KV k={`คนไทย (${data!.thaiCount})`} v={`฿${nf(data!.thaiAmt)}`} />
-              <KV k={`ต่างชาติ (${data!.foreignCount})`} v={`฿${nf(data!.foreignAmt)}`} />
+              <KV k={`จีน (${data!.chineseCount})`} v={`฿${nf(data!.chineseAmt)}`} />
+              <KV k={`ฝรั่ง (${data!.westernCount})`} v={`฿${nf(data!.westernAmt)}`} />
               {data!.otherCount > 0 && <KV k={`อื่นๆ (${data!.otherCount})`} v={`฿${nf(data!.otherAmt)}`} />}
             </div>
           </div>

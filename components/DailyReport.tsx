@@ -104,7 +104,8 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       `รวมเป็นเงิน ${nf(data.total)} บาท`,
       ``,
       `คนไทย ${data.thaiCount} ราย เป็นเงิน ${nf(data.thaiAmt)} บาท`,
-      `คนต่างชาติ ${data.foreignCount} ราย เป็นเงิน ${nf(data.foreignAmt)} บาท`,
+      `จีน ${data.chineseCount} ราย เป็นเงิน ${nf(data.chineseAmt)} บาท`,
+      `ฝรั่ง ${data.westernCount} ราย เป็นเงิน ${nf(data.westernAmt)} บาท`,
       ...(data.otherCount > 0 ? [`อื่นๆ/ไม่ระบุ ${data.otherCount} ราย เป็นเงิน ${nf(data.otherAmt)} บาท`] : []),
       ``,
       `เงินสดยกมา ${nf(openingN)} บาท`,
@@ -240,7 +241,8 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
             <Rule />
             <div className="space-y-1.5">
               <Line label={`🇹🇭 คนไทย · ${data!.thaiCount} ราย`} value={`${nf(data!.thaiAmt)} บาท`} />
-              <Line label={`🌏 ต่างชาติ · ${data!.foreignCount} ราย`} value={`${nf(data!.foreignAmt)} บาท`} />
+              <Line label={`🇨🇳 จีน · ${data!.chineseCount} ราย`} value={`${nf(data!.chineseAmt)} บาท`} />
+              <Line label={`🌍 ฝรั่ง · ${data!.westernCount} ราย`} value={`${nf(data!.westernAmt)} บาท`} />
               {data!.otherCount > 0 && <Line label={`• อื่นๆ · ${data!.otherCount} ราย`} value={`${nf(data!.otherAmt)} บาท`} />}
             </div>
             <Rule />
