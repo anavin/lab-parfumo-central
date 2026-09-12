@@ -323,6 +323,31 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   );
 }
 
+// สัญชาติลูกค้า: ปุ่ม ไทย/จีน/ฝรั่ง/อื่นๆ — เลือก "อื่นๆ" แล้วพิมพ์ระบุสัญชาติเอง (เก็บค่าที่พิมพ์ลง nation)
+function NationPicker({ value, onChange, invalid, big }: { value: string; onChange: (v: string) => void; invalid?: boolean; big?: boolean }) {
+  const isCanon = NATION_BUTTONS.some(([v]) => v === value);
+  const [otherOpen, setOtherOpen] = useState(false);
+  const otherActive = otherOpen || (!!value && !isCanon);
+  const btn = (on: boolean) =>
+    (big ? "py-3" : "py-2.5") + " rounded-lg text-sm font-medium border transition " +
+    (on ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas");
+  return (
+    <div>
+      <div className={"grid grid-cols-2 sm:grid-cols-4 gap-2" + (invalid ? " ring-1 ring-danger rounded-lg p-0.5" : "")}>
+        {NATION_BUTTONS.map(([v, l]) => (
+          <button key={v} type="button" onClick={() => { setOtherOpen(false); onChange(v); }} className={btn(value === v)}>{l}</button>
+        ))}
+        <button type="button" onClick={() => { setOtherOpen(true); onChange(""); }} className={btn(otherActive)}>✏️ อื่นๆ</button>
+      </div>
+      {otherActive && (
+        <input autoFocus value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="ระบุสัญชาติ เช่น ญี่ปุ่น เกาหลี อินเดีย"
+          className="mt-2 w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- bill builder
 function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false, stockMap = null }: {
   state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null;
@@ -541,11 +566,8 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       {/* nationality — big toggle */}
       <div className="mb-3" data-field="สัญชาติ">
         <div className="text-xs text-muted mb-1">สัญชาติลูกค้า *</div>
-        <div className={"grid grid-cols-3 gap-2" + (missing.includes("สัญชาติ") ? " ring-1 ring-danger rounded-lg p-0.5" : "")}>
-          {NATION_BUTTONS.map(([v, l]) => (
-            <button key={v} onClick={() => { set({ nation: v }); clearMiss("สัญชาติ"); }} className={"py-3 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
-          ))}
-        </div>
+        <NationPicker big value={state.nation} invalid={missing.includes("สัญชาติ")}
+          onChange={(v) => { set({ nation: v }); if (v.trim()) clearMiss("สัญชาติ"); }} />
       </div>
 
       {/* bill-level extra discount (%) — default 0%, adjustable. Comes before payment
@@ -1077,12 +1099,8 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
             className={"py-2.5" + (split ? "" : errRing("ช่องทางชำระ"))} />
         </Field>
         <Field label="สัญชาติลูกค้า *">
-          <div className={"grid grid-cols-3 gap-2 rounded-lg" + errRing("สัญชาติลูกค้า")}>
-            {NATION_BUTTONS.map(([v, l]) => (
-              <button key={v} type="button" onClick={() => { s("nation", v); clearMiss("สัญชาติลูกค้า"); }}
-                className={"py-2.5 rounded-lg text-sm font-medium border transition " + (state.nation === v ? "bg-brand text-white border-brand" : "bg-surface border-line hover:bg-canvas")}>{l}</button>
-            ))}
-          </div>
+          <NationPicker value={state.nation} invalid={missing.includes("สัญชาติลูกค้า")}
+            onChange={(v) => { s("nation", v); if (v.trim()) clearMiss("สัญชาติลูกค้า"); }} />
         </Field>
         <Field label="เลขใบเสร็จ"><input className={inp} value={state.receipt_no} onChange={(e) => s("receipt_no", e.target.value)} placeholder="ไม่มีก็เว้นได้" /></Field>
       </div>

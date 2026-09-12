@@ -18,14 +18,16 @@ export const NATION_BUTTONS: readonly (readonly [NationValue, string])[] = [
   ["Western", "🌍 ฝรั่ง"],
 ] as const;
 
-// ป้ายแสดงผลจากค่าใน DB — รองรับค่าเดิม "Foreign" และค่าว่าง
+// ป้ายแสดงผลจากค่าใน DB — รองรับค่าเดิม "Foreign", ค่าว่าง, และสัญชาติที่พิมพ์ระบุเอง (อื่นๆ)
 export function natLabel(n?: string | null): string {
-  switch ((n || "").trim()) {
+  const v = (n || "").trim();
+  switch (v) {
     case "Thai": return "ไทย";
     case "Chinese": return "จีน";
     case "Western": return "ฝรั่ง";
     case "Foreign": return "ต่างชาติ"; // ข้อมูลเดิมก่อนแยกจีน/ฝรั่ง
-    default: return "-";
+    case "": return "-";
+    default: return v; // สัญชาติที่พิมพ์ระบุเอง เช่น ญี่ปุ่น/เกาหลี → แสดงตามที่พิมพ์
   }
 }
 
