@@ -4,6 +4,7 @@ import { Search, ChevronRight, Loader2 } from "lucide-react";
 import { num } from "@/lib/format";
 import { lossDrilldown, type LossDrilldown } from "@/lib/actions/stock";
 import { LossSignals } from "@/components/LossSignals";
+import { CountCoverage, type Coverage } from "@/components/CountCoverage";
 import type { LossSignals as Signals } from "@/lib/queries";
 
 // ป้องกันของหาย — เทียบ "คาดว่าเหลือ (book)" กับ "นับจริง (actual)" จากการนับสต๊อกล่าสุด
@@ -24,7 +25,7 @@ const seenLabel = (iso: string | null) => {
   return d <= 0 ? "วันนี้" : d === 1 ? "เมื่อวาน" : `${d} วันก่อน`;
 };
 
-export function StockLoss({ rows, summary, branch, signals }: { rows: LossRow[]; summary: LossSummary; branch: string | null; signals: Signals }) {
+export function StockLoss({ rows, summary, branch, signals, coverage }: { rows: LossRow[]; summary: LossSummary; branch: string | null; signals: Signals; coverage: Coverage }) {
   const [term, setTerm] = useState("");
   const [shortOnly, setShortOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);          // scent|size ที่กางอยู่
@@ -69,7 +70,8 @@ export function StockLoss({ rows, summary, branch, signals }: { rows: LossRow[];
         )}
       </div>
 
-      {/* สัญญาณผิดปกติ (บิลน่าสงสัย / เงินสดขาด / ปรับมือ) */}
+      {/* นับตามรอบ (count coverage) + สัญญาณผิดปกติ */}
+      <CountCoverage coverage={coverage} />
       <LossSignals signals={signals} />
 
       <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">ผลต่างการนับ</div>

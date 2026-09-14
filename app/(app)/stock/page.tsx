@@ -92,6 +92,29 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   };
   const cashShortN = signals.cash.filter((c) => c.diff < 0).length;
   const lossAlert = lossSummary.shortN > 0 || lossSummary.negativeN > 0 || cashShortN > 0 || signals.bills.length > 0;
+
+  // ---- ชั้น 4: นับตามรอบ (count coverage) — คำนวณจาก movMap (คงเหลือ+ขาย) + varAgg (นับล่าสุด) ----
+  const inStock = [...movMap.values()].filter((m) => m.remaining > 0 && !isBag(m.scent));
+  const covRows = inStock.map((m) => {
+    const a = varAgg.get(`${m.scent}|${m.size}`);
+    const countedAt = a?.countedAt ?? null;
+    const ds = countedAt ? daysSince(countedAt) : null;
+    return { scent: m.scent, size: m.size, remaining: m.remaining, velocity: Object.values(m.sold).reduce((s, q) => s + q, 0), countedAt, daysSince: ds };
+  });
+  const coverage = {
+    total: covRows.length,
+    countedRecent: covRows.filter((r) => r.daysSince != null && r.daysSince <= 30).length,
+    neverN: covRows.filter((r) => r.countedAt == null).length,
+    staleN: covRows.filter((r) => r.daysSince != null && r.daysSince > 14).length,
+    // ควรนับก่อน: ยังไม่ครบรอบ (ไม่เคยนับ/ค้าง>14) เรียง ไม่เคยนับ → ค้างนาน → ของเยอะ → ขายเร็ว
+    suggest: covRows
+      .filter((r) => r.countedAt == null || (r.daysSince != null && r.daysSince > 14))
+      .sort((x, y) =>
+        (x.countedAt == null ? 0 : 1) - (y.countedAt == null ? 0 : 1)
+        || (y.daysSince ?? 9999) - (x.daysSince ?? 9999)
+        || y.remaining - x.remaining || y.velocity - x.velocity)
+      .slice(0, 40),
+  };
   // derive the summary from the rows we already fetched (saves one full STOCK_CTE recompute)
   const s = {
     shipped: rows.reduce((a, r) => a + (r.shipped || 0), 0),
@@ -133,7 +156,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           matrix={<StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
           movement={<StockMovement dates={moveDates} rows={movRows} />}
           /* ป้องกันของหายมีข้อมูลอ่อนไหว → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (สิทธิ์ requisitions) */
-          loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} signals={signals} /> : null}
+          loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} signals={signals} coverage={coverage} /> : null}
         />
       </Card>
 
