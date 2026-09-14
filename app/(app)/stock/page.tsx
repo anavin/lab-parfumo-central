@@ -1,7 +1,7 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num, baht } from "@/lib/format";
 import { q } from "@/lib/db";
-import { stockLive, reorderSuggestions, negativeStock, stockValuation, stockMovement, countVariance } from "@/lib/queries";
+import { stockLive, reorderSuggestions, negativeStock, stockValuation, stockMovement, countVariance, lossSignals } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockMatrix } from "@/components/StockMatrix";
@@ -27,10 +27,10 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const [Y, M, D] = bkkToday.split("-").map(Number);
   const baseUtc = Date.UTC(Y, M - 1, D);
   const moveDates = Array.from({ length: 30 }, (_, i) => new Date(baseUtc - (29 - i) * 86400000).toISOString().slice(0, 10));
-  const [rows, user, adjustments, reorder, negatives, valuation, moves, variance] = await Promise.all([
+  const [rows, user, adjustments, reorder, negatives, valuation, moves, variance, signals] = await Promise.all([
     stockLive(branch), getCurrentUser(), listStockAdjustments(branch),
     reorderSuggestions(branch), negativeStock(branch), stockValuation(branch),
-    stockMovement(branch, moveDates[0]), countVariance(branch),
+    stockMovement(branch, moveDates[0]), countVariance(branch), lossSignals(branch),
   ]);
   // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
   const soldByBarcode = new Map<string, Map<string, number>>();
@@ -90,7 +90,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
     negativeN: negatives.length,
     notCountedN: lossRows.filter((r) => r.neverCounted || r.stale).length,
   };
-  const lossAlert = lossSummary.shortN > 0 || lossSummary.negativeN > 0;
+  const cashShortN = signals.cash.filter((c) => c.diff < 0).length;
+  const lossAlert = lossSummary.shortN > 0 || lossSummary.negativeN > 0 || cashShortN > 0 || signals.bills.length > 0;
   // derive the summary from the rows we already fetched (saves one full STOCK_CTE recompute)
   const s = {
     shipped: rows.reduce((a, r) => a + (r.shipped || 0), 0),
@@ -132,7 +133,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           matrix={<StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
           movement={<StockMovement dates={moveDates} rows={movRows} />}
           /* ป้องกันของหายมีข้อมูลอ่อนไหว → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (สิทธิ์ requisitions) */
-          loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} /> : null}
+          loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} signals={signals} /> : null}
         />
       </Card>
 

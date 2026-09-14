@@ -3,6 +3,8 @@ import { Fragment, useMemo, useState, useTransition } from "react";
 import { Search, ChevronRight, Loader2 } from "lucide-react";
 import { num } from "@/lib/format";
 import { lossDrilldown, type LossDrilldown } from "@/lib/actions/stock";
+import { LossSignals } from "@/components/LossSignals";
+import type { LossSignals as Signals } from "@/lib/queries";
 
 // ป้องกันของหาย — เทียบ "คาดว่าเหลือ (book)" กับ "นับจริง (actual)" จากการนับสต๊อกล่าสุด
 // ผลต่างติดลบ = ของขาด/หาย · พร้อมมูลค่า + วันที่นับล่าสุด + เตือนของที่ยังไม่ได้นับนาน
@@ -22,7 +24,7 @@ const seenLabel = (iso: string | null) => {
   return d <= 0 ? "วันนี้" : d === 1 ? "เมื่อวาน" : `${d} วันก่อน`;
 };
 
-export function StockLoss({ rows, summary, branch }: { rows: LossRow[]; summary: LossSummary; branch: string | null }) {
+export function StockLoss({ rows, summary, branch, signals }: { rows: LossRow[]; summary: LossSummary; branch: string | null; signals: Signals }) {
   const [term, setTerm] = useState("");
   const [shortOnly, setShortOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);          // scent|size ที่กางอยู่
@@ -67,6 +69,10 @@ export function StockLoss({ rows, summary, branch }: { rows: LossRow[]; summary:
         )}
       </div>
 
+      {/* สัญญาณผิดปกติ (บิลน่าสงสัย / เงินสดขาด / ปรับมือ) */}
+      <LossSignals signals={signals} />
+
+      <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">ผลต่างการนับ</div>
       {/* controls */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="relative flex-1 min-w-[160px] max-w-xs">

@@ -396,6 +396,62 @@ export async function countVariance(branch: string | null): Promise<
   catch { return []; }   // stock-count tables not migrated / empty → no variance panel
 }
 
+/** Loss-prevention "signals" (theft vectors) for the last ~30 days: suspicious bills
+ *  (zero price / full discount / no barcode / huge qty), manual negative stock
+ *  adjustments, and days where the counted cash drawer came up short vs expected.
+ *  Each block guards its own migration (counted_cash etc.) so a missing column
+ *  degrades to empty instead of breaking the panel. */
+export type LossSignals = {
+  bills: { at: string; who: string | null; ref: string | null; item: string | null; reason: string }[];
+  cash: { date: string; counted: number; closing: number; diff: number; who: string | null }[];
+  adjusts: { at: string; who: string | null; item: string; qty: number; note: string | null }[];
+};
+export async function lossSignals(branch: string | null): Promise<LossSignals> {
+  const brSales = branch ? `and ${SOLD_BRANCH} = $1` : ``;
+  const args = branch ? [branch] : [];
+  let bills: LossSignals["bills"] = [], cash: LossSignals["cash"] = [], adjusts: LossSignals["adjusts"] = [];
+  try {
+    bills = await q(`
+      select at, who, ref, item, reason from (
+        select (sale_date::text||' '||coalesce(sale_time::text,'')) at, u.full_name who, nullif(receipt_no,'') ref, item, sale_date d,
+          case when coalesce(unit_price,0)=0 then 'ราคา 0'
+               when coalesce(unit_price,0)>0 and coalesce(discount,0) >= unit_price*qty then 'ส่วนลดเต็ม'
+               when coalesce(barcode,'')='' then 'ไม่มีบาร์โค้ด'
+               when qty > 50 then 'จำนวนสูงผิดปกติ' end reason
+        from sales s left join users u on u.id=s.created_by
+        where sale_date >= current_date - 30 ${brSales}
+        union all
+        select (entry_date::text||' '||coalesce(sale_time::text,'')) at, u.full_name who, nullif(receipt_no,'') ref, item, entry_date d,
+          case when coalesce(unit_price,0)=0 then 'ราคา 0'
+               when coalesce(unit_price,0)>0 and coalesce(discount,0) >= unit_price*qty then 'ส่วนลดเต็ม'
+               when coalesce(barcode,'')='' then 'ไม่มีบาร์โค้ด'
+               when qty > 50 then 'จำนวนสูงผิดปกติ' end reason
+        from submissions s left join users u on u.id=s.created_by
+        where kind='sale' and status='pending' and deleted_at is null and entry_date >= current_date - 30 ${brSales}
+      ) x where reason is not null order by d desc, at desc limit 40`, args);
+  } catch { bills = []; }
+  try {
+    const brCash = branch ? `and branch = $1` : ``;
+    cash = await q(`
+      select entry_date::text date, counted_cash::float counted, closing::float closing,
+             (counted_cash - closing)::float diff, u.full_name who
+      from daily_cash c left join users u on u.id=c.updated_by
+      where counted_cash is not null and counted_cash <> closing and entry_date >= current_date - 60 ${brCash}
+      order by entry_date desc limit 30`, args);
+  } catch { cash = []; }
+  try {
+    const brAdj = branch ? `and upper(a.branch) = upper($1)` : ``;
+    adjusts = await q(`
+      select created_at::text at, u.full_name who,
+             (coalesce(scent,'') || case when coalesce(size,'')<>'' then ' '||size else '' end) item,
+             qty::float qty, note
+      from stock_adjustments a left join users u on u.id=a.created_by
+      where qty < 0 and coalesce(note,'') not like 'นับสต๊อก%' and created_at::date >= current_date - 30 ${brAdj}
+      order by created_at desc limit 30`, args);
+  } catch { adjusts = []; }
+  return { bills, cash, adjusts };
+}
+
 /** Remaining stock per barcode at a branch — for the sale oversell check. Barcodes
  *  not present read as 0. Includes pending sales (they already reserve stock). */
 export async function stockForBarcodes(branch: string, barcodes: string[]): Promise<Map<string, number>> {
