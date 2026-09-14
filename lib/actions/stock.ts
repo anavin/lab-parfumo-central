@@ -170,35 +170,44 @@ export async function lossDrilldown(branchInput: string | null, scent: string, s
     const fromD = cnts[1]?.ra ? cnts[1].ra.slice(0, 10)
       : new Date(new Date(toD + "T00:00:00").getTime() - 90 * 86400000).toISOString().slice(0, 10);
 
-    const brSales = branch ? `and ${SRC_BR}=$4` : ``;
+    const brSales = branch ? `and ${SRC_BR}=$4::text` : ``;
     const salesArgs: any[] = branch ? [codes, fromD, toD, branch] : [codes, fromD, toD];
 
-    // ขาย (อนุมัติ + pending)
-    const sales = await q<{ d: string; t: string; who: string | null; ref: string | null; item: string | null; qty: number; up: number; disc: number }>(
-      `select sale_date::text d, coalesce(sale_time::text,'') t, u.full_name who,
-              nullif(receipt_no,'') ref, item, qty::float qty, coalesce(unit_price,0)::float up, coalesce(discount,0)::float disc
-       from sales s left join users u on u.id=s.created_by
-       where barcode = any($1) and sale_date >= $2::date and sale_date <= $3::date ${brSales}
-       union all
-       select entry_date::text d, coalesce(sale_time::text,'') t, u.full_name who,
-              nullif(receipt_no,'') ref, item, qty::float qty, coalesce(unit_price,0)::float up, coalesce(discount,0)::float disc
-       from submissions s left join users u on u.id=s.created_by
-       where kind='sale' and status='pending' and deleted_at is null and barcode = any($1)
-         and entry_date >= $2::date and entry_date <= $3::date ${brSales}`, salesArgs);
+    // ขาย (อนุมัติ + pending) — แต่ละ query ทนพัง (คนละตาราง/คอลัมน์อาจต่างบน prod)
+    let sales: { d: string; t: string; who: string | null; ref: string | null; item: string | null; qty: number; up: number; disc: number }[] = [];
+    try {
+      sales = await q(
+        `select sale_date::text d, coalesce(sale_time::text,'') t, u.full_name who,
+                nullif(receipt_no,'') ref, item, qty::float qty, coalesce(unit_price,0)::float up, coalesce(discount,0)::float disc
+         from sales s left join users u on u.id=s.created_by
+         where barcode = any($1::text[]) and sale_date >= $2::date and sale_date <= $3::date ${brSales}
+         union all
+         select entry_date::text d, coalesce(sale_time::text,'') t, u.full_name who,
+                nullif(receipt_no,'') ref, item, qty::float qty, coalesce(unit_price,0)::float up, coalesce(discount,0)::float disc
+         from submissions s left join users u on u.id=s.created_by
+         where kind='sale' and status='pending' and deleted_at is null and barcode = any($1::text[])
+           and entry_date >= $2::date and entry_date <= $3::date ${brSales}`, salesArgs);
+    } catch (e) { console.error("[lossDrilldown/sales]", e); }
 
     // ปรับมือ
     const adjArgs: any[] = branch ? [codes, fromD, toD, branch] : [codes, fromD, toD];
-    const adjusts = await q<{ at: string; who: string | null; qty: number; note: string | null }>(
-      `select created_at::text at, u.full_name who, qty::float qty, note
-       from stock_adjustments a left join users u on u.id=a.created_by
-       where barcode = any($1) and created_at::date >= $2::date and created_at::date <= $3::date
-         ${branch ? "and upper(a.branch)=$4" : ""} order by created_at desc`, adjArgs);
+    let adjusts: { at: string; who: string | null; qty: number; note: string | null }[] = [];
+    try {
+      adjusts = await q(
+        `select created_at::text at, u.full_name who, qty::float qty, note
+         from stock_adjustments a left join users u on u.id=a.created_by
+         where barcode = any($1::text[]) and created_at::date >= $2::date and created_at::date <= $3::date
+           ${branch ? "and upper(a.branch)=upper($4::text)" : ""} order by created_at desc`, adjArgs);
+    } catch (e) { console.error("[lossDrilldown/adjusts]", e); }
 
     // คืนสินค้า (รายชิ้น)
-    const returns = await q<{ at: string; name: string | null; sku: string | null; status: string | null }>(
-      `select return_date::text at, name, sku, receive_status status
-       from return_items where serial = any($1) and return_date >= $2::date and return_date <= $3::date
-       order by return_date desc`, [codes, fromD, toD]);
+    let returns: { at: string; name: string | null; sku: string | null; status: string | null }[] = [];
+    try {
+      returns = await q(
+        `select return_date::text at, name, sku, receive_status status
+         from return_items where serial = any($1::text[]) and return_date >= $2::date and return_date <= $3::date
+         order by return_date desc`, [codes, fromD, toD]);
+    } catch (e) { console.error("[lossDrilldown/returns]", e); }
 
     const events: LossEvent[] = [];
     for (const s of sales) {
@@ -227,11 +236,14 @@ export async function lossDrilldown(branchInput: string | null, scent: string, s
     events.sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0));
 
     // ใครเข้าเวร (ขายกลิ่นนี้กี่บิลในช่วง)
-    const shifts = await q<{ name: string; bills: number }>(
-      `select coalesce(u.full_name,'—') name, count(distinct coalesce(nullif(receipt_no,''),'#'||s.id::text))::int bills
-       from sales s left join users u on u.id=s.created_by
-       where barcode = any($1) and sale_date >= $2::date and sale_date <= $3::date ${brSales}
-       group by u.full_name order by bills desc`, salesArgs);
+    let shifts: { name: string; bills: number }[] = [];
+    try {
+      shifts = await q(
+        `select coalesce(u.full_name,'—') name, count(distinct coalesce(nullif(receipt_no,''),'#'||s.id::text))::int bills
+         from sales s left join users u on u.id=s.created_by
+         where barcode = any($1::text[]) and sale_date >= $2::date and sale_date <= $3::date ${brSales}
+         group by u.full_name order by bills desc`, salesArgs);
+    } catch (e) { console.error("[lossDrilldown/shifts]", e); }
 
     return { ok: true, from: fromD, to: toD, events: events.slice(0, 60), shifts };
   } catch (e: any) {
