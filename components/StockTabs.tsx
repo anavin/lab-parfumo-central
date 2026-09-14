@@ -6,8 +6,9 @@ type TabId = "stock" | "move" | "loss";
 
 // สลับแท็บบนหน้า /stock — คงเหลือ (matrix) · การเคลื่อนไหว (heatmap ขายรายวัน) · ป้องกันของหาย
 // ทุกแท็บ mount ค้างไว้ (ใช้ hidden) เพื่อไม่ให้ state (การแก้จำนวน/ตัวกรอง) รีเซ็ตตอนสลับ
-export function StockTabs({ matrix, movement, loss, lossAlert = false }:
-  { matrix: React.ReactNode; movement: React.ReactNode; loss: React.ReactNode; lossAlert?: boolean }) {
+// loss = null → ไม่มีสิทธิ์ (ผู้จัดการ/แอดมิน/ปฏิบัติการเท่านั้น) → ซ่อนแท็บป้องกันของหาย
+export function StockTabs({ matrix, movement, loss = null, lossAlert = false }:
+  { matrix: React.ReactNode; movement: React.ReactNode; loss?: React.ReactNode; lossAlert?: boolean }) {
   const [tab, setTab] = useState<TabId>("stock");
   const Btn = ({ id, icon: Icon, label, dot }: { id: TabId; icon: any; label: string; dot?: boolean }) => (
     <button onClick={() => setTab(id)}
@@ -22,11 +23,11 @@ export function StockTabs({ matrix, movement, loss, lossAlert = false }:
       <div className="inline-flex gap-1 p-1 mb-3 rounded-xl border border-line bg-surface">
         <Btn id="stock" icon={Package} label="คงเหลือ" />
         <Btn id="move" icon={Activity} label="การเคลื่อนไหว" />
-        <Btn id="loss" icon={ShieldAlert} label="ป้องกันของหาย" dot={lossAlert} />
+        {loss && <Btn id="loss" icon={ShieldAlert} label="ป้องกันของหาย" dot={lossAlert} />}
       </div>
       <div hidden={tab !== "stock"}>{matrix}</div>
       <div hidden={tab !== "move"}>{movement}</div>
-      <div hidden={tab !== "loss"}>{loss}</div>
+      {loss && <div hidden={tab !== "loss"}>{loss}</div>}
     </div>
   );
 }
