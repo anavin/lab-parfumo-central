@@ -10,7 +10,8 @@ type Row = { barcode: string; scent: string; size: string; shipped: number; sold
 
 const sizeDigits = (s: string) => { const m = String(s || "").match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN; };
 const sizeLabel = (s: string) => String(s || "").replace(/\s+/g, " ").trim();
-const cellTone = (r: number) => r <= 0 ? "bg-danger-soft text-danger font-bold" : r <= 3 ? "bg-warn-soft text-warn font-bold" : "text-ink font-semibold";
+// 0 = ปล่อยว่าง (ไม่โชว์เลข 0) โทนจืด · 1-3 = เตือน (ส้ม) · >3 = ปกติ
+const cellTone = (r: number) => r <= 0 ? "text-line" : r <= 3 ? "bg-warn-soft text-warn font-bold" : "text-ink font-semibold";
 
 type Cell = { remaining: number; barcode: string; multi: boolean };
 type Grp = { scent: string; cells: Map<string, Cell>; total: number; active: boolean };
@@ -148,7 +149,7 @@ export function StockMatrix({ rows, branch = null, canEdit = false, inactiveScen
                         <button type="button" disabled={!canCell} onClick={() => canCell && openEdit(g.scent, s, c.remaining)}
                           className={`inline-block min-w-[34px] rounded-md px-2 py-1 tabular-nums ${cellTone(c.remaining)} ${canCell ? "hover:ring-1 hover:ring-brand cursor-pointer" : "cursor-default"}`}
                           title={canCell ? "แตะเพื่อแก้จำนวน" : c.multi ? "มีหลายบาร์โค้ดในช่องนี้" : undefined}>
-                          {num(c.remaining)}
+                          {c.remaining > 0 ? num(c.remaining) : " "}
                         </button>
                       </td>
                     );
