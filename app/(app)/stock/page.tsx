@@ -1,10 +1,12 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num, baht } from "@/lib/format";
 import { q } from "@/lib/db";
-import { stockLive, reorderSuggestions, negativeStock, stockValuation } from "@/lib/queries";
+import { stockLive, reorderSuggestions, negativeStock, stockValuation, stockMovement } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockMatrix } from "@/components/StockMatrix";
+import { StockTabs } from "@/components/StockTabs";
+import { StockMovement, type MovRow } from "@/components/StockMovement";
 import { StockAdjust } from "@/components/StockAdjust";
 import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -19,10 +21,37 @@ export const dynamic = "force-dynamic";
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
-  const [rows, user, adjustments, reorder, negatives, valuation] = await Promise.all([
+  // last 30 days axis (Bangkok time) for the movement heatmap — build from y-m-d to avoid tz drift
+  const bkkToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  const [Y, M, D] = bkkToday.split("-").map(Number);
+  const baseUtc = Date.UTC(Y, M - 1, D);
+  const moveDates = Array.from({ length: 30 }, (_, i) => new Date(baseUtc - (29 - i) * 86400000).toISOString().slice(0, 10));
+  const [rows, user, adjustments, reorder, negatives, valuation, moves] = await Promise.all([
     stockLive(branch), getCurrentUser(), listStockAdjustments(branch),
     reorderSuggestions(branch), negativeStock(branch), stockValuation(branch),
+    stockMovement(branch, moveDates[0]),
   ]);
+  // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
+  const soldByBarcode = new Map<string, Map<string, number>>();
+  for (const m of moves) {
+    let bc = soldByBarcode.get(m.barcode);
+    if (!bc) { bc = new Map(); soldByBarcode.set(m.barcode, bc); }
+    bc.set(m.d, (bc.get(m.d) || 0) + (m.q || 0));
+  }
+  const movMap = new Map<string, MovRow>();
+  for (const r of rows) {
+    const key = `${r.scent}|${r.size}`;
+    let mv = movMap.get(key);
+    if (!mv) { mv = { scent: r.scent, size: r.size, remaining: 0, sold: {} }; movMap.set(key, mv); }
+    mv.remaining += r.remaining || 0;
+    const bc = soldByBarcode.get(r.barcode);
+    if (bc) for (const [d, q] of bc) mv.sold[d] = (mv.sold[d] || 0) + q;
+  }
+  const mlOf = (z?: string) => { const mm = String(z || "").match(/(\d+(?:\.\d+)?)/); return mm ? parseFloat(mm[1]) : 0; };
+  const isBag = (n?: string) => /ถุง/.test(String(n || ""));
+  const movRows = [...movMap.values()].sort((a, b) =>
+    (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)
+    || a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
   // derive the summary from the rows we already fetched (saves one full STOCK_CTE recompute)
   const s = {
     shipped: rows.reduce((a, r) => a + (r.shipped || 0), 0),
@@ -57,9 +86,12 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           <ExportButton kind="stock" />
         </div>} />
 
-      {/* PRIMARY: the stock matrix (คงเหลือแต่ละกลิ่น). Admin edits qty inline + closes scents. */}
+      {/* PRIMARY: คงเหลือ (matrix) + การเคลื่อนไหว (heatmap ขายรายวัน) as tabs */}
       <Card title={`คงเหลือแต่ละกลิ่น · ${rows.length} SKU`}>
-        <StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />
+        <StockTabs
+          matrix={<StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
+          movement={<StockMovement dates={moveDates} rows={movRows} />}
+        />
       </Card>
 
       {/* SECONDARY: everything else, collapsed — click to expand */}

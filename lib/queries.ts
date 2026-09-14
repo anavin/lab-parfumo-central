@@ -351,6 +351,25 @@ export async function stockLive(branch: string | null = null) {
   }
 }
 
+/** Daily units sold per barcode over the last `days` (for the stock-movement heatmap).
+ *  Counts approved sales + pending sale submissions (both leave the shelf), scoped to a
+ *  branch (null = all). `cutoff` is computed in Bangkok time by the caller. */
+export async function stockMovement(branch: string | null, cutoff: string): Promise<{ barcode: string; d: string; q: number }[]> {
+  const sql = `
+    select barcode, d::text d, sum(q)::float q from (
+      select barcode, sale_date d, qty q, ${SOLD_BRANCH} br
+        from sales where coalesce(barcode,'') <> '' and sale_date >= $2::date
+      union all
+      select barcode, entry_date d, qty q, ${SOLD_BRANCH} br
+        from submissions where kind='sale' and status='pending' and deleted_at is null
+          and coalesce(barcode,'') <> '' and entry_date >= $2::date
+    ) x
+    where ($1::text is null or br = upper($1))
+    group by barcode, d`;
+  try { return await q<{ barcode: string; d: string; q: number }>(sql, [branch, cutoff]); }
+  catch { return []; }   // never break the stock page over the movement panel
+}
+
 /** Remaining stock per barcode at a branch — for the sale oversell check. Barcodes
  *  not present read as 0. Includes pending sales (they already reserve stock). */
 export async function stockForBarcodes(branch: string, barcodes: string[]): Promise<Map<string, number>> {
