@@ -1,12 +1,13 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num, baht } from "@/lib/format";
 import { q } from "@/lib/db";
-import { stockLive, reorderSuggestions, negativeStock, stockValuation, stockMovement } from "@/lib/queries";
+import { stockLive, reorderSuggestions, negativeStock, stockValuation, stockMovement, countVariance } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockMatrix } from "@/components/StockMatrix";
 import { StockTabs } from "@/components/StockTabs";
 import { StockMovement, type MovRow } from "@/components/StockMovement";
+import { StockLoss, type LossRow } from "@/components/StockLoss";
 import { StockAdjust } from "@/components/StockAdjust";
 import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -26,10 +27,10 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const [Y, M, D] = bkkToday.split("-").map(Number);
   const baseUtc = Date.UTC(Y, M - 1, D);
   const moveDates = Array.from({ length: 30 }, (_, i) => new Date(baseUtc - (29 - i) * 86400000).toISOString().slice(0, 10));
-  const [rows, user, adjustments, reorder, negatives, valuation, moves] = await Promise.all([
+  const [rows, user, adjustments, reorder, negatives, valuation, moves, variance] = await Promise.all([
     stockLive(branch), getCurrentUser(), listStockAdjustments(branch),
     reorderSuggestions(branch), negativeStock(branch), stockValuation(branch),
-    stockMovement(branch, moveDates[0]),
+    stockMovement(branch, moveDates[0]), countVariance(branch),
   ]);
   // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
   const soldByBarcode = new Map<string, Map<string, number>>();
@@ -52,6 +53,44 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const movRows = [...movMap.values()].sort((a, b) =>
     (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)
     || a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
+
+  // ---- ป้องกันของหาย: เทียบผลนับล่าสุด (คาด vs จริง) + เตือนของที่ยังไม่ได้นับนาน ----
+  const daysSince = (iso: string) => Math.floor((baseUtc - Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10))) / 86400000);
+  type VarAgg = { expected: number; counted: number; value: number; countedAt: string | null };
+  const varAgg = new Map<string, VarAgg>();
+  for (const v of variance) {
+    const key = `${v.scent}|${v.size}`;
+    const a = varAgg.get(key) || { expected: 0, counted: 0, value: 0, countedAt: null };
+    a.expected += v.expected || 0; a.counted += v.counted || 0;
+    a.value += (v.counted - v.expected) * (v.unit_cost || 0);   // ต้นทุนของส่วนที่ขาด/เกิน (ติดลบ=หาย)
+    const d = v.counted_at ? v.counted_at.slice(0, 10) : null;
+    if (d && (!a.countedAt || d > a.countedAt)) a.countedAt = d;
+    varAgg.set(key, a);
+  }
+  const lossRows: LossRow[] = [];
+  const keys = new Set<string>([...varAgg.keys(), ...[...movMap.values()].filter((m) => m.remaining > 0).map((m) => `${m.scent}|${m.size}`)]);
+  for (const key of keys) {
+    const [scent, size] = key.split("|");
+    const remaining = movMap.get(key)?.remaining ?? 0;
+    const a = varAgg.get(key);
+    if (a) {
+      const diff = Math.round(a.counted - a.expected);
+      const stale = a.countedAt ? daysSince(a.countedAt) > 14 : false;
+      lossRows.push({ scent, size, expected: a.expected, counted: a.counted, diff, value: a.value, remaining, countedAt: a.countedAt, stale, neverCounted: false });
+    } else {
+      lossRows.push({ scent, size, expected: null, counted: null, diff: null, value: 0, remaining, countedAt: null, stale: false, neverCounted: true });
+    }
+  }
+  // จัดเรียง: ของขาดก่อน (ขาดมากสุดบน) → ยังไม่นับ/ค้างนาน → เกิน → ตรง
+  const rank = (r: LossRow) => r.diff != null && r.diff < 0 ? 0 : (r.neverCounted || r.stale) ? 1 : r.diff != null && r.diff > 0 ? 2 : 3;
+  lossRows.sort((x, y) => rank(x) - rank(y) || (x.diff ?? 0) - (y.diff ?? 0) || x.scent.localeCompare(y.scent, "th") || mlOf(x.size) - mlOf(y.size));
+  const lossSummary = {
+    shortN: lossRows.filter((r) => r.diff != null && r.diff < 0).length,
+    shortUnits: lossRows.reduce((a, r) => a + (r.diff != null && r.diff < 0 ? -r.diff : 0), 0),
+    negativeN: negatives.length,
+    notCountedN: lossRows.filter((r) => r.neverCounted || r.stale).length,
+  };
+  const lossAlert = lossSummary.shortN > 0 || lossSummary.negativeN > 0;
   // derive the summary from the rows we already fetched (saves one full STOCK_CTE recompute)
   const s = {
     shipped: rows.reduce((a, r) => a + (r.shipped || 0), 0),
@@ -89,8 +128,10 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       {/* PRIMARY: คงเหลือ (matrix) + การเคลื่อนไหว (heatmap ขายรายวัน) as tabs */}
       <Card title={`คงเหลือแต่ละกลิ่น · ${rows.length} SKU`}>
         <StockTabs
+          lossAlert={lossAlert}
           matrix={<StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
           movement={<StockMovement dates={moveDates} rows={movRows} />}
+          loss={<StockLoss rows={lossRows} summary={lossSummary} />}
         />
       </Card>
 

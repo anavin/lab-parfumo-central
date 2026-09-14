@@ -370,6 +370,32 @@ export async function stockMovement(branch: string | null, cutoff: string): Prom
   catch { return []; }   // never break the stock page over the movement panel
 }
 
+/** Latest approved stock-count line per barcode (for the loss-prevention panel):
+ *  expected (book stock at count time) vs counted (physical) → variance. Includes the
+ *  latest unit cost so a shortfall can be valued. Branch null = all. */
+export async function countVariance(branch: string | null): Promise<
+  { barcode: string; scent: string; size: string; expected: number; counted: number; counted_at: string | null; unit_cost: number | null }[]
+> {
+  const sql = `
+    with latest as (
+      select distinct on (l.barcode) l.barcode, l.scent, l.size,
+             l.expected::float expected, l.counted::float counted, c.reviewed_at::text counted_at
+      from stock_count_lines l
+      join stock_counts c on c.id = l.count_id
+      where c.status='approved' and coalesce(l.barcode,'') <> '' and ($1::text is null or c.branch = $1)
+      order by l.barcode, c.reviewed_at desc nulls last, c.id desc
+    ),
+    lc as (
+      select distinct on (barcode) barcode, unit_cost::float uc
+      from product_costs where barcode is not null order by barcode, cost_date desc nulls last, id desc
+    )
+    select latest.barcode, latest.scent, latest.size, latest.expected, latest.counted,
+           latest.counted_at, lc.uc unit_cost
+    from latest left join lc on lc.barcode = latest.barcode`;
+  try { return await q(sql, [branch]); }
+  catch { return []; }   // stock-count tables not migrated / empty → no variance panel
+}
+
 /** Remaining stock per barcode at a branch — for the sale oversell check. Barcodes
  *  not present read as 0. Includes pending sales (they already reserve stock). */
 export async function stockForBarcodes(branch: string, barcodes: string[]): Promise<Map<string, number>> {
