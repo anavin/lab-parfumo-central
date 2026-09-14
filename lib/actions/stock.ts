@@ -161,11 +161,13 @@ export async function lossDrilldown(branchInput: string | null, scent: string, s
     if (!codes.length) return { ok: true, from: null, to: null, events: [], shifts: [] };
 
     // ช่วงเวลา = ตั้งแต่นับครั้งก่อน → นับล่าสุด (ที่รวมกลิ่น/ขนาดนี้). ไม่มีครั้งก่อน → ย้อน 90 วัน
+    // NOTE: SELECT DISTINCT + ORDER BY ต้องเรียงด้วย column ที่อยู่ใน select (Postgres เข้ม, PGlite หลวม)
+    // reviewed_at::text = ISO → เรียง text desc ได้ลำดับเวลาที่ถูกต้อง
     const cnts = await q<{ ra: string }>(
       `select distinct c.reviewed_at::text ra from stock_counts c
        join stock_count_lines l on l.count_id=c.id
        where c.status='approved' and l.scent=$1 and l.size=$2 and ($3::text is null or c.branch=$3) and c.reviewed_at is not null
-       order by c.reviewed_at desc limit 2`, [scent, size, branch]);
+       order by ra desc limit 2`, [scent, size, branch]);
     const toD = (cnts[0]?.ra || new Date().toISOString()).slice(0, 10);
     const fromD = cnts[1]?.ra ? cnts[1].ra.slice(0, 10)
       : new Date(new Date(toD + "T00:00:00").getTime() - 90 * 86400000).toISOString().slice(0, 10);
