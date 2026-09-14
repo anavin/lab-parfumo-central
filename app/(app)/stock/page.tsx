@@ -1,7 +1,7 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num, baht } from "@/lib/format";
 import { q } from "@/lib/db";
-import { stockLive, reorderSuggestions, negativeStock, stockValuation, stockMovement, countVariance, lossSignals } from "@/lib/queries";
+import { stockPageBundle, stockMovement, countVariance, lossSignals } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockMatrix } from "@/components/StockMatrix";
@@ -27,11 +27,12 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const [Y, M, D] = bkkToday.split("-").map(Number);
   const baseUtc = Date.UTC(Y, M - 1, D);
   const moveDates = Array.from({ length: 30 }, (_, i) => new Date(baseUtc - (29 - i) * 86400000).toISOString().slice(0, 10));
-  const [rows, user, adjustments, reorder, negatives, valuation, moves, variance, signals] = await Promise.all([
-    stockLive(branch), getCurrentUser(), listStockAdjustments(branch),
-    reorderSuggestions(branch), negativeStock(branch), stockValuation(branch),
+  const [bundle, user, adjustments, moves, variance, signals] = await Promise.all([
+    stockPageBundle(branch), getCurrentUser(), listStockAdjustments(branch),
     stockMovement(branch, moveDates[0]), countVariance(branch), lossSignals(branch),
   ]);
+  // one STOCK_CTE pass → derive คงเหลือ / ควรเติม / ติดลบ / มูลค่า (was 4 separate CTE queries)
+  const { rows, reorder, negatives, valuation } = bundle;
   // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
   const soldByBarcode = new Map<string, Map<string, number>>();
   for (const m of moves) {

@@ -582,6 +582,95 @@ type ProdRow = { id: number; barcode: string; scent: string; grade: string; size
 /** Product search for the sale form. A stock-gated branch (isStockGated) only returns
  *  products in stock at that branch and includes `remaining` (so the qty picker can cap
  *  it); any other branch searches the whole catalog with remaining = null (no limit). */
+/** ONE STOCK_CTE pass for the whole /stock page. Replaces 4 separate CTE queries
+ *  (stockLive + negativeStock + stockValuation + reorderSuggestions) — each of which
+ *  re-scanned sales/submissions/po_items/return_items/stock_adjustments — with a single
+ *  detail query (+ one light 30-day sales query for velocity), deriving all four results
+ *  in JS. Numbers are identical to the four originals (kept for their other callers). */
+export async function stockPageBundle(branch: string | null = null, coverDays = 14) {
+  type Detail = {
+    barcode: string; scent: string; size: string; branch: string;
+    shipped: number; sold: number; returned: number; adjusted: number; remaining: number;
+    price: number; cost: number | null;
+  };
+  const lc = `, lc as (
+    select distinct on (barcode) barcode, unit_cost::float uc
+    from product_costs where barcode is not null order by barcode, cost_date desc nulls last, id desc)`;
+  const where = branch ? `where s.branch = $1` : ``;
+  const detailTail = `select s.barcode, s.scent, s.size, s.branch,
+      s.shipped, s.sold, s.returned, s.adjusted, s.remaining,
+      coalesce(p.price,0)::float price, lc.uc cost
+    from stock s left join products p on p.barcode = s.barcode left join lc on lc.barcode = s.barcode ${where}`;
+  const args = branch ? [branch] : [];
+  const run = (cte: string) => q<Detail>(`${cte}${lc} ${detailTail}`, args);
+  let detail: Detail[];
+  try { detail = await run(STOCK_CTE); }
+  catch (e: any) {
+    if (e?.code === "42P01") detail = await run(STOCK_CTE_NOADJ);
+    else if (e?.code === "42703") detail = await run(STOCK_CTE_LEGACY);
+    else throw e;
+  }
+
+  // 30-day velocity per (barcode, branch) — one light sales scan, no STOCK_CTE
+  const vel = new Map<string, number>();
+  try {
+    const vr = await q<{ barcode: string; branch: string; q: number }>(
+      `select barcode, ${SOLD_BRANCH} branch, sum(qty)::float q
+       from sales where barcode is not null and sale_date::date >= current_date - interval '30 days' group by 1, 2`, []);
+    for (const r of vr) vel.set(`${r.barcode}|${r.branch}`, r.q);
+  } catch { /* no sales / column missing → empty velocity */ }
+
+  // ---- stockLive-equivalent rows (branch → per-row; null → grouped across branches) ----
+  type LiveRow = { barcode: string; scent: string; size: string; shipped: number; sold: number; returned: number; remaining: number };
+  let rows: LiveRow[];
+  if (branch) {
+    rows = detail.map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, shipped: r.shipped, sold: r.sold, returned: r.returned, remaining: r.remaining }));
+  } else {
+    const m = new Map<string, LiveRow>();
+    for (const r of detail) {
+      const k = `${r.barcode}|${r.scent}|${r.size}`;
+      const e = m.get(k) ?? { barcode: r.barcode, scent: r.scent, size: r.size, shipped: 0, sold: 0, returned: 0, remaining: 0 };
+      e.shipped += r.shipped; e.sold += r.sold; e.returned += r.returned; e.remaining += r.remaining;
+      m.set(k, e);
+    }
+    rows = [...m.values()];
+  }
+  rows.sort((a, b) => a.remaining - b.remaining || (a.scent || "").localeCompare(b.scent || ""));
+
+  // ---- negatives (per barcode×branch, net = shipped + adjusted − sold − returned < 0) ----
+  const negatives = detail
+    .map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, branch: r.branch, shipped: r.shipped, sold: r.sold, returned: r.returned, adjusted: r.adjusted, net: r.shipped + r.adjusted - r.sold - r.returned }))
+    .filter((r) => r.net < 0)
+    .sort((a, b) => a.net - b.net);
+
+  // ---- valuation ----
+  let retail = 0, cost = 0, uncosted = 0, skus = 0;
+  for (const r of detail) {
+    retail += r.remaining * r.price;
+    if (r.cost != null) cost += r.remaining * r.cost;
+    if (r.remaining > 0) { skus++; if (r.cost == null) uncosted++; }
+  }
+  const valuation = { retail, cost, uncosted, skus };
+
+  // ---- reorder suggestions (remaining < coverDays of 30-day velocity) ----
+  const reorder = detail
+    .map((r) => {
+      const sold30 = vel.get(`${r.barcode}|${r.branch}`) || 0;
+      const rate = sold30 / 30;
+      const rawCover = sold30 > 0 ? r.remaining / rate : null;
+      return {
+        barcode: r.barcode, scent: r.scent, size: r.size, branch: r.branch, remaining: r.remaining,
+        sold30, velocity: Math.round(rate * 100) / 100,
+        days_cover: rawCover == null ? null : Math.round(rawCover * 10) / 10, rawCover,
+      };
+    })
+    .filter((r) => r.sold30 > 0 && r.rawCover != null && r.rawCover < coverDays)
+    .sort((a, b) => (a.days_cover ?? Infinity) - (b.days_cover ?? Infinity) || a.remaining - b.remaining)
+    .map(({ rawCover, ...r }) => r);
+
+  return { rows, negatives, valuation, reorder };
+}
+
 export async function searchProductsForSale(term: string, branch: string | null): Promise<ProdRow[]> {
   const t = `${(term ?? "").trim()}%`;
   if (!branch || !isStockGated(branch)) {
