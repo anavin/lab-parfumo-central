@@ -141,3 +141,102 @@ export async function deleteStockAdjustment(id: number): Promise<{ ok: boolean; 
     return { ok: true };
   } catch (e) { console.error("[deleteStockAdjustment]", e); return { ok: false, error: "ลบไม่สำเร็จ" }; }
 }
+
+// ── ป้องกันของหาย: สาวหาต้นตอ ────────────────────────────────────────────────
+// กดกลิ่นที่ "ขาด" → ดึงทุกเหตุการณ์ที่กระทบสต๊อกในช่วงระหว่างนับ 2 ครั้งล่าสุด
+// (ขาย/ปรับมือ/คืน) + ใครเข้าเวรช่วงนั้น เพื่อสาวว่าของหายตรงไหน/ใคร
+export type LossEvent = { at: string; kind: "sale" | "adjust" | "return" | "count"; who: string | null; detail: string; qty: string; flag: boolean };
+export type LossDrilldown = { ok: boolean; error?: string; from?: string | null; to?: string | null; events?: LossEvent[]; shifts?: { name: string; bills: number }[] };
+
+// map source → รหัสสาขา (เหมือน SOLD_BRANCH ใน queries.ts)
+const SRC_BR = `upper(case when source='EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end)`;
+
+export async function lossDrilldown(branchInput: string | null, scent: string, size: string): Promise<LossDrilldown> {
+  await requirePermission("requisitions");
+  try {
+    const branch = branchInput ? resolveBranch(branchInput) : null;
+    const prods = await q<{ barcode: string }>(
+      `select barcode from products where scent=$1 and size=$2 and coalesce(barcode,'')<>''`, [scent, size]);
+    const codes = prods.map((p) => p.barcode);
+    if (!codes.length) return { ok: true, from: null, to: null, events: [], shifts: [] };
+
+    // ช่วงเวลา = ตั้งแต่นับครั้งก่อน → นับล่าสุด (ที่รวมกลิ่น/ขนาดนี้). ไม่มีครั้งก่อน → ย้อน 90 วัน
+    const cnts = await q<{ ra: string }>(
+      `select distinct c.reviewed_at::text ra from stock_counts c
+       join stock_count_lines l on l.count_id=c.id
+       where c.status='approved' and l.scent=$1 and l.size=$2 and ($3::text is null or c.branch=$3) and c.reviewed_at is not null
+       order by c.reviewed_at desc limit 2`, [scent, size, branch]);
+    const toD = (cnts[0]?.ra || new Date().toISOString()).slice(0, 10);
+    const fromD = cnts[1]?.ra ? cnts[1].ra.slice(0, 10)
+      : new Date(new Date(toD + "T00:00:00").getTime() - 90 * 86400000).toISOString().slice(0, 10);
+
+    const brSales = branch ? `and ${SRC_BR}=$4` : ``;
+    const salesArgs: any[] = branch ? [codes, fromD, toD, branch] : [codes, fromD, toD];
+
+    // ขาย (อนุมัติ + pending)
+    const sales = await q<{ d: string; t: string; who: string | null; ref: string | null; item: string | null; qty: number; up: number; disc: number }>(
+      `select sale_date::text d, coalesce(sale_time::text,'') t, u.full_name who,
+              nullif(receipt_no,'') ref, item, qty::float qty, coalesce(unit_price,0)::float up, coalesce(discount,0)::float disc
+       from sales s left join users u on u.id=s.created_by
+       where barcode = any($1) and sale_date >= $2::date and sale_date <= $3::date ${brSales}
+       union all
+       select entry_date::text d, coalesce(sale_time::text,'') t, u.full_name who,
+              nullif(receipt_no,'') ref, item, qty::float qty, coalesce(unit_price,0)::float up, coalesce(discount,0)::float disc
+       from submissions s left join users u on u.id=s.created_by
+       where kind='sale' and status='pending' and deleted_at is null and barcode = any($1)
+         and entry_date >= $2::date and entry_date <= $3::date ${brSales}`, salesArgs);
+
+    // ปรับมือ
+    const adjArgs: any[] = branch ? [codes, fromD, toD, branch] : [codes, fromD, toD];
+    const adjusts = await q<{ at: string; who: string | null; qty: number; note: string | null }>(
+      `select created_at::text at, u.full_name who, qty::float qty, note
+       from stock_adjustments a left join users u on u.id=a.created_by
+       where barcode = any($1) and created_at::date >= $2::date and created_at::date <= $3::date
+         ${branch ? "and upper(a.branch)=$4" : ""} order by created_at desc`, adjArgs);
+
+    // คืนสินค้า (รายชิ้น)
+    const returns = await q<{ at: string; name: string | null; sku: string | null; status: string | null }>(
+      `select return_date::text at, name, sku, receive_status status
+       from return_items where serial = any($1) and return_date >= $2::date and return_date <= $3::date
+       order by return_date desc`, [codes, fromD, toD]);
+
+    const events: LossEvent[] = [];
+    for (const s of sales) {
+      const full = s.up > 0 && s.disc >= s.up * s.qty;
+      events.push({
+        at: `${s.d} ${s.t}`.trim(), kind: "sale", who: s.who,
+        detail: `บิล ${s.ref || "—"} · ${s.item || "รายการ"} ×${s.qty}${s.disc > 0 ? ` · ลด ${Math.round(s.disc)}` : ""}`,
+        qty: `−${s.qty}`, flag: s.up === 0 || full,
+      });
+    }
+    for (const a of adjusts) {
+      const isCount = /นับสต๊อก/.test(a.note || "");
+      events.push({
+        at: a.at.slice(0, 16).replace("T", " "), kind: isCount ? "count" : "adjust", who: a.who,
+        detail: isCount ? `ปรับจากผลนับ (${a.qty > 0 ? "+" : ""}${a.qty})` : `ปรับมือ ${a.qty > 0 ? "+" : ""}${a.qty}${a.note ? ` · ${a.note}` : ""}`,
+        qty: `${a.qty > 0 ? "+" : ""}${a.qty}`, flag: !isCount && a.qty < 0,
+      });
+    }
+    for (const r of returns) {
+      events.push({
+        at: r.at, kind: "return", who: null,
+        detail: `คืน ${r.name || ""}${r.sku ? ` · ${r.sku}` : " · ไม่มีเลขอ้างอิง"}`,
+        qty: "คืน", flag: !r.sku,
+      });
+    }
+    events.sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0));
+
+    // ใครเข้าเวร (ขายกลิ่นนี้กี่บิลในช่วง)
+    const shifts = await q<{ name: string; bills: number }>(
+      `select coalesce(u.full_name,'—') name, count(distinct coalesce(nullif(receipt_no,''),'#'||s.id::text))::int bills
+       from sales s left join users u on u.id=s.created_by
+       where barcode = any($1) and sale_date >= $2::date and sale_date <= $3::date ${brSales}
+       group by u.full_name order by bills desc`, salesArgs);
+
+    return { ok: true, from: fromD, to: toD, events: events.slice(0, 60), shifts };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: true, from: null, to: null, events: [], shifts: [] };
+    console.error("[lossDrilldown]", e);
+    return { ok: false, error: "ดึงข้อมูลไม่สำเร็จ" };
+  }
+}
