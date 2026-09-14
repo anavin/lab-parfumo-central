@@ -6,12 +6,13 @@ import { resolveBranch, branchName } from "@/lib/branches";
 import { logAudit } from "@/lib/audit";
 import { stockRawForBarcodes } from "@/lib/queries";
 
-export type CountLineInput = { barcode: string; scent: string; size: string; expected: number; counted: number };
-export type CountLine = CountLineInput & { id: number };
+export type CountLineInput = { barcode: string; scent: string; size: string; expected: number; counted: number; verified?: boolean };
+export type CountLine = CountLineInput & { id: number; verified: boolean };
 export type StockCount = {
   id: number; branch: string; status: string; note: string | null;
   counted_by_name: string | null; created_at: string; reviewed_by_name: string | null;
   reviewed_at: string | null; review_note: string | null; lines_count: number; diff_count: number;
+  short: number; over: number; verified_count: number;
 };
 
 /** Salesperson submits a physical count for their branch → status 'pending' (awaits admin). */
@@ -21,19 +22,24 @@ export async function submitStockCount(branch: string, lines: CountLineInput[], 
   const clean = (lines || []).filter((l) => l.barcode);
   if (!clean.length) return { ok: false, error: "ยังไม่มีรายการนับ" };
   try {
-    // header + all count lines in one tx so a partial count is never saved
-    const id = await tx<number>(async (run) => {
+    // header + all count lines in one tx so a partial count is never saved.
+    // `verified` = the salesperson physically counted this row (not left at pre-fill);
+    // guarded so a pre-0033 DB still saves (retry without the column).
+    const build = (withV: boolean) => tx<number>(async (run) => {
       const [c] = await run<{ id: number }>(
         `insert into stock_counts (branch, status, note, counted_by) values ($1,'pending',$2,$3) returning id`,
         [b, (note || "").trim() || null, me.id]);
       for (const l of clean) {
-        await run(`insert into stock_count_lines (count_id, barcode, scent, size, expected, counted)
-                 values ($1,$2,$3,$4,$5,$6)`,
-          [c.id, l.barcode, l.scent || null, l.size || null,
-           Math.max(0, Math.round(Number(l.expected) || 0)), Math.max(0, Math.round(Number(l.counted) || 0))]);
+        const base = [c.id, l.barcode, l.scent || null, l.size || null,
+          Math.max(0, Math.round(Number(l.expected) || 0)), Math.max(0, Math.round(Number(l.counted) || 0))];
+        if (withV) await run(`insert into stock_count_lines (count_id, barcode, scent, size, expected, counted, verified) values ($1,$2,$3,$4,$5,$6,$7)`, [...base, !!l.verified]);
+        else await run(`insert into stock_count_lines (count_id, barcode, scent, size, expected, counted) values ($1,$2,$3,$4,$5,$6)`, base);
       }
       return c.id;
     });
+    let id: number;
+    try { id = await build(true); }
+    catch (e: any) { if (e?.code === "42703") id = await build(false); else throw e; }
     await logAudit("create", "stock", id, `ส่งนับสต๊อก ${branchName(b)} (${clean.length} รายการ)`);
     revalidatePath("/stock/counts"); revalidatePath("/my/count");
     return { ok: true, id };
@@ -47,29 +53,36 @@ export async function submitStockCount(branch: string, lines: CountLineInput[], 
 /** Count sessions for the admin review list (optionally by status). */
 export async function listStockCounts(status: string | null = null): Promise<StockCount[]> {
   await requireUser();
-  try {
-    const where = status ? `where c.status = $1` : ``;
-    const args = status ? [status] : [];
-    return await q<StockCount>(`
+  const where = status ? `where c.status = $1` : ``;
+  const args = status ? [status] : [];
+  const sql = (verifiedCol: string) => `
       select c.id, c.branch, c.status, c.note, cu.full_name counted_by_name,
              c.created_at::text created_at, ru.full_name reviewed_by_name,
              c.reviewed_at::text reviewed_at, c.review_note,
              count(l.id)::int lines_count,
-             count(l.id) filter (where l.counted <> l.expected)::int diff_count
+             count(l.id) filter (where l.counted <> l.expected)::int diff_count,
+             coalesce(sum(greatest(0, l.expected - l.counted)),0)::int short,
+             coalesce(sum(greatest(0, l.counted - l.expected)),0)::int "over",
+             ${verifiedCol} verified_count
       from stock_counts c
       left join stock_count_lines l on l.count_id = c.id
       left join users cu on cu.id = c.counted_by
       left join users ru on ru.id = c.reviewed_by
       ${where} group by c.id, cu.full_name, ru.full_name
-      order by (c.status='pending') desc, c.created_at desc limit 100`, args);
+      order by (c.status='pending') desc, c.created_at desc limit 100`;
+  try {
+    try { return await q<StockCount>(sql(`count(l.id) filter (where l.verified)::int`), args); }
+    catch (e: any) { if (e?.code === "42703") return await q<StockCount>(sql(`0::int`), args); throw e; }  // pre-0033
   } catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
 export async function getStockCountLines(id: number): Promise<CountLine[]> {
   await requireUser();
+  const sql = (verifiedCol: string) => `select id, barcode, scent, size, expected::float expected, counted::float counted, ${verifiedCol} verified
+    from stock_count_lines where count_id = $1 order by scent, size`;
   try {
-    return await q<CountLine>(`select id, barcode, scent, size, expected::float expected, counted::float counted
-      from stock_count_lines where count_id = $1 order by scent, size`, [Number(id)]);
+    try { return await q<CountLine>(sql("verified"), [Number(id)]); }
+    catch (e: any) { if (e?.code === "42703") return await q<CountLine>(sql("false"), [Number(id)]); throw e; }  // pre-0033
   } catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 

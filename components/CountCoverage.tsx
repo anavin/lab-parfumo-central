@@ -37,7 +37,7 @@ export function CountCoverage({ coverage }: { coverage: Coverage }) {
           <div className="flex flex-wrap gap-3 text-xs text-muted mb-3">
             <span>ไม่เคยนับ <b className="text-danger">{neverN}</b></span>
             <span>· ค้าง &gt;14 วัน <b className="text-warn">{staleN}</b></span>
-            <Link href="/stock/counts" className="ml-auto text-brand hover:underline">ไปหน้าตรวจนับสต๊อก →</Link>
+            <Link href="/my/count" className="ml-auto text-brand hover:underline font-medium">เริ่มนับ (ควรนับก่อน) →</Link>
           </div>
 
           {suggest.length === 0 ? (

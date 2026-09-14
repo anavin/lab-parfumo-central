@@ -24,6 +24,7 @@ function Card({ c }: { c: StockCount }) {
   const [loading, setLoading] = useState(false);
   const [saving, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [diffOnly, setDiffOnly] = useState(false);
   const st = STATUS[c.status] ?? STATUS.pending;
 
   const toggle = () => {
@@ -50,7 +51,12 @@ function Card({ c }: { c: StockCount }) {
             {branchName(c.branch)}
             <span className={`inline-flex px-1.5 py-0.5 rounded text-[11px] font-medium ${st.cls}`}>{st.label}</span>
           </div>
-          <div className="text-[11px] text-muted">{c.created_at?.slice(0, 16).replace("T", " ")} · {c.counted_by_name ?? "-"} · {c.lines_count} รายการ{c.diff_count > 0 ? ` · ต่าง ${c.diff_count}` : " · ตรงทั้งหมด"}</div>
+          <div className="text-[11px] text-muted">
+            {c.created_at?.slice(0, 16).replace("T", " ")} · {c.counted_by_name ?? "-"} · ยืนยัน {c.verified_count}/{c.lines_count}
+            {c.short > 0 && <span className="text-danger"> · ขาด {c.short}</span>}
+            {c.over > 0 && <span className="text-warn-dark"> · เกิน {c.over}</span>}
+            {c.short === 0 && c.over === 0 && <span className="text-success"> · ตรงทั้งหมด</span>}
+          </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -58,6 +64,12 @@ function Card({ c }: { c: StockCount }) {
         <div className="px-4 pb-4 border-t border-line-soft pt-3">
           {loading ? <div className="py-4 text-center text-sm text-muted"><Loader2 className="w-4 h-4 animate-spin inline" /></div> : (
             <>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] text-muted">✓ = พนักงานนับจริง (ไม่ใช่ค่าที่ระบบเติมให้)</span>
+                <label className="inline-flex items-center gap-1 text-[11px] text-muted cursor-pointer select-none">
+                  <input type="checkbox" checked={diffOnly} onChange={(e) => setDiffOnly(e.target.checked)} className="accent-brand" /> เฉพาะที่ต่าง
+                </label>
+              </div>
               <div className="max-h-[50vh] overflow-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-left text-xs text-muted border-b border-line-soft">
@@ -67,11 +79,11 @@ function Card({ c }: { c: StockCount }) {
                     <th className="py-1.5 font-semibold text-right">ส่วนต่าง</th>
                   </tr></thead>
                   <tbody>
-                    {(lines ?? []).map((l) => {
+                    {(lines ?? []).filter((l) => !diffOnly || Math.round(l.counted - l.expected) !== 0).map((l) => {
                       const d = Math.round(l.counted - l.expected);
                       return (
                         <tr key={l.id} className="border-b border-line-soft last:border-0">
-                          <td className="py-1.5 pr-2">{l.scent} <span className="text-muted text-xs">{l.size}</span></td>
+                          <td className="py-1.5 pr-2">{l.verified && <span className="text-success mr-1" title="พนักงานนับจริง">✓</span>}{l.scent} <span className="text-muted text-xs">{l.size}</span></td>
                           <td className="py-1.5 pr-2 text-right tabular-nums text-muted">{Math.round(l.expected)}</td>
                           <td className="py-1.5 pr-2 text-right tabular-nums font-medium">{Math.round(l.counted)}</td>
                           <td className={`py-1.5 text-right tabular-nums font-semibold ${d === 0 ? "text-success" : d < 0 ? "text-danger" : "text-warn-dark"}`}>{d > 0 ? "+" : ""}{d || "0"}</td>
