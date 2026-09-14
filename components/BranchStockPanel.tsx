@@ -7,8 +7,11 @@ type Row = { barcode: string; scent: string; size: string; remaining: number };
 
 const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
 
+// ดึงจำนวน ml จากข้อความขนาด ("10 ml." → 10) เพื่อเรียงขนาดเล็ก→ใหญ่
+const mlOf = (s?: string) => { const m = String(s || "").match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+
 /** Read-only branch stock for the salesperson on /my — what's left at the branch
- *  they're working at today. Sorted low-stock-first so near-empty items stand out. */
+ *  they're working at today. Sorted by scent (Thai collation), then size small→large. */
 export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { rows: Row[]; branchName: string; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [term, setTerm] = useState("");
@@ -16,7 +19,8 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
   // only what's actually in stock (received via requisition / adjusted in), by name —
   // hide the 0/phantom rows (items sold but never received into this branch)
   const stocked = useMemo(
-    () => rows.filter((r) => (Number(r.remaining) || 0) > 0).sort((a, b) => (a.scent || "").localeCompare(b.scent || "")),
+    () => rows.filter((r) => (Number(r.remaining) || 0) > 0)
+      .sort((a, b) => (a.scent || "").localeCompare(b.scent || "", "th") || mlOf(a.size) - mlOf(b.size)),
     [rows]);
   const list = useMemo(() => {
     const t = term.trim().toLowerCase();
