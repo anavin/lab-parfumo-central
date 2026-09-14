@@ -370,6 +370,44 @@ export async function stockMovement(branch: string | null, cutoff: string): Prom
   catch { return []; }   // never break the stock page over the movement panel
 }
 
+/** Write today's stock snapshot (remaining per barcode) for every active branch into
+ *  stock_daily — one bulk upsert per branch. Called nightly by /api/cron/snapshot. */
+export async function snapshotStockNow(): Promise<{ ok: boolean; snap_date: string; rows: number; branches: number; error?: string }> {
+  const snap = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  let total = 0, brCount = 0;
+  try {
+    for (const b of BRANCHES.filter((x) => x.active)) {
+      const live = (await stockLive(b.code)).filter((r) => (Number(r.remaining) || 0) > 0);
+      brCount++;
+      if (!live.length) continue;
+      const params: any[] = [];
+      const tuples = live.map((r, i) => {
+        const o = i * 6;
+        params.push(snap, b.code, r.barcode, r.scent, r.size, Math.round(Number(r.remaining) || 0));
+        return `($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5},$${o + 6})`;
+      }).join(",");
+      await q(`insert into stock_daily (snap_date, branch, barcode, scent, size, remaining) values ${tuples}
+        on conflict (snap_date, branch, barcode) do update set remaining=excluded.remaining, scent=excluded.scent, size=excluded.size`, params);
+      total += live.length;
+    }
+    return { ok: true, snap_date: snap, rows: total, branches: brCount };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, snap_date: snap, rows: 0, branches: 0, error: "ยังไม่ได้สร้างตาราง stock_daily (รัน SQL 0034)" };
+    throw e;
+  }
+}
+
+/** Total remaining stock per day (trend chart) from the daily snapshots. */
+export async function stockTrendTotals(branch: string | null, days = 60): Promise<{ d: string; remaining: number }[]> {
+  try {
+    const where = branch ? `and branch = $1` : ``;
+    const args = branch ? [branch] : [];
+    return await q(`select snap_date::text d, sum(remaining)::float remaining
+      from stock_daily where snap_date >= current_date - ${Number(days) || 60} ${where}
+      group by snap_date order by snap_date`, args);
+  } catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Latest approved stock-count line per barcode (for the loss-prevention panel):
  *  expected (book stock at count time) vs counted (physical) → variance. Includes the
  *  latest unit cost so a shortfall can be valued. Branch null = all. */
