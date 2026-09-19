@@ -775,6 +775,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     }, 250);
   };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
+  const hasPromo = it.list_price != null && it.list_price > up;   // promo line under ราคา → equal spacer on the others
   const is4ml = /^4\s*ml/i.test(String(it.size || "").trim());   // giveaway-eligible size
   // clamp per-item discount to the line subtotal so the card never shows a
   // misleading negative total (mirrors the authoritative BillForm math).
@@ -813,11 +814,12 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       <div className="grid grid-cols-3 gap-2.5 pl-7">
         <Cell label={max != null ? `จำนวน · เหลือ ${max}` : "จำนวน"}>
           <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty, max)} className="py-2.5 justify-center min-h-[44px]" />
+          {hasPromo && <div className="h-[15px] mt-0.5" />}
         </Cell>
         <Cell label="ราคา">
           <input {...numAttrs("unit_price")} className={fld} />
-          {it.list_price != null && it.list_price > up && (
-            <div className="mt-0.5 text-center text-[10px] leading-none">
+          {hasPromo && (
+            <div className="h-[15px] mt-0.5 text-center text-[10px] leading-none">
               <span className="text-muted-soft line-through">฿{Number(it.list_price).toLocaleString()}</span>
               <span className="ml-1 text-brand font-semibold">โปร</span>
             </div>
@@ -826,6 +828,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
         <Cell label="ส่วนลด" active={it.gift || Number(it.discount) > 0}>
           <input {...(it.gift ? { value: String(Math.round(q * up)), readOnly: true, inputMode: "numeric" as const } : numAttrs("discount"))}
             className={`${fld} ${(it.gift || Number(it.discount) > 0) ? "!text-danger !border-danger/50 font-semibold" : ""}`} />
+          {hasPromo && <div className="h-[15px] mt-0.5" />}
         </Cell>
       </div>
       {/* ของแถม — only for 4ml testers; ticking gives a full discount (free ฿0) */}
