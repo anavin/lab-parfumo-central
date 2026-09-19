@@ -740,7 +740,9 @@ export async function getActivePromotionForSale(date: string): Promise<{ name: s
   } catch { return { name: promo.name, byBarcode: {} }; }
 }
 
-/** Distinct grade × size present in the catalog — drives the promo price grid. */
+/** Grade × size for the promo price grid — perfume grades × bottle sizes only
+ *  (10/30/50 ml). Excludes 4ml giveaways and non-perfume lines (bags, cloths,
+ *  tumblers with sizes like "Size M" / "Dark Blue"). */
 export async function productGradeSizes(): Promise<{ grades: string[]; sizes: string[] }> {
   const ml = (s: string) => { const m = String(s || "").match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
   const GRADE_RANK: Record<string, number> = { "EDP": 0, "EDP+": 1, "EDT": 2, "LE PARFUM": 3, "PARFUM": 4 };
@@ -748,8 +750,9 @@ export async function productGradeSizes(): Promise<{ grades: string[]; sizes: st
     const rows = await q<{ grade: string; size: string }>(
       `select distinct coalesce(nullif(trim(grade),''),'-') grade, coalesce(nullif(trim(size),''),'-') size
        from products where coalesce(nullif(trim(grade),''),'') <> '' and coalesce(nullif(trim(size),''),'') <> ''`);
-    const grades = [...new Set(rows.map((r) => r.grade))].sort((a, b) => (GRADE_RANK[a.toUpperCase()] ?? 8) - (GRADE_RANK[b.toUpperCase()] ?? 8) || a.localeCompare(b));
-    const sizes = [...new Set(rows.map((r) => r.size))].sort((a, b) => ml(b) - ml(a));   // 50 → 30 → 10 → 4
+    const perfume = rows.filter((r) => ml(r.size) >= 10 && /ml/i.test(r.size));   // 10/30/50 ml only (drops 4ml + non-ml)
+    const grades = [...new Set(perfume.map((r) => r.grade))].sort((a, b) => (GRADE_RANK[a.toUpperCase()] ?? 8) - (GRADE_RANK[b.toUpperCase()] ?? 8) || a.localeCompare(b));
+    const sizes = [...new Set(perfume.map((r) => r.size))].sort((a, b) => ml(b) - ml(a));   // 50 → 30 → 10
     return { grades, sizes };
   } catch { return { grades: [], sizes: [] }; }
 }
