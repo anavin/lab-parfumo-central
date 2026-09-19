@@ -83,7 +83,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ---- bill (multi-item) types ----
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
-type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean; stock?: number | null };
+type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean; stock?: number | null; list_price?: number };
+// active promotion resolved to barcode → special price (see getActivePromotionForSale)
+export type Promo = { name: string; byBarcode: Record<string, { price: number; normal: number }> } | null;
+// apply the promo special price to a new/scanned item (keeps the normal price for a struck-through display)
+const withPromo = (patch: Partial<BillItem>, promo: Promo): Partial<BillItem> => {
+  const pp = promo?.byBarcode?.[String(patch.barcode || "")];
+  return pp ? { ...patch, unit_price: pp.price, list_price: pp.normal } : patch;
+};
 type Tender = { channel: string; amount: any };
 type BillState = { sale_date: string; sale_time: string; source: string; receipt_no: string; payment_channel: string; nation: string; discount_pct: any; discount_baht: any; items: BillItem[]; attachments: string[]; splitPay: boolean; tenders: Tender[] };
 type BillItemPayload = { item: string; barcode: string; size: string; qty: number; unit_price: number; discount: number; payment_channel: string };
@@ -98,8 +105,8 @@ const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRA
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
-export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null, defaultPay = "Cash" }:
-  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null; defaultPay?: string }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null, defaultPay = "Cash", promo = null }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null; defaultPay?: string; promo?: Promo }) {
   const router = useRouter();
   const viewingPast = date !== today;   // browsing an older day; new sales still go to today
   // Which shop the salesperson is working at today (Central World / Seacon …).
@@ -170,7 +177,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const scanToNewBill = (code: string) => start(async () => {
     try {
       const p = await lookupBarcode(code);
-      const it = p ? newItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 })
+      const it = p ? newItem(withPromo({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 }, promo))
                    : newItem({ barcode: code });
       setEdit(null); setAutoScan(false); setBill({ ...blankBill(date, false, branch, defaultPay), items: [it] });
       beep("ok"); try { navigator.vibrate?.(40); } catch {}
@@ -285,7 +292,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         </div>
       )}
       {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan} laserMode={laserMode}
-        stockMap={stockMap} onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
+        stockMap={stockMap} promo={promo} onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
 
       {edit && <SaleForm state={edit} setState={setEdit} pending={pending} fullName={fullName}
         onSave={() => start(async () => {
@@ -349,8 +356,8 @@ function NationPicker({ value, onChange, invalid, big }: { value: string; onChan
 }
 
 // ---------------------------------------------------------------- bill builder
-function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false, stockMap = null }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null;
+function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false, stockMap = null, promo = null }: {
+  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null; promo?: Promo;
 }) {
   const [scanning, setScanning] = useState(!!autoScan && !laserMode);
   // per-item quantity cap at a stock-gated branch: available stock minus what other
@@ -390,8 +397,9 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         updateItem(existing.key, { qty });
         return { ok: true, label: p.scent, sub: `จำนวน ${qty} ชิ้น` };
       }
-      addItem({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 });
-      const sub = [p.size, p.price ? `฿${Number(p.price).toLocaleString()}` : ""].filter(Boolean).join(" · ");
+      const pat = withPromo({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 }, promo);
+      addItem(pat);
+      const sub = [p.size, pat.unit_price ? `฿${Number(pat.unit_price).toLocaleString()}${pat.list_price ? " (โปร)" : ""}` : ""].filter(Boolean).join(" · ");
       return { ok: true, label: p.scent, sub };
     }
     addItem({ barcode: code });
@@ -537,9 +545,15 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         <span className="text-xs text-muted">{fullName}</span>
       </div>
 
+      {promo && (
+        <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-brand-soft border border-brand/30 px-3 py-1.5 text-xs text-brand-dark">
+          🏷️ กำลังใช้โปร: <b>{promo.name}</b> — ราคาพิเศษเติมให้อัตโนมัติเมื่อเลือกสินค้า
+        </div>
+      )}
+
       {/* items */}
       <div className="space-y-2 mb-3">
-        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} max={capFor(it)} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} />)}
+        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} max={capFor(it)} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} promo={promo} />)}
         {state.items.length === 0 && <div className="text-center text-sm text-muted py-6 border border-dashed border-line rounded-xl">ยังไม่มีสินค้า — กด “สแกนเพิ่ม” หรือ “เพิ่มเอง”</div>}
       </div>
 
@@ -725,7 +739,7 @@ const Cell = ({ label, children, active = false }: { label: string; children: Re
   <div><span className={`block text-[10px] text-center mb-0.5 ${active ? "text-danger font-semibold" : "text-muted"}`}>{label}</span>{children}</div>
 );
 
-function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false, max = null }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean; max?: number | null }) {
+function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false, max = null, promo = null }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean; max?: number | null; promo?: Promo }) {
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);   // surfaced so WebView issues are visible
@@ -740,7 +754,11 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
     setTimeout(() => nameRef.current?.focus({ preventScroll: true }), 120);
   }, [autoFocus]);
   // qty is a dropdown now (no keyboard) — just fill the product and close the list
-  const pick = (p: any) => { onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price, stock: p.remaining ?? null }); setAcOpen(false); };
+  const pick = (p: any) => {
+    const pat = withPromo({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: p.price }, promo);
+    onChange({ item: p.scent, barcode: p.barcode, size: p.size, unit_price: pat.unit_price, list_price: pat.list_price, stock: p.remaining ?? null });
+    setAcOpen(false);
+  };
   const onName = (v: string) => {
     onChange({ item: v, barcode: "" });
     setSearchErr(null);
@@ -796,7 +814,15 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
         <Cell label={max != null ? `จำนวน · เหลือ ${max}` : "จำนวน"}>
           <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty, max)} className="py-2.5 justify-center min-h-[44px]" />
         </Cell>
-        <Cell label="ราคา"><input {...numAttrs("unit_price")} className={fld} /></Cell>
+        <Cell label="ราคา">
+          <input {...numAttrs("unit_price")} className={fld} />
+          {it.list_price != null && it.list_price > up && (
+            <div className="mt-0.5 text-center text-[10px] leading-none">
+              <span className="text-muted-soft line-through">฿{Number(it.list_price).toLocaleString()}</span>
+              <span className="ml-1 text-brand font-semibold">โปร</span>
+            </div>
+          )}
+        </Cell>
         <Cell label="ส่วนลด" active={it.gift || Number(it.discount) > 0}>
           <input {...(it.gift ? { value: String(Math.round(q * up)), readOnly: true, inputMode: "numeric" as const } : numAttrs("discount"))}
             className={`${fld} ${(it.gift || Number(it.discount) > 0) ? "!text-danger !border-danger/50 font-semibold" : ""}`} />

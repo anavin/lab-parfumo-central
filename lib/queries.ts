@@ -710,6 +710,50 @@ export async function stockPageBundle(branch: string | null = null, coverDays = 
   return { rows, negatives, valuation, reorder };
 }
 
+/** The promotion in effect on `date` (active + date range covers it) — newest wins.
+ *  Returns its special-price map { "grade|size": price } for auto-pricing at sale entry. */
+export async function getActivePromotion(date: string): Promise<{ id: number; name: string; prices: Record<string, number> } | null> {
+  try {
+    const [p] = await q<{ id: number; name: string; prices: Record<string, number> }>(
+      `select id, name, prices from promotions
+       where active and start_date <= $1::date and end_date >= $1::date
+       order by start_date desc, id desc limit 1`, [date]);
+    return p ?? null;
+  } catch (e: any) { if (e?.code === "42P01") return null; throw e; }
+}
+
+/** Active promo resolved to a barcode → special-price map for the sale form (client just
+ *  looks up by barcode; no grade needed there). Only barcodes whose special ≠ normal. */
+export async function getActivePromotionForSale(date: string): Promise<{ name: string; byBarcode: Record<string, { price: number; normal: number }> } | null> {
+  const promo = await getActivePromotion(date);
+  if (!promo || !promo.prices || !Object.keys(promo.prices).length) return null;
+  try {
+    const rows = await q<{ barcode: string; grade: string; size: string; price: number }>(
+      `select barcode, coalesce(grade,'') grade, coalesce(size,'') size, coalesce(price,0)::float price
+       from products where coalesce(barcode,'') <> ''`);
+    const byBarcode: Record<string, { price: number; normal: number }> = {};
+    for (const r of rows) {
+      const sp = promo.prices[`${r.grade}|${r.size}`];
+      if (sp && sp > 0 && sp !== r.price) byBarcode[r.barcode] = { price: sp, normal: r.price };
+    }
+    return { name: promo.name, byBarcode };
+  } catch { return { name: promo.name, byBarcode: {} }; }
+}
+
+/** Distinct grade × size present in the catalog — drives the promo price grid. */
+export async function productGradeSizes(): Promise<{ grades: string[]; sizes: string[] }> {
+  const ml = (s: string) => { const m = String(s || "").match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+  const GRADE_RANK: Record<string, number> = { "EDP": 0, "EDP+": 1, "EDT": 2, "LE PARFUM": 3, "PARFUM": 4 };
+  try {
+    const rows = await q<{ grade: string; size: string }>(
+      `select distinct coalesce(nullif(trim(grade),''),'-') grade, coalesce(nullif(trim(size),''),'-') size
+       from products where coalesce(nullif(trim(grade),''),'') <> '' and coalesce(nullif(trim(size),''),'') <> ''`);
+    const grades = [...new Set(rows.map((r) => r.grade))].sort((a, b) => (GRADE_RANK[a.toUpperCase()] ?? 8) - (GRADE_RANK[b.toUpperCase()] ?? 8) || a.localeCompare(b));
+    const sizes = [...new Set(rows.map((r) => r.size))].sort((a, b) => ml(b) - ml(a));   // 50 → 30 → 10 → 4
+    return { grades, sizes };
+  } catch { return { grades: [], sizes: [] }; }
+}
+
 export async function searchProductsForSale(term: string, branch: string | null): Promise<ProdRow[]> {
   const t = `${(term ?? "").trim()}%`;
   if (!branch || !isStockGated(branch)) {
