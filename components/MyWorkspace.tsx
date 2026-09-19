@@ -782,7 +782,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   // ของแถม (gift) → full discount → line is free (฿0).
   const dc = it.gift ? q * up : Math.min(q * up, Number(it.discount) || 0);
   const line = q * up - dc;
-  const fld = "w-full border border-line rounded-lg px-1.5 py-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
+  const fld = "w-full h-[44px] border border-line rounded-lg px-1.5 text-sm text-center tabular-nums focus:outline-none focus:border-brand";
   // numeric field: select-all on focus + strip leading zeros so a leading 0 disappears when typing
   const numAttrs = (k: "unit_price" | "discount") => ({
     value: it[k] as any,
