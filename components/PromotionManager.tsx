@@ -17,7 +17,7 @@ const toDraft = (p: Promotion): Draft => ({ id: p.id, name: p.name, start_date: 
 
 const inp = "border border-line rounded-lg px-2.5 py-2 text-sm bg-surface text-ink focus:outline-none focus:border-brand";
 
-export function PromotionManager({ promotions, grades, sizes }: { promotions: Promotion[]; grades: string[]; sizes: string[] }) {
+export function PromotionManager({ promotions, grades, sizes, normal = {} }: { promotions: Promotion[]; grades: string[]; sizes: string[]; normal?: Record<string, number> }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -72,16 +72,25 @@ export function PromotionManager({ promotions, grades, sizes }: { promotions: Pr
                   {grades.map((g) => (
                     <tr key={g} className="border-t border-line-soft">
                       <td className="px-3 py-2.5 font-semibold text-ink whitespace-nowrap text-[15px]">{g}</td>
-                      {sizes.map((s) => (
-                        <td key={s} className="px-1.5 py-1.5 text-center">
-                          <input inputMode="numeric" value={draft.prices[key(g, s)] ?? ""} onChange={(e) => setCell(g, s, e.target.value)}
-                            placeholder="—" className="w-28 h-12 text-center text-lg font-semibold tabular-nums border border-line rounded-xl bg-surface focus:outline-none focus:border-brand" />
-                        </td>
-                      ))}
+                      {sizes.map((s) => {
+                        const np = normal[key(g, s)];
+                        const promoVal = draft.prices[key(g, s)] ?? "";
+                        return (
+                          <td key={s} className="px-1.5 py-2 text-center align-top">
+                            {/* ราคาปกติ (อ้างอิง) — ขีดฆ่าเมื่อมีราคาโปร */}
+                            <div className={"text-xs mb-1 tabular-nums " + (promoVal ? "text-muted-soft line-through" : "text-muted")}>
+                              {np ? `฿${np.toLocaleString()}` : "—"}
+                            </div>
+                            <input inputMode="numeric" value={promoVal} onChange={(e) => setCell(g, s, e.target.value)}
+                              placeholder="ราคาโปร" className="w-28 h-12 text-center text-lg font-semibold tabular-nums text-brand-dark border border-line rounded-xl bg-surface focus:outline-none focus:border-brand placeholder:text-sm placeholder:font-normal placeholder:text-muted-soft" />
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p className="text-[11px] text-muted mt-2">เลขบนขีดฆ่า = ราคาปกติ (อ้างอิง) · ช่องล่าง = ราคาโปรที่จะใช้ · เว้นว่าง = ขายราคาปกติ</p>
             </div>
           )}
         </div>

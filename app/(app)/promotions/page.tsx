@@ -14,7 +14,7 @@ export default async function PromotionsPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Tag} title="โปรโมชัน"
         subtitle="ตั้งราคาพิเศษตามเกรด × ขนาด ในแต่ละช่วงเวลา — ระบบเติมราคาให้อัตโนมัติตอนขาย" />
-      <PromotionManager promotions={promotions} grades={dims.grades} sizes={dims.sizes} />
+      <PromotionManager promotions={promotions} grades={dims.grades} sizes={dims.sizes} normal={dims.normal} />
     </div>
   );
 }

@@ -743,18 +743,27 @@ export async function getActivePromotionForSale(date: string): Promise<{ name: s
 /** Grade × size for the promo price grid — perfume grades × bottle sizes only
  *  (10/30/50 ml). Excludes 4ml giveaways and non-perfume lines (bags, cloths,
  *  tumblers with sizes like "Size M" / "Dark Blue"). */
-export async function productGradeSizes(): Promise<{ grades: string[]; sizes: string[] }> {
+export async function productGradeSizes(): Promise<{ grades: string[]; sizes: string[]; normal: Record<string, number> }> {
   const ml = (s: string) => { const m = String(s || "").match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
   const GRADE_RANK: Record<string, number> = { "EDP": 0, "EDP+": 1, "EDT": 2, "LE PARFUM": 3, "PARFUM": 4 };
   try {
-    const rows = await q<{ grade: string; size: string }>(
-      `select distinct coalesce(nullif(trim(grade),''),'-') grade, coalesce(nullif(trim(size),''),'-') size
+    const rows = await q<{ grade: string; size: string; price: number }>(
+      `select coalesce(nullif(trim(grade),''),'-') grade, coalesce(nullif(trim(size),''),'-') size, coalesce(price,0)::float price
        from products where coalesce(nullif(trim(grade),''),'') <> '' and coalesce(nullif(trim(size),''),'') <> ''`);
     const perfume = rows.filter((r) => ml(r.size) >= 10 && /ml/i.test(r.size));   // 10/30/50 ml only (drops 4ml + non-ml)
     const grades = [...new Set(perfume.map((r) => r.grade))].sort((a, b) => (GRADE_RANK[a.toUpperCase()] ?? 8) - (GRADE_RANK[b.toUpperCase()] ?? 8) || a.localeCompare(b));
     const sizes = [...new Set(perfume.map((r) => r.size))].sort((a, b) => ml(b) - ml(a));   // 50 → 30 → 10
-    return { grades, sizes };
-  } catch { return { grades: [], sizes: [] }; }
+    // ราคาปกติต่อ (เกรด|ขนาด) — เลือกราคาที่พบบ่อยสุด (mode) กันกรณีมีราคาปนกันเล็กน้อย
+    const tally = new Map<string, Map<number, number>>();
+    for (const r of perfume) {
+      if (!(r.price > 0)) continue;
+      const k = `${r.grade}|${r.size}`;
+      const m = tally.get(k) ?? new Map<number, number>(); m.set(r.price, (m.get(r.price) ?? 0) + 1); tally.set(k, m);
+    }
+    const normal: Record<string, number> = {};
+    for (const [k, m] of tally) normal[k] = [...m.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
+    return { grades, sizes, normal };
+  } catch { return { grades: [], sizes: [], normal: {} }; }
 }
 
 export async function searchProductsForSale(term: string, branch: string | null): Promise<ProdRow[]> {
