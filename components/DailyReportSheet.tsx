@@ -89,10 +89,7 @@ export function DailyReportSheet({ date, source, data, rows, showDetail = true, 
             </div>
             <div>
               <SecTitle>สัญชาติลูกค้า</SecTitle>
-              <KV k={`คนไทย (${data!.thaiCount})`} v={`฿${nf(data!.thaiAmt)}`} />
-              <KV k={`จีน (${data!.chineseCount})`} v={`฿${nf(data!.chineseAmt)}`} />
-              <KV k={`ฝรั่ง (${data!.westernCount})`} v={`฿${nf(data!.westernAmt)}`} />
-              {data!.otherCount > 0 && <KV k={`อื่นๆ (${data!.otherCount})`} v={`฿${nf(data!.otherAmt)}`} />}
+              {data!.nations.map((n) => <KV key={n.value} k={`${n.label} (${n.count})`} v={`฿${nf(n.amt)}`} />)}
             </div>
           </div>
 

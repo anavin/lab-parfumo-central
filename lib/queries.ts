@@ -3,6 +3,7 @@ import { SPLIT2 } from "@/lib/payments";
 import { DEFAULT_BRANCH, normalizeBranch, BRANCHES, isStockGated } from "@/lib/branches";
 import { PRODUCT_SEARCH_ORDER } from "@/lib/product-order";
 import { ALLOC_STATUS } from "@/lib/stock-alloc";
+import { natLabel } from "@/lib/nation";
 
 // ---- filters --------------------------------------------------------------
 // months: subset of month labels ('Nov-25') to include, or null = all.
@@ -1235,8 +1236,16 @@ export async function dailyReport(date: string, source: string, userId: number |
   const foreignCount = chineseCount + westernCount + foreignLegacyCount;
   const foreignAmt = chineseAmt + westernAmt + foreignLegacyAmt;
 
+  // รายสัญชาติจริง (แยก "อื่นๆ" เป็นแต่ละสัญชาติ เช่น ญี่ปุ่น/เกาหลี/ต่างชาติ(เดิม)/ไม่ระบุ)
+  // เรียง ไทย → จีน → ฝรั่ง ก่อน แล้วที่เหลือมากไปน้อย · ไม่ระบุอยู่ท้ายสุด · โชว์เฉพาะที่มีบิล
+  const NAT_ORDER: Record<string, number> = { Thai: 0, Chinese: 1, Western: 2 };
+  const nations = [...nat.entries()]
+    .map(([k, e]) => ({ value: k, label: natLabel(k), count: e.bills.size, amt: e.amt }))
+    .filter((n) => n.count > 0)
+    .sort((a, b) => (NAT_ORDER[a.value] ?? (a.value === "ไม่ระบุ" ? 9 : 8)) - (NAT_ORDER[b.value] ?? (b.value === "ไม่ระบุ" ? 9 : 8)) || b.amt - a.amt);
+
   return {
-    orders, total, cash, nonCash, branchCash,
+    orders, total, cash, nonCash, branchCash, nations,
     thaiCount, thaiAmt, chineseCount, chineseAmt, westernCount, westernAmt,
     foreignCount, foreignAmt, otherCount, otherAmt,
   };

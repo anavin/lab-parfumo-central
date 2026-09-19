@@ -12,6 +12,8 @@ import { branchName } from "@/lib/branches";
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const nf = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 const ddmmyy = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y.slice(2)}`; };
+// ธงประจำสัญชาติ — ไทย/จีน/ฝรั่ง มีธง, สัญชาติอื่นๆ ที่พิมพ์เอง/ไม่ระบุ ใช้จุด
+const natFlag = (value: string) => value === "Thai" ? "🇹🇭" : value === "Chinese" ? "🇨🇳" : value === "Western" ? "🌍" : "•";
 
 export function DailyReport({ defaultSource = "CTW", revision, mine = false, date: dateProp, onDateChange, readOnly = false }: {
   defaultSource?: string; revision?: string | number; mine?: boolean;
@@ -103,10 +105,7 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
       ``,
       `รวมเป็นเงิน ${nf(data.total)} บาท`,
       ``,
-      `คนไทย ${data.thaiCount} ราย เป็นเงิน ${nf(data.thaiAmt)} บาท`,
-      `จีน ${data.chineseCount} ราย เป็นเงิน ${nf(data.chineseAmt)} บาท`,
-      `ฝรั่ง ${data.westernCount} ราย เป็นเงิน ${nf(data.westernAmt)} บาท`,
-      ...(data.otherCount > 0 ? [`อื่นๆ/ไม่ระบุ ${data.otherCount} ราย เป็นเงิน ${nf(data.otherAmt)} บาท`] : []),
+      ...data.nations.map((n) => `${n.label} ${n.count} ราย เป็นเงิน ${nf(n.amt)} บาท`),
       ``,
       `เงินสดยกมา ${nf(openingN)} บาท`,
       ...(seedN ? [`เงินสดที่เอาไปสาขา ${nf(seedN)} บาท`] : []),
@@ -240,10 +239,9 @@ export function DailyReport({ defaultSource = "CTW", revision, mine = false, dat
             <Line label="รวมเป็นเงิน" value={`${nf(data!.total)} บาท`} strong />
             <Rule />
             <div className="space-y-1.5">
-              <Line label={`🇹🇭 คนไทย · ${data!.thaiCount} ราย`} value={`${nf(data!.thaiAmt)} บาท`} />
-              <Line label={`🇨🇳 จีน · ${data!.chineseCount} ราย`} value={`${nf(data!.chineseAmt)} บาท`} />
-              <Line label={`🌍 ฝรั่ง · ${data!.westernCount} ราย`} value={`${nf(data!.westernAmt)} บาท`} />
-              {data!.otherCount > 0 && <Line label={`• อื่นๆ · ${data!.otherCount} ราย`} value={`${nf(data!.otherAmt)} บาท`} />}
+              {data!.nations.map((n) => (
+                <Line key={n.value} label={`${natFlag(n.value)} ${n.label} · ${n.count} ราย`} value={`${nf(n.amt)} บาท`} />
+              ))}
             </div>
             <Rule />
             <div className="space-y-1.5">
