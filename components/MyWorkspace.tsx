@@ -838,25 +838,6 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
           <span className={it.gift ? "font-semibold text-success" : "text-ink"}>🎁 ของแถม — ไม่คิดเงิน (ฟรี ฿0)</span>
         </label>
       )}
-      {/* quick per-item discount — the shop's standard amounts; tap to apply, tap
-          again to clear. Hidden for free / complimentary items (price 0) and gifts. */}
-      {up > 0 && !it.gift && (
-        <div className="mt-2 pl-7 flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-muted mr-0.5">ลดเร็ว</span>
-          {[200, 100, 50].map((v) => {
-            const active = Number(it.discount) === v;
-            return (
-              <button key={v} type="button" onClick={() => onChange({ discount: active ? 0 : v })}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border transition ${active ? "bg-brand text-white border-brand" : "border-line text-ink hover:bg-canvas"}`}>
-                −฿{v}
-              </button>
-            );
-          })}
-          {Number(it.discount) > 0 && (
-            <button type="button" onClick={() => onChange({ discount: 0 })} className="px-2 py-1 rounded-full text-xs text-muted hover:bg-canvas">ล้าง</button>
-          )}
-        </div>
-      )}
       {showPayment && (
         <div className="mt-2.5 pl-7">
           <span className="block text-[10px] text-muted mb-0.5">ช่องทางชำระชิ้นนี้</span>
@@ -1106,20 +1087,6 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         <Field label="ส่วนลด"><input {...numFld("discount")} className={`${inp} ${Number(state.discount) > 0 ? "!text-danger !border-danger/50 font-semibold" : ""}`} /></Field>
         <Field label="ขนาด"><input className={inp} value={state.size} onChange={(e) => s("size", e.target.value)} /></Field>
       </div>
-      {/* quick per-item discount — same as the add form */}
-      {Number(state.unit_price) > 0 && (
-        <div className="mb-3 flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-muted mr-0.5">ลดเร็ว</span>
-          {[200, 100, 50].map((v) => {
-            const active = Number(state.discount) === v;
-            return (
-              <button key={v} type="button" onClick={() => s("discount", active ? 0 : v)}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border transition ${active ? "bg-brand text-white border-brand" : "border-line text-ink hover:bg-canvas"}`}>−฿{v}</button>
-            );
-          })}
-          {Number(state.discount) > 0 && <button type="button" onClick={() => s("discount", 0)} className="px-2 py-1 rounded-full text-xs text-muted hover:bg-canvas">ล้าง</button>}
-        </div>
-      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <Field label="ช่องทางชำระ *">
           <Select value={state.payment_channel} onValueChange={paymentPick} onPick={bumpQr}
