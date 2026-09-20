@@ -546,8 +546,10 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       </div>
 
       {promo && (
-        <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-brand-soft border border-brand/30 px-3 py-1.5 text-xs text-brand-dark">
-          🏷️ กำลังใช้โปร: <b>{promo.name}</b> — ราคาพิเศษเติมให้อัตโนมัติเมื่อเลือกสินค้า
+        <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-brand-soft border border-brand/30 px-3 py-1.5 text-xs text-brand-dark whitespace-nowrap overflow-hidden">
+          <span className="shrink-0">🏷️ โปร:</span>
+          <b className="truncate">{promo.name}</b>
+          <span className="shrink-0 text-brand-dark/70">· ราคาพิเศษอัตโนมัติ</span>
         </div>
       )}
 
