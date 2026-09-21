@@ -58,7 +58,7 @@ const payLabel = (v: string | null | undefined, lang: ReceiptLang) => {
   return !v ? "เงินสด" : v === SPLIT2 ? "จ่าย 2 ช่องทาง" : (PAYMENTS.find((p) => p.v === v)?.label.replace(/\s*\(.*\)$/, "") || v);
 };
 
-export type ReceiptItem = { name: string; size: string; qty: number; unitPrice: number; discount: number; total: number };
+export type ReceiptItem = { name: string; size: string; qty: number; unitPrice: number; discount: number; total: number; promo?: boolean };
 export type ReceiptTender = { channel: string; amount: number };
 
 export function Receipt({ receiptNo, date, time, salesperson, items, paymentChannel, tenders, lang = "th" }: {
@@ -117,13 +117,13 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
           <div key={i} className="text-[16px]">
             <div className="flex gap-2 font-bold">
               <span className="w-7 shrink-0 tabular-nums">{Math.round(it.qty)}</span>
-              <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}</span>
+              <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}{it.promo ? <span className="ml-1 text-[12px] font-semibold align-middle">🏷️{lang === "th" ? "โปร" : "PROMO"}</span> : null}</span>
               <span className="tabular-nums text-right">{nf(lineFull(it))}</span>
             </div>
             {it.discount > 0 && (
               <div className="flex gap-2 text-[14px] font-medium text-neutral-700">
                 <span className="w-7 shrink-0" />
-                <span className="flex-1 min-w-0 pl-2">{t.lineDiscount}</span>
+                <span className="flex-1 min-w-0 pl-2">{it.promo ? (lang === "th" ? "ส่วนลดโปรโมชัน" : "Promotion") : t.lineDiscount}</span>
                 <span className="tabular-nums text-right">-{nf(it.discount)}</span>
               </div>
             )}

@@ -24,7 +24,7 @@ function registerFontOnce() {
 }
 
 export type ReceiptLang = "th" | "en";
-export type PdfReceiptItem = { name: string; size: string; qty: number; discount: number; total: number };
+export type PdfReceiptItem = { name: string; size: string; qty: number; discount: number; total: number; promo?: boolean };
 export type PdfReceiptTender = { channel: string; amount: number };
 
 const SHOP = {
@@ -175,13 +175,13 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
             <View key={i}>
               <View style={sty.itemRow}>
                 <Text style={sty.qty}>{Math.round(it.qty)}</Text>
-                <Text style={sty.name}>{it.name}{it.size ? ` ${it.size}` : ""}</Text>
+                <Text style={sty.name}>{it.name}{it.size ? ` ${it.size}` : ""}{it.promo ? (lang === "th" ? "  (โปร)" : "  (PROMO)") : ""}</Text>
                 <Text style={[sty.amt, { width: amtW }]}>{nf(lineFull(it))}</Text>
               </View>
               {it.discount > 0 && (
                 <View style={sty.itemRow}>
                   <Text style={sty.qty}> </Text>
-                  <Text style={[sty.name, { color: C.faint }]}>{t.lineDiscount}</Text>
+                  <Text style={[sty.name, { color: C.faint }]}>{it.promo ? (lang === "th" ? "ส่วนลดโปรโมชัน" : "Promotion") : t.lineDiscount}</Text>
                   <Text style={[sty.amt, { width: amtW, color: C.faint }]}>-{nf(it.discount)}</Text>
                 </View>
               )}

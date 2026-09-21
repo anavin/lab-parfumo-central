@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/require-user";
-import { billByReceipt, paymentsForRefs } from "@/lib/queries";
+import { billByReceipt, paymentsForRefs, promoLineInfo } from "@/lib/queries";
 import { type ReceiptItem } from "@/components/Receipt";
 import { ReceiptView } from "@/components/ReceiptView";
 
@@ -20,9 +20,17 @@ export default async function ReceiptPage({ params }: { params: Promise<{ ref: s
   }
 
   const first = rows[0];
-  const items: ReceiptItem[] = rows.map((r) => ({
-    name: r.item || "-", size: r.size || "", qty: r.qty || 0, unitPrice: r.unit_price || 0, discount: r.discount || 0, total: r.total || 0,
-  }));
+  // lines sold at a promo price → show normal price + the saving as a promotion discount
+  const promoInfo = await promoLineInfo(first.entry_date, rows.map((r) => r.barcode));
+  const items: ReceiptItem[] = rows.map((r) => {
+    const pi = r.barcode ? promoInfo[r.barcode] : undefined;
+    const isPromo = !!pi && Math.round(r.unit_price || 0) === Math.round(pi.special);
+    if (isPromo) {
+      const saving = (pi!.normal - (r.unit_price || 0)) * (r.qty || 0);   // fold into the receipt discount so gross = normal price
+      return { name: r.item || "-", size: r.size || "", qty: r.qty || 0, unitPrice: pi!.normal, discount: (r.discount || 0) + saving, total: r.total || 0, promo: true };
+    }
+    return { name: r.item || "-", size: r.size || "", qty: r.qty || 0, unitPrice: r.unit_price || 0, discount: r.discount || 0, total: r.total || 0 };
+  });
   const tenders = (await paymentsForRefs([decoded]))[decoded] || [];   // per-channel split amounts (if any)
 
   return (

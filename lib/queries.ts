@@ -722,6 +722,27 @@ export async function getActivePromotion(date: string): Promise<{ id: number; na
   } catch (e: any) { if (e?.code === "42P01") return null; throw e; }
 }
 
+/** For a receipt: which lines were sold at a promo price, and the normal price to show.
+ *  Derived from the promo active on the sale date (read-only; no promo data stored on the
+ *  sale). Returns barcode → { normal, special } only where a promo special < normal exists. */
+export async function promoLineInfo(date: string, barcodes: (string | null)[]): Promise<Record<string, { normal: number; special: number }>> {
+  const codes = [...new Set((barcodes || []).filter(Boolean) as string[])];
+  if (!codes.length) return {};
+  const promo = await getActivePromotion(date);
+  if (!promo || !promo.prices) return {};
+  try {
+    const rows = await q<{ barcode: string; grade: string; size: string; price: number }>(
+      `select barcode, coalesce(grade,'') grade, coalesce(size,'') size, coalesce(price,0)::float price
+       from products where barcode = any($1::text[])`, [codes]);
+    const out: Record<string, { normal: number; special: number }> = {};
+    for (const r of rows) {
+      const sp = promo.prices[`${r.grade}|${r.size}`];
+      if (sp && sp > 0 && sp < r.price) out[r.barcode] = { normal: r.price, special: sp };
+    }
+    return out;
+  } catch { return {}; }
+}
+
 /** Active promo resolved to a barcode → special-price map for the sale form (client just
  *  looks up by barcode; no grade needed there). Only barcodes whose special ≠ normal. */
 export async function getActivePromotionForSale(date: string): Promise<{ name: string; byBarcode: Record<string, { price: number; normal: number }> } | null> {
@@ -1214,14 +1235,14 @@ export async function dailySaleRows(date: string, source: string, userId: number
  *  for the printable tax receipt. Salesperson uses the current name. */
 export async function billByReceipt(ref: string) {
   const alive = await aliveAnd("s");
-  return q<{ id: number; receipt_no: string; item: string; size: string; qty: number; unit_price: number; discount: number; total: number; sale_time: string; author: string; entry_date: string; source: string; payment_channel: string }>(`
-    select s.id, s.receipt_no, s.item, s.size, s.qty::float qty, s.unit_price::float unit_price,
+  return q<{ id: number; receipt_no: string; item: string; barcode: string | null; size: string; qty: number; unit_price: number; discount: number; total: number; sale_time: string; author: string; entry_date: string; source: string; payment_channel: string }>(`
+    select s.id, s.receipt_no, s.item, s.barcode, s.size, s.qty::float qty, s.unit_price::float unit_price,
            coalesce(s.discount,0)::float discount, s.total::float total, s.sale_time::text sale_time,
            coalesce(u.full_name, nullif(s.ba,''), '') author, s.sale_date::text entry_date, s.source, s.payment_channel
     from sales s left join users u on u.id = s.created_by
     where s.receipt_no = $1
     union all
-    select s.id, s.receipt_no, s.item, s.size, s.qty::float, s.unit_price::float,
+    select s.id, s.receipt_no, s.item, s.barcode, s.size, s.qty::float, s.unit_price::float,
            coalesce(s.discount,0)::float, s.total::float, s.sale_time::text,
            coalesce(u.full_name, '') author, s.entry_date::text, s.source, s.payment_channel
     from submissions s join users u on u.id = s.created_by
