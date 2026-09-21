@@ -117,7 +117,7 @@ export function Receipt({ receiptNo, date, time, salesperson, items, paymentChan
           <div key={i} className="text-[16px]">
             <div className="flex gap-2 font-bold">
               <span className="w-7 shrink-0 tabular-nums">{Math.round(it.qty)}</span>
-              <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}{it.promo ? <span className="ml-1 text-[12px] font-semibold align-middle">🏷️{lang === "th" ? "โปร" : "PROMO"}</span> : null}</span>
+              <span className="flex-1 min-w-0">{it.name}{it.size ? ` ${it.size}` : ""}</span>
               <span className="tabular-nums text-right">{nf(lineFull(it))}</span>
             </div>
             {it.discount > 0 && (

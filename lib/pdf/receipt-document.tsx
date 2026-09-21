@@ -175,7 +175,7 @@ export function ReceiptDocument({ receiptNo, date, time, salesperson, items, pay
             <View key={i}>
               <View style={sty.itemRow}>
                 <Text style={sty.qty}>{Math.round(it.qty)}</Text>
-                <Text style={sty.name}>{it.name}{it.size ? ` ${it.size}` : ""}{it.promo ? (lang === "th" ? "  (โปร)" : "  (PROMO)") : ""}</Text>
+                <Text style={sty.name}>{it.name}{it.size ? ` ${it.size}` : ""}</Text>
                 <Text style={[sty.amt, { width: amtW }]}>{nf(lineFull(it))}</Text>
               </View>
               {it.discount > 0 && (
