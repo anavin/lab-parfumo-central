@@ -58,8 +58,17 @@ export async function reopenDrawer(date: string, branch: string): Promise<{ ok: 
   const me = await requirePermission("cash");
   const br = normalizeBranch(branch);
   try {
-    await q(`update daily_cash set confirmed=false, updated_by=$3, updated_at=now()
-             where entry_date=$1 and branch=$2 and confirmed=true`, [date, br, me.id]);
+    // Un-post the bank deposit too, so re-confirming with a CHANGED deposit posts the new
+    // amount instead of being skipped by the posted_cash_id guard (which would keep the old
+    // ledger entry). Atomic + FOR UPDATE to serialize against a concurrent confirm.
+    await tx(async (run) => {
+      const [row] = await run<{ posted: number | null }>(
+        `select posted_cash_id posted from daily_cash where entry_date=$1 and branch=$2 and confirmed=true for update`, [date, br]);
+      if (!row) return;   // not a confirmed row → nothing to reopen
+      if (row.posted) { await run(`delete from cash_entries where id=$1`, [row.posted]); }
+      await run(`update daily_cash set confirmed=false, posted_cash_id=null, updated_by=$3, updated_at=now()
+                 where entry_date=$1 and branch=$2`, [date, br, me.id]);
+    });
     await logAudit("update", "cash", date, `เปิดยอดเงินสดใหม่เพื่อแก้ไข ${branchName(br)} ${date}`);
     revalidatePath("/cash"); revalidatePath("/my"); revalidatePath("/");
     return { ok: true };
