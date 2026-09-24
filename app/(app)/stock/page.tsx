@@ -157,7 +157,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         <StockTabs
           lossAlert={lossAlert}
           matrix={<StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
-          movement={<><StockTrend data={trend} /><StockMovement dates={moveDates} rows={movRows} /></>}
+          movement={<><StockTrend data={trend} canManage={canRequisition} /><StockMovement dates={moveDates} rows={movRows} /></>}
           /* ป้องกันของหายมีข้อมูลอ่อนไหว → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (สิทธิ์ requisitions) */
           loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} signals={signals} coverage={coverage} /> : null}
         />

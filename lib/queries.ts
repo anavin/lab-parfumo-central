@@ -739,7 +739,16 @@ export async function confirmedCashDays(): Promise<string[]> {
 export async function promoLineInfo(date: string, barcodes: (string | null)[]): Promise<Record<string, { normal: number; special: number }>> {
   const codes = [...new Set((barcodes || []).filter(Boolean) as string[])];
   if (!codes.length) return {};
-  const promo = await getActivePromotion(date);
+  // find the promo whose window covered the SALE date — ignore the current `active` flag so a
+  // receipt still shows the promotion even if the promo was later turned off. Correctness is
+  // guaranteed downstream: a line is flagged only when its stored unit price == the special.
+  let promo: { prices: Record<string, number> } | null = null;
+  try {
+    const [p] = await q<{ prices: Record<string, number> }>(
+      `select prices from promotions where start_date <= $1::date and end_date >= $1::date
+       order by start_date desc, id desc limit 1`, [date]);
+    promo = p ?? null;
+  } catch (e: any) { if (e?.code === "42P01") return {}; throw e; }
   if (!promo || !promo.prices) return {};
   try {
     const rows = await q<{ barcode: string; grade: string; size: string; price: number }>(

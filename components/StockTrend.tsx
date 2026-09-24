@@ -1,15 +1,36 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, Camera } from "lucide-react";
 import { num } from "@/lib/format";
+import { runStockSnapshot } from "@/lib/actions/stock";
+
+const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
 // แนวโน้มสต๊อกรวมคงเหลือรายวัน (จาก snapshot รายวัน) — เห็นสต๊อกไหลลง/ขึ้นข้ามวัน
-export function StockTrend({ data }: { data: { d: string; remaining: number }[] }) {
+export function StockTrend({ data, canManage = false }: { data: { d: string; remaining: number }[]; canManage?: boolean }) {
+  const router = useRouter();
+  const [saving, start] = useTransition();
+  const lastDate = data.length ? data[data.length - 1].d : null;
+  const today = bkkToday();
+  // cron ควรเก็บทุกคืน — ถ้า snapshot ล่าสุดไม่ใช่วันนี้/เมื่อวาน แปลว่า cron อาจไม่ทำงาน
+  const stale = !!lastDate && lastDate < new Date(Date.parse(today) - 86400000).toISOString().slice(0, 10);
+  const snap = () => start(async () => { const r = await runStockSnapshot(); if (r.ok) router.refresh(); else alert(r.error ?? "เก็บ snapshot ไม่สำเร็จ"); });
+  const SnapBtn = canManage ? (
+    <button onClick={snap} disabled={saving} className="inline-flex items-center gap-1 text-xs text-brand-dark border border-line rounded-lg px-2 py-1 hover:bg-canvas">
+      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />} เก็บตอนนี้
+    </button>
+  ) : null;
+
   const pts = useMemo(() => data.map((r) => ({ d: r.d, v: Number(r.remaining) || 0 })), [data]);
 
   if (pts.length < 2) {
     return (
       <div className="rounded-xl border border-line bg-surface p-3 mb-3">
-        <div className="text-sm font-medium text-ink mb-1">แนวโน้มสต๊อกรวม</div>
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-sm font-medium text-ink">แนวโน้มสต๊อกรวม</div>
+          {SnapBtn}
+        </div>
         <p className="text-xs text-muted">
           {pts.length === 0 ? "ยังไม่มีข้อมูลย้อนหลัง" : `เก็บวันแรกแล้ว (คงเหลือ ${num(pts[0].v)})`} — ระบบเก็บ snapshot ทุกคืน กราฟจะขึ้นเมื่อมีข้อมูลตั้งแต่ 2 วัน
         </p>
@@ -31,7 +52,11 @@ export function StockTrend({ data }: { data: { d: string; remaining: number }[] 
   return (
     <div className="rounded-xl border border-line bg-surface p-3 mb-3">
       <div className="flex items-baseline justify-between mb-2">
-        <div className="text-sm font-medium text-ink">แนวโน้มสต๊อกรวม · {pts.length} วัน</div>
+        <div className="text-sm font-medium text-ink flex items-center gap-2">
+          แนวโน้มสต๊อกรวม · {pts.length} วัน
+          {stale && <span className="text-[11px] text-warn font-normal" title={`snapshot ล่าสุด ${lastDate} — cron อาจไม่ทำงาน`}>⚠ snapshot ค้าง</span>}
+          {SnapBtn}
+        </div>
         <div className="text-xs">
           <span className="tabular-nums font-semibold text-ink">{num(last)}</span>
           <span className={"ml-1.5 tabular-nums " + (delta < 0 ? "text-danger" : delta > 0 ? "text-success" : "text-muted")}>

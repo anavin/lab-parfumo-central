@@ -34,8 +34,12 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
     if (res?.ok) router.refresh(); else alert(res?.error ?? "บันทึกไม่สำเร็จ");
   });
   const reopen = () => {
-    if (!confirm(`เปิดยอดวัน ${fmtDay(r.entry_date)} ใหม่เพื่อแก้ไข?\nยอดยกมา/คงเหลือจะคำนวณใหม่จากยอดขายจริง (เช่น หลังแก้บิลย้อนหลัง) — แล้วกดยืนยันอีกครั้ง`)) return;
-    start(async () => { const res = await reopenDrawer(r.entry_date, branch); if (res?.ok) router.refresh(); else alert(res?.error ?? "เปิดยอดใหม่ไม่สำเร็จ"); });
+    if (!confirm(`เปิดยอดวัน ${fmtDay(r.entry_date)} ใหม่เพื่อแก้ไข?\n\nจะเปิดวันนี้และวันที่ปิดยอด "หลังจากนี้" ทั้งหมดด้วย เพื่อให้ยอดยกมาไหลต่อเนื่อง (ยอดยกมา/คงเหลือคำนวณใหม่จากยอดขายจริง)\nจากนั้นกด “ยืนยัน & บันทึกเข้าระบบ” ใหม่ทีละวัน จากวันเก่าสุดก่อน`)) return;
+    start(async () => {
+      const res = await reopenDrawer(r.entry_date, branch);
+      if (res?.ok) { router.refresh(); if ((res.count ?? 0) > 1) setTimeout(() => alert(`เปิดยอดใหม่ ${res.count} วันแล้ว — กรุณายืนยันใหม่ทีละวันจากวันเก่าสุด`), 100); }
+      else alert(res?.error ?? "เปิดยอดใหม่ไม่สำเร็จ");
+    });
   };
 
   return (

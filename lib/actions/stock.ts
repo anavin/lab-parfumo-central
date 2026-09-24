@@ -254,3 +254,17 @@ export async function lossDrilldown(branchInput: string | null, scent: string, s
     return { ok: false, error: "ดึงข้อมูลไม่สำเร็จ" };
   }
 }
+
+/** Manually capture today's stock snapshot (self-heal when the nightly cron missed a day).
+ *  Same write as /api/cron/snapshot; gated so only admin/manager triggers it. */
+export async function runStockSnapshot(): Promise<{ ok: boolean; error?: string; rows?: number }> {
+  await requirePermission("requisitions");
+  try {
+    const { snapshotStockNow } = await import("@/lib/queries");
+    const r = await snapshotStockNow();
+    if (!r.ok) return { ok: false, error: r.error };
+    await logAudit("update", "stock", null, `เก็บ snapshot สต๊อกด้วยมือ (${r.rows} รายการ)`);
+    revalidatePath("/stock");
+    return { ok: true, rows: r.rows };
+  } catch (e: any) { console.error("[runStockSnapshot]", e); return { ok: false, error: "เก็บ snapshot ไม่สำเร็จ" }; }
+}

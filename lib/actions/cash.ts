@@ -54,24 +54,28 @@ export async function confirmDrawer(date: string, branch: string, opening: numbe
  *  Just clears `confirmed` so the day's opening/closing recompute LIVE from the chain again;
  *  the posted bank deposit is left as-is (posted_cash_id still guards against a double-post
  *  on re-confirm). Admin then reviews and re-confirms. */
-export async function reopenDrawer(date: string, branch: string): Promise<{ ok: boolean; error?: string }> {
+export async function reopenDrawer(date: string, branch: string): Promise<{ ok: boolean; error?: string; count?: number }> {
   const me = await requirePermission("cash");
   const br = normalizeBranch(branch);
   try {
-    // Un-post the bank deposit too, so re-confirming with a CHANGED deposit posts the new
-    // amount instead of being skipped by the posted_cash_id guard (which would keep the old
-    // ledger entry). Atomic + FOR UPDATE to serialize against a concurrent confirm.
-    await tx(async (run) => {
-      const [row] = await run<{ posted: number | null }>(
-        `select posted_cash_id posted from daily_cash where entry_date=$1 and branch=$2 and confirmed=true for update`, [date, br]);
-      if (!row) return;   // not a confirmed row → nothing to reopen
-      if (row.posted) { await run(`delete from cash_entries where id=$1`, [row.posted]); }
+    // Reopen this day AND every confirmed day AFTER it: a later confirmed day anchors its
+    // stored opening, so it wouldn't pick up this day's change otherwise. Reopening the whole
+    // downstream chain lets every day's opening recompute live (then re-confirm oldest→newest).
+    // Un-post each day's bank deposit too so a changed deposit re-posts on confirm (posted_cash_id
+    // guard would otherwise keep the old ledger entry). Atomic + FOR UPDATE.
+    const affected = await tx<string[]>(async (run) => {
+      const rows = await run<{ entry_date: string; posted: number | null }>(
+        `select entry_date::text entry_date, posted_cash_id posted from daily_cash
+         where branch=$2 and entry_date >= $1 and confirmed=true order by entry_date for update`, [date, br]);
+      for (const r of rows) if (r.posted) await run(`delete from cash_entries where id=$1`, [r.posted]);
       await run(`update daily_cash set confirmed=false, posted_cash_id=null, updated_by=$3, updated_at=now()
-                 where entry_date=$1 and branch=$2`, [date, br, me.id]);
+                 where branch=$2 and entry_date >= $1 and confirmed=true`, [date, br, me.id]);
+      return rows.map((r) => r.entry_date);
     });
-    await logAudit("update", "cash", date, `เปิดยอดเงินสดใหม่เพื่อแก้ไข ${branchName(br)} ${date}`);
+    if (!affected.length) return { ok: true, count: 0 };
+    await logAudit("update", "cash", date, `เปิดยอดเงินสดใหม่ ${branchName(br)} · ${affected.length} วัน (ตั้งแต่ ${date})`);
     revalidatePath("/cash"); revalidatePath("/my"); revalidatePath("/");
-    return { ok: true };
+    return { ok: true, count: affected.length };
   } catch (e: any) {
     if (e?.code === "42703" || e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง/คอลัมน์เงินสด" };
     console.error("[reopenDrawer] failed", e);

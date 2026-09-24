@@ -25,6 +25,11 @@ export function PromotionManager({ promotions, grades, sizes, normal = {} }: { p
 
   const save = () => start(async () => {
     if (!draft) return;
+    // warn if this promo's dates overlap another ACTIVE promo (only the latest-starting one wins per day)
+    if (draft.active) {
+      const clash = promotions.find((p) => p.id !== draft.id && p.active && p.start_date <= draft.end_date && p.end_date >= draft.start_date);
+      if (clash && !confirm(`ช่วงวันที่ทับกับโปร "${clash.name}" (${thDate(clash.start_date)}–${thDate(clash.end_date)}) ที่เปิดอยู่\nวันที่ทับกัน ระบบจะใช้โปรที่ "เริ่มล่าสุด" — ยืนยันบันทึก?`)) return;
+    }
     setErr(null);
     const prices: Record<string, number> = {};
     for (const [k, v] of Object.entries(draft.prices)) { const n = Math.round(Number(v) || 0); if (n > 0) prices[k] = n; }
