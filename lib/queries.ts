@@ -722,6 +722,17 @@ export async function getActivePromotion(date: string): Promise<{ id: number; na
   } catch (e: any) { if (e?.code === "42P01") return null; throw e; }
 }
 
+/** (day|branch) keys whose cash drawer is already confirmed/closed — so the review UI can
+ *  warn before unapproving/editing a bill on a closed day (which won't propagate to the
+ *  cash balance until that day is reopened). */
+export async function confirmedCashDays(): Promise<string[]> {
+  try {
+    const rows = await q<{ d: string; branch: string }>(
+      `select entry_date::text d, branch from daily_cash where confirmed = true`);
+    return rows.map((r) => `${r.d}|${r.branch}`);
+  } catch { return []; }
+}
+
 /** For a receipt: which lines were sold at a promo price, and the normal price to show.
  *  Derived from the promo active on the sale date (read-only; no promo data stored on the
  *  sale). Returns barcode → { normal, special } only where a promo special < normal exists. */

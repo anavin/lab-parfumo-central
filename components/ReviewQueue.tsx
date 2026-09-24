@@ -113,9 +113,13 @@ function BillTime({ bill, onSaved }: { bill: Bill; onSaved: () => void }) {
   );
 }
 
-export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {} }:
-  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]> }) {
+export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {}, closedDays = [] }:
+  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; closedDays?: string[] }) {
   const router = useRouter();
+  const closedSet = useMemo(() => new Set(closedDays), [closedDays]);
+  // this bill sits on a cash day the admin already closed → editing/unapproving it won't
+  // move the cash balance until that day is reopened on /cash
+  const billOnClosedDay = (bill: Bill) => { const r = bill.rows[0]; return !!r && closedSet.has(`${r.entry_date}|${r.source ?? ""}`); };
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);      // bill key being processed
   const [editId, setEditId] = useState<number | null>(null);
@@ -218,7 +222,10 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
     start(async () => { try { await approveMany(ids); refresh(); } catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } });
   };
   const unapproveBill = (bill: Bill) => {
-    if (!confirm("ยกเลิกการอนุมัติบิลนี้?\nยอดจะถูกดึงออกจากระบบการขาย และบิลจะกลับไปสถานะ ‘รอตรวจ’")) return;
+    const closedWarn = billOnClosedDay(bill)
+      ? "\n\n⚠️ วันนี้ปิดยอดเงินสดแล้ว — การแก้บิลจะยังไม่กระทบยอดเงินสดหน้าร้าน จนกว่าจะ ‘เปิดยอดใหม่’ ของวันนั้นที่หน้าเงินสด"
+      : "";
+    if (!confirm("ยกเลิกการอนุมัติบิลนี้?\nยอดจะถูกดึงออกจากระบบการขาย และบิลจะกลับไปสถานะ ‘รอตรวจ’" + closedWarn)) return;
     start(async () => {
       setBusy(bill.key);
       try { await unapproveMany(bill.rows.map((r) => r.id)); refresh(); }
@@ -472,6 +479,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                   className="mr-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-muted text-sm font-medium hover:bg-canvas hover:text-ink disabled:opacity-50">
                                   {busy === bill.key ? <Clock className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />} ยกเลิกการอนุมัติ
                                 </button>
+                                {billOnClosedDay(bill) && <span className="mr-2 text-[11px] text-warn font-medium inline-flex items-center gap-1" title="วันนี้ปิดยอดเงินสดแล้ว — แก้บิลต้องเปิดยอดใหม่ที่หน้าเงินสด">🔒 ปิดยอดแล้ว</span>}
                                 {bill.ref && (
                                   <a href={`/receipt/${encodeURIComponent(bill.ref)}`} target="_blank" rel="noopener"
                                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-line text-muted text-sm font-medium hover:bg-canvas hover:text-ink">

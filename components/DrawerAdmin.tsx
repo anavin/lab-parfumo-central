@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Lock, FileText } from "lucide-react";
-import { confirmDrawer } from "@/lib/actions/cash";
+import { Check, Lock, FileText, RotateCcw } from "lucide-react";
+import { confirmDrawer, reopenDrawer } from "@/lib/actions/cash";
 import { DailyReport } from "@/components/DailyReport";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { baht } from "@/lib/format";
@@ -33,6 +33,10 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
     const res = await confirmDrawer(r.entry_date, branch, Number(opening) || 0, Number(seed) || 0, Number(deposit) || 0, c);
     if (res?.ok) router.refresh(); else alert(res?.error ?? "บันทึกไม่สำเร็จ");
   });
+  const reopen = () => {
+    if (!confirm(`เปิดยอดวัน ${fmtDay(r.entry_date)} ใหม่เพื่อแก้ไข?\nยอดยกมา/คงเหลือจะคำนวณใหม่จากยอดขายจริง (เช่น หลังแก้บิลย้อนหลัง) — แล้วกดยืนยันอีกครั้ง`)) return;
+    start(async () => { const res = await reopenDrawer(r.entry_date, branch); if (res?.ok) router.refresh(); else alert(res?.error ?? "เปิดยอดใหม่ไม่สำเร็จ"); });
+  };
 
   return (
     <>
@@ -66,7 +70,13 @@ function DrawerRow({ r, slips, branch }: { r: Row; slips: CashAttachment[]; bran
             <FileText className="w-3.5 h-3.5" /> ดูรายงาน
           </button>
           {r.confirmed ? (
-            <span className="inline-flex items-center gap-1 text-xs text-success font-medium"><Lock className="w-3.5 h-3.5" /> เข้าระบบแล้ว</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 text-xs text-success font-medium"><Lock className="w-3.5 h-3.5" /> เข้าระบบแล้ว</span>
+              <button onClick={reopen} disabled={pending} title="เปิดยอดวันนี้ใหม่เพื่อแก้ไข (คำนวณยอดใหม่)"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-brand-dark hover:bg-canvas border border-line">
+                <RotateCcw className="w-3.5 h-3.5" /> เปิดยอดใหม่
+              </button>
+            </span>
           ) : (
             <button onClick={save} disabled={pending}
               className="btn btn-brand text-xs">

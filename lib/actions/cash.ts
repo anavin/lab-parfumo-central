@@ -50,6 +50,26 @@ export async function confirmDrawer(date: string, branch: string, opening: numbe
   }
 }
 
+/** Admin: reopen a confirmed day for correction (e.g. after editing a bill on that day).
+ *  Just clears `confirmed` so the day's opening/closing recompute LIVE from the chain again;
+ *  the posted bank deposit is left as-is (posted_cash_id still guards against a double-post
+ *  on re-confirm). Admin then reviews and re-confirms. */
+export async function reopenDrawer(date: string, branch: string): Promise<{ ok: boolean; error?: string }> {
+  const me = await requirePermission("cash");
+  const br = normalizeBranch(branch);
+  try {
+    await q(`update daily_cash set confirmed=false, updated_by=$3, updated_at=now()
+             where entry_date=$1 and branch=$2 and confirmed=true`, [date, br, me.id]);
+    await logAudit("update", "cash", date, `เปิดยอดเงินสดใหม่เพื่อแก้ไข ${branchName(br)} ${date}`);
+    revalidatePath("/cash"); revalidatePath("/my"); revalidatePath("/");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42703" || e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง/คอลัมน์เงินสด" };
+    console.error("[reopenDrawer] failed", e);
+    return { ok: false, error: "เปิดยอดใหม่ไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+}
+
 /** Slips attached for a (day, branch). A salesperson sees ONLY their own; an admin
  *  (who reviews on /cash) sees everyone's. */
 export async function getCashSlips(date: string, branch: string = DEFAULT_BRANCH): Promise<CashAttachment[]> {
