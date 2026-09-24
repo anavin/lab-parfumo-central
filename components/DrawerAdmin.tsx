@@ -112,9 +112,11 @@ export function DrawerAdmin({ rows, attachments = {}, branch = "CTW" }: { rows: 
           <th className="px-3 py-2.5 text-right">นับจริง / ผลต่าง</th>
           <th className="px-5 py-2.5 text-right">จัดการ</th>
         </tr></thead>
-        {/* key includes branch (+ its figures) so switching สาขา remounts each row and its
-            input state resets to the new branch — otherwise old numbers linger until refresh */}
-        <tbody>{rows.map((r) => <DrawerRow key={`${branch}-${r.entry_date}`} r={r} slips={attachments[r.entry_date] ?? []} branch={branch} />)}</tbody>
+        {/* key includes branch AND the confirmed/opening/seed/deposit figures so the row REMOUNTS
+            (re-seeding its input state) whenever they change — e.g. after "เปิดยอดใหม่" recomputes
+            the carried-in opening, or a bill edit shifts it. Without this the inputs keep the stale
+            value and re-confirming would save the wrong opening. */}
+        <tbody>{rows.map((r) => <DrawerRow key={`${branch}-${r.entry_date}-${r.confirmed ? 1 : 0}-${Math.round(r.opening)}-${Math.round(r.seed)}-${Math.round(r.deposit)}`} r={r} slips={attachments[r.entry_date] ?? []} branch={branch} />)}</tbody>
       </table>
       <p className="text-[11px] text-muted px-5 py-2">
         กด “ดูรายงาน” เพื่อตรวจยอดขายของวันนั้น · ตรวจ/แก้ ยกมา–เอาไปสาขา–เข้าธนาคาร แล้ว “ยืนยัน & บันทึกเข้าระบบ” → ยอดเข้าธนาคารลงบัญชีเงินสด (โพสต์ครั้งเดียว แล้วล็อกแถว) · คงเหลือ = ยกมา + เอาไปสาขา + เงินสดขาย − เข้าธนาคาร · สาขาใหม่ ยกมา = 0 · “นับจริง” = เงินสดที่นับได้จริงในลิ้นชัก → ผลต่าง เกิน/ขาด เทียบกับคงเหลือ
