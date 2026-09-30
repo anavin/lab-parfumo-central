@@ -278,10 +278,16 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
         // cap received at the ordered qty so a fat-finger can't inflate branch stock.
         // Backfill a missing barcode from the linked product (by product_id, else scent+size) —
         // stock is keyed by barcode, so a blank-barcode line would be received but never counted.
+        // normalize scent/size so "30 ml" matches the product's "30 ml." (and casing/spacing).
+        // NB: a " TRY ME!" suffix stays in the normalized key, so testers never map onto a
+        // sellable product's barcode by accident.
         await run(`update po_items set received_qty = least($2, qty), line_remark=$3,
                  barcode = case when coalesce(barcode,'') = '' then coalesce(
                      (select p.barcode from products p where p.id = po_items.product_id and coalesce(p.barcode,'') <> ''),
-                     (select p.barcode from products p where p.scent = po_items.scent and p.size = po_items.size and coalesce(p.barcode,'') <> '' limit 1)
+                     (select p.barcode from products p
+                        where regexp_replace(lower(coalesce(p.scent,'')), '[^a-z0-9]', '', 'g') = regexp_replace(lower(coalesce(po_items.scent,'')), '[^a-z0-9]', '', 'g')
+                          and regexp_replace(lower(coalesce(p.size,'')),  '[^a-z0-9]', '', 'g') = regexp_replace(lower(coalesce(po_items.size,'')),  '[^a-z0-9]', '', 'g')
+                          and coalesce(p.barcode,'') <> '' limit 1)
                    ) else barcode end
                where id=$1 and po_id=$4`,
           [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
