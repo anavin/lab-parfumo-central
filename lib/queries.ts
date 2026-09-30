@@ -371,6 +371,29 @@ export async function stockMovement(branch: string | null, cutoff: string): Prom
   catch { return []; }   // never break the stock page over the movement panel
 }
 
+export type TesterRow = { branch: string; scent: string; size: string; qty: number };
+/** Tester (TRY ME!) stock, kept SEPARATE from sellable stock. Testers arrive on requisitions
+ *  with no barcode, so they never enter STOCK_CTE (which requires a barcode) — this surfaces
+ *  them on their own. Counted from received / branch-allocated requisitions, per branch × scent
+ *  (the "TRY ME!" suffix is stripped for display). Testers aren't sold, so qty = received. */
+export async function testerStock(branch: string | null = null): Promise<TesterRow[]> {
+  const sql = `
+    select ${branchFromLabel("po.branch_label")} branch,
+           btrim(regexp_replace(i.scent, '\\s*TRY ME!?\\s*$', '', 'gi')) scent,
+           coalesce(i.size,'') size,
+           sum(coalesce(i.received_qty, 0))::float qty
+    from po_items i
+    join purchase_orders po on po.id = i.po_id
+    where po.deleted_at is null and po.status in ('received', '${ALLOC_STATUS}')
+      and i.scent ilike '%try me%'
+      and ($1::text is null or ${branchFromLabel("po.branch_label")} = upper($1))
+    group by 1, 2, 3
+    having sum(coalesce(i.received_qty, 0)) <> 0
+    order by 2, 3`;
+  try { return await q<TesterRow>(sql, [branch]); }
+  catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }
+}
+
 /** Write today's stock snapshot (remaining per barcode) for every active branch into
  *  stock_daily — one bulk upsert per branch. Called nightly by /api/cron/snapshot. */
 export async function snapshotStockNow(): Promise<{ ok: boolean; snap_date: string; rows: number; branches: number; error?: string }> {

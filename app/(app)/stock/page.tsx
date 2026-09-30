@@ -1,7 +1,7 @@
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { num, baht } from "@/lib/format";
 import { q } from "@/lib/db";
-import { stockPageBundle, stockMovement, countVariance, lossSignals, stockTrendTotals } from "@/lib/queries";
+import { stockPageBundle, stockMovement, countVariance, lossSignals, stockTrendTotals, testerStock } from "@/lib/queries";
 import { listStockAdjustments } from "@/lib/actions/stock";
 import { ExportButton } from "@/components/ExportButton";
 import { StockMatrix } from "@/components/StockMatrix";
@@ -9,6 +9,7 @@ import { StockTabs } from "@/components/StockTabs";
 import { StockMovement, type MovRow } from "@/components/StockMovement";
 import { StockTrend } from "@/components/StockTrend";
 import { StockLoss, type LossRow } from "@/components/StockLoss";
+import { TesterStock } from "@/components/TesterStock";
 import { StockAdjust } from "@/components/StockAdjust";
 import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -28,10 +29,10 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const [Y, M, D] = bkkToday.split("-").map(Number);
   const baseUtc = Date.UTC(Y, M - 1, D);
   const moveDates = Array.from({ length: 30 }, (_, i) => new Date(baseUtc - (29 - i) * 86400000).toISOString().slice(0, 10));
-  const [bundle, user, adjustments, moves, variance, signals, trend] = await Promise.all([
+  const [bundle, user, adjustments, moves, variance, signals, trend, testers] = await Promise.all([
     stockPageBundle(branch), getCurrentUser(), listStockAdjustments(branch),
     stockMovement(branch, moveDates[0]), countVariance(branch), lossSignals(branch),
-    stockTrendTotals(branch, 60),
+    stockTrendTotals(branch, 60), testerStock(branch),
   ]);
   // one STOCK_CTE pass → derive คงเหลือ / ควรเติม / ติดลบ / มูลค่า (was 4 separate CTE queries)
   const { rows, reorder, negatives, valuation } = bundle;
@@ -158,6 +159,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           lossAlert={lossAlert}
           matrix={<StockMatrix rows={rows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
           movement={<><StockTrend data={trend} canManage={canRequisition} /><StockMovement dates={moveDates} rows={movRows} /></>}
+          tester={<TesterStock rows={testers} branch={branch} />}
           /* ป้องกันของหายมีข้อมูลอ่อนไหว → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (สิทธิ์ requisitions) */
           loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} signals={signals} coverage={coverage} /> : null}
         />
