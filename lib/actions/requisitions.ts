@@ -235,13 +235,26 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
         if (bc) byBarcode.set(bc, (byBarcode.get(bc) || 0) + 1);
         else { const k = `${norm(s.product)}|${norm(s.size)}`; byName.set(k, (byName.get(k) || 0) + 1); }
       }
-      const poItems = await q<{ id: number; barcode: string | null; scent: string | null; size: string | null }>(`select id, barcode, scent, size from po_items where po_id=$1`, [id]);
+      const poItems = await q<{ id: number; barcode: string | null; scent: string | null; size: string | null; qty: number }>(`select id, barcode, scent, size, qty from po_items where po_id=$1`, [id]);
       ctwLines = poItems.map((it) => {
         const bc = String(it.barcode || "").trim();
         const qty = bc && byBarcode.has(bc) ? byBarcode.get(bc)! : (byName.get(`${norm(it.scent || "")}|${norm(it.size || "")}`) ?? 0);
         return { id: it.id, received_qty: qty };
       });
-      const matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
+      let matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
+      // The warehouse pushed `shipped.length` physical pieces — those goods ARE at the branch.
+      // If some SKUs didn't map to a line by barcode/name (data mismatch across systems), don't
+      // silently zero those lines (that = "รับแล้วแต่สต๊อกไม่ขึ้น"). Give each unmatched line its
+      // ordered qty from the leftover budget, capped so the PO total never exceeds what was shipped.
+      if (shipped.length > 0 && matched < shipped.length) {
+        let budget = shipped.length - matched;
+        const orderedById = new Map(poItems.map((it) => [it.id, Math.max(0, Math.round(Number(it.qty) || 0))]));
+        for (const l of ctwLines) {
+          if (budget <= 0) break;
+          if (l.received_qty === 0) { const take = Math.min(orderedById.get(l.id) || 0, budget); l.received_qty = take; budget -= take; }
+        }
+        matched = ctwLines.reduce((s, l) => s + l.received_qty, 0);
+      }
       if (shipped.length > 0 && matched !== shipped.length) ctwWarn = `จับคู่ SKU คลังไม่ครบ: เข้าสต๊อก ${matched}/${shipped.length} ชิ้น — ตรวจสอบบาร์โค้ด/ชื่อสินค้า`;
     }
     const useLines = ctwLines ?? lines;
@@ -262,8 +275,15 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
         return { ok: false, error: "รับได้เฉพาะใบเบิกที่มอบหมายให้คุณ (ให้แอดมินมอบหมายก่อน)" };
       }
       for (const l of useLines || []) {
-        // cap received at the ordered qty so a fat-finger can't inflate branch stock
-        await run(`update po_items set received_qty = least($2, qty), line_remark=$3 where id=$1 and po_id=$4`,
+        // cap received at the ordered qty so a fat-finger can't inflate branch stock.
+        // Backfill a missing barcode from the linked product (by product_id, else scent+size) —
+        // stock is keyed by barcode, so a blank-barcode line would be received but never counted.
+        await run(`update po_items set received_qty = least($2, qty), line_remark=$3,
+                 barcode = case when coalesce(barcode,'') = '' then coalesce(
+                     (select p.barcode from products p where p.id = po_items.product_id and coalesce(p.barcode,'') <> ''),
+                     (select p.barcode from products p where p.scent = po_items.scent and p.size = po_items.size and coalesce(p.barcode,'') <> '' limit 1)
+                   ) else barcode end
+               where id=$1 and po_id=$4`,
           [l.id, Math.max(0, Math.round(Number(l.received_qty) || 0)), (l.remark || "").trim() || null, id]);
       }
       await run(`update purchase_orders set status='received', received_at=now(), received_by=$2,
