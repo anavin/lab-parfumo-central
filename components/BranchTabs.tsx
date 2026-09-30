@@ -5,16 +5,18 @@ import { branchOptions } from "@/lib/branches";
 /**
  * Branch (สาขา) switcher driven by a URL search param (default `?branch=`).
  * `withAll` prepends a "ทุกสาขา" tab (value "all") for combined views.
- * Renders nothing when there is only one branch. Reused on /cash, /stock, /review.
+ * `defaultValue` sets which tab is active when no param is present (default: the
+ * first option — "all" when withAll, else the first branch). Reused on /cash, /stock, /review.
+ * Renders nothing when there is only one branch.
  */
-export function BranchTabs({ param = "branch", withAll = false }: { param?: string; withAll?: boolean }) {
+export function BranchTabs({ param = "branch", withAll = false, defaultValue }: { param?: string; withAll?: boolean; defaultValue?: string }) {
   const base = branchOptions();
   const opts = withAll ? [{ value: "all", label: "ทุกสาขา" }, ...base] : base;
   const router = useRouter();
   const sp = useSearchParams();
   const pathname = usePathname();
   if (base.length < 2) return null;
-  const cur = sp.get(param) ?? opts[0].value;
+  const cur = sp.get(param) ?? defaultValue ?? opts[0].value;
   const go = (v: string) => {
     const p = new URLSearchParams(sp.toString());
     p.set(param, v);

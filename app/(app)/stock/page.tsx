@@ -15,7 +15,7 @@ import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { BranchTabs } from "@/components/BranchTabs";
-import { isBranch, branchName } from "@/lib/branches";
+import { isBranch, branchName, DEFAULT_BRANCH } from "@/lib/branches";
 import { Package, AlertTriangle, PackagePlus, ChevronDown } from "lucide-react";
 import Link from "next/link";
 
@@ -23,7 +23,9 @@ export const dynamic = "force-dynamic";
 
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
   const sp = await searchParams;
-  const branch = isBranch(sp.branch) ? sp.branch! : null;   // null = all branches combined
+  // default to CTW (the main branch) — open the page and you see CTW only.
+  // ?branch=all → combined; ?branch=SCS → Seacon (both still reachable via the switcher).
+  const branch = sp.branch === "all" ? null : (isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH);
   // last 30 days axis (Bangkok time) for the movement heatmap — build from y-m-d to avoid tz drift
   const bkkToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const [Y, M, D] = bkkToday.split("-").map(Number);
@@ -144,7 +146,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       <PageHeader icon={Package} title="สต๊อกคงเหลือ"
         subtitle={`คงเหลือแต่ละกลิ่น · ${branch ? branchName(branch) : "ทุกสาขา"}`}
         action={<div className="flex items-center gap-2">
-          <BranchTabs withAll />
+          <BranchTabs withAll defaultValue={DEFAULT_BRANCH} />
           {canRequisition && (
             <Link href="/stock/allocate" className="btn btn-brand">
               <PackagePlus className="w-4 h-4" /> จัดสต๊อกเข้าสาขา
