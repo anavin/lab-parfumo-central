@@ -1,5 +1,6 @@
 "use server";
 import { q } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/require-user";
 import { normalizeBranch, branchName } from "@/lib/branches";
 
@@ -28,5 +29,33 @@ export async function checkSku(sku: string, branch: string, barcode?: string): P
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
     console.error("[checkSku]", e);
     return { ok: false, error: "ตรวจ SKU ไม่สำเร็จ ลองใหม่" };
+  }
+}
+
+export type SkuAdd = { ok: true; scent: string | null; size: string | null } | { ok: false; error: string };
+/** Manually register an existing SKU sticker into stock at a branch (for stock that didn't arrive
+ *  with a SKU from the warehouse). Picks the product by barcode, records the unit as in_stock.
+ *  Manager-only. Rejects a SKU that already exists (so a sold unit can't be silently reset). */
+export async function addSkuUnit(input: { sku: string; barcode: string; branch: string }): Promise<SkuAdd> {
+  const me = await requirePermission("requisitions");
+  const sku = String(input.sku || "").trim();
+  const barcode = String(input.barcode || "").trim();
+  const branch = normalizeBranch(input.branch);
+  if (!sku) return { ok: false, error: "ไม่มีรหัส SKU" };
+  if (!barcode) return { ok: false, error: "กรุณาเลือกสินค้าก่อน" };
+  try {
+    const [p] = await q<{ scent: string | null; size: string | null }>(`select scent, size from products where barcode = $1`, [barcode]);
+    if (!p) return { ok: false, error: "ไม่พบสินค้าตามบาร์โค้ดนี้" };
+    const [ex] = await q<{ status: string }>(`select status from sku_units where sku = $1`, [sku]);
+    if (ex) return { ok: false, error: ex.status === "sold" ? `SKU "${sku}" ขายไปแล้ว` : `SKU "${sku}" มีในระบบอยู่แล้ว` };
+    await q(`insert into sku_units (sku, barcode, scent, size, branch, received_by, status, received_at)
+             values ($1,$2,$3,$4,$5,$6,'in_stock', now())`,
+      [sku, barcode, p.scent, p.size, branch, me.id]);
+    revalidatePath("/stock");
+    return { ok: true, scent: p.scent, size: p.size };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU (รัน migration 0036)" };
+    console.error("[addSkuUnit]", e);
+    return { ok: false, error: "เพิ่ม SKU ไม่สำเร็จ ลองใหม่" };
   }
 }
