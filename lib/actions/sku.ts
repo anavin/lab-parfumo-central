@@ -63,3 +63,51 @@ export async function addSkuUnit(input: { sku: string; barcode: string; branch: 
     return { ok: false, error: "เพิ่ม SKU ไม่สำเร็จ ลองใหม่" };
   }
 }
+
+/** Edit one SKU unit (manager-only): reassign product (by barcode), move branch, or change status.
+ *  Setting any status other than 'sold' also clears the sold bill link (so reverting a mistaken
+ *  sale frees the unit). `sku` must be the exact stored value. */
+export async function updateSkuUnit(input: { sku: string; barcode?: string; branch?: string; status?: string }): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("requisitions");
+  const sku = String(input.sku || "").trim();
+  if (!sku) return { ok: false, error: "ไม่มีรหัส SKU" };
+  try {
+    const [u] = await q<{ sku: string }>(`select sku from sku_units where sku = $1`, [sku]);
+    if (!u) return { ok: false, error: "ไม่พบ SKU นี้" };
+    const sets: string[] = []; const args: any[] = [sku]; let i = 2;
+    if (input.barcode) {
+      const [p] = await q<{ scent: string | null; size: string | null }>(`select scent, size from products where barcode = $1`, [input.barcode]);
+      if (!p) return { ok: false, error: "ไม่พบสินค้าตามบาร์โค้ด" };
+      sets.push(`barcode=$${i++}`, `scent=$${i++}`, `size=$${i++}`); args.push(input.barcode, p.scent, p.size);
+    }
+    if (input.branch) { sets.push(`branch=$${i++}`); args.push(normalizeBranch(input.branch)); }
+    if (input.status) {
+      sets.push(`status=$${i++}`); args.push(input.status);
+      if (input.status !== "sold") sets.push(`sold_submission_id=null`, `sold_receipt_no=null`, `sold_branch=null`, `sold_at=null`);
+    }
+    if (!sets.length) return { ok: true };
+    await q(`update sku_units set ${sets.join(", ")} where sku = $1`, args);
+    revalidatePath("/stock");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง SKU" };
+    console.error("[updateSkuUnit]", e);
+    return { ok: false, error: "แก้ไขไม่สำเร็จ ลองใหม่" };
+  }
+}
+
+/** Delete one SKU unit (manager-only). For a wrongly-added / lost / damaged unit. */
+export async function deleteSkuUnit(sku: string): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("requisitions");
+  const s = String(sku || "").trim();
+  if (!s) return { ok: false, error: "ไม่มีรหัส SKU" };
+  try {
+    await q(`delete from sku_units where sku = $1`, [s]);
+    revalidatePath("/stock");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง SKU" };
+    console.error("[deleteSkuUnit]", e);
+    return { ok: false, error: "ลบไม่สำเร็จ ลองใหม่" };
+  }
+}
