@@ -6,6 +6,7 @@ import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye } f
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
+import { SkuCountMode } from "@/components/SkuCountMode";
 
 // verified = พนักงานลงมือกับแถวนี้จริง (พิมพ์/กด +−/สแกน) — ไม่ใช่ปล่อยค่าที่ระบบเติมให้
 type Item = { barcode: string; scent: string; size: string; expected: number; counted: string; changed: boolean; verified: boolean };
@@ -14,12 +15,13 @@ const sizeNum = (s: string) => parseInt(String(s).replace(/[^\d]/g, ""), 10) || 
 const byName = (a: Item, b: Item) => (a.scent || "").localeCompare(b.scent || "") || sizeNum(a.size) - sizeNum(b.size);
 const keyOf = (r: { barcode: string; size: string }) => `${r.barcode}__${r.size}`;
 
-export function StockCountForm({ expected, branch, staleKeys = [] }:
-  { expected: { barcode: string; scent: string; size: string; remaining: number; sold: number }[]; branch: string; staleKeys?: string[] }) {
+export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = [] }:
+  { expected: { barcode: string; scent: string; size: string; remaining: number; sold: number }[]; branch: string; staleKeys?: string[]; skuUnits?: { sku: string; barcode: string | null; scent: string | null; size: string | null }[] }) {
   const router = useRouter();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
+  const [mode, setMode] = useState<"qty" | "sku">("qty");   // นับตามจำนวน vs สแกน SKU รายชิ้น
 
   const base = useMemo<Item[]>(() =>
     expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)), changed: (Number(e.sold) || 0) > 0, verified: false })).sort(byName), [expected]);
@@ -134,6 +136,16 @@ export function StockCountForm({ expected, branch, staleKeys = [] }:
 
   return (
     <div className="space-y-3 pb-24">
+      {/* เลือกวิธีนับ: ตามจำนวน (เดิม) หรือ สแกน SKU รายชิ้น (รู้ว่าขวดไหนหาย) */}
+      <div className="inline-flex gap-1 p-1 rounded-xl border border-line bg-surface">
+        <button onClick={() => setMode("qty")} className={"px-3.5 py-2 text-sm font-medium rounded-lg transition " + (mode === "qty" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>นับตามจำนวน</button>
+        <button onClick={() => setMode("sku")} className={"px-3.5 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>สแกน SKU รายชิ้น</button>
+      </div>
+
+      {mode === "sku" ? (
+        <SkuCountMode units={skuUnits} />
+      ) : (
+      <>
       {restored && (
         <div className="rounded-lg bg-brand-soft/60 border border-brand/30 px-3 py-2 text-xs text-brand-dark flex items-center gap-2">
           กู้ร่างที่นับค้างไว้แล้ว
@@ -223,6 +235,8 @@ export function StockCountForm({ expected, branch, staleKeys = [] }:
         </button>
       )}
       {scanning && <BarcodeScanner knownCodes={knownCodes} onDetected={onCameraScan} onClose={() => setScanning(false)} />}
+      </>
+      )}
     </div>
   );
 }
