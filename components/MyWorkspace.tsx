@@ -380,6 +380,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
+  const [confirmSku, setConfirmSku] = useState<string | null>(null);   // SKU incomplete → warn, but allow saving
   const [showDisc, setShowDisc] = useState(false);                 // end-of-bill discount hidden by default (tap to open)
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
@@ -540,12 +541,16 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     if (!String(state.nation || "").trim()) m.push("สัญชาติ");
     if (state.items.length === 0) m.push("สินค้า");
     else if (state.items.some((it) => !String(it.item || "").trim())) m.push("ชื่อสินค้าให้ครบ");
-    // SKU-tracked products must have a scanned SKU for every piece before the bill can save
-    const skuShort = state.items.filter((it) => needsSku(it) && (it.skus?.length ?? 0) < (Number(it.qty) || 0));
-    if (skuShort.length) m.push(`สแกน SKU ให้ครบ: ${skuShort.map((it) => `${it.item} (${it.skus?.length ?? 0}/${Number(it.qty) || 0})`).join(", ")}`);
     // slip is optional now — never blocks saving
     setMissing(m);
     if (m.length > 0) { scrollToMissing(m); return; }
+    // SKU is a soft warning, not a block: if a SKU-tracked line is short, confirm before saving
+    // (SKUs aren't fully rolled out yet, so the cashier can proceed without scanning).
+    const skuShort = state.items.filter((it) => needsSku(it) && (it.skus?.length ?? 0) < (Number(it.qty) || 0));
+    if (skuShort.length) { setConfirmSku(skuShort.map((it) => `${it.item} (${it.skus?.length ?? 0}/${Number(it.qty) || 0})`).join(", ")); return; }
+    doSubmit();
+  };
+  const doSubmit = () => {
     const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel, skus: l.it.skus }));
     const outTenders = split ? tenders.map((t, i) => ({ channel: t.channel, amount: tenderAmount(i) })) : undefined;
     onSubmit(items, outTenders, net);
@@ -756,6 +761,10 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
       <ConfirmDialog open={confirmCancel} title="ยกเลิกบิลนี้?" message="ข้อมูลที่กรอกไว้จะหายทั้งหมด" danger confirmLabel="ทิ้งบิล"
         onCancel={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); onCancel(); }} />
+
+      <ConfirmDialog open={!!confirmSku} title="ยังสแกน SKU ไม่ครบ" message={`${confirmSku ?? ""}\n\nบันทึกบิลต่อโดยไม่ผูก SKU ได้เลย (สินค้าที่สแกนแล้วจะยังผูกให้)`}
+        confirmLabel="บันทึกเลย" pending={pending}
+        onCancel={() => setConfirmSku(null)} onConfirm={() => { setConfirmSku(null); doSubmit(); }} />
 
       {scanning && <BarcodeScanner continuous knownCodes={knownCodes} onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
