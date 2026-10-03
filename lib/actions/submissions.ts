@@ -127,7 +127,8 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
           const upd = await run<{ sku: string }>(
             `update sku_units set status='sold', sold_submission_id=$2, sold_receipt_no=$3,
                     sold_branch=$4, sold_at=now()
-             where sku=$1 and status='in_stock' and branch=upper($5)
+             where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g'))
+               and status='in_stock' and branch=upper($5)
                and (coalesce(barcode,'')='' or barcode=$6) returning sku`,
             [sku, row.id, ref, resolveBranch(d.source), resolveBranch(d.source), it.barcode || ""]);
           if (!upd.length) throw new Error(`SKU ${sku} ขายไม่ได้ (ไม่พบ/ขายไปแล้ว/คนละสินค้าหรือสาขา)`);

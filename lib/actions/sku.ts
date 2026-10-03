@@ -16,15 +16,18 @@ export async function checkSku(sku: string, branch: string, barcode?: string): P
   const code = String(sku || "").trim();
   if (!code) return { ok: false, error: "ไม่มีรหัส SKU" };
   try {
-    const [u] = await q<{ barcode: string | null; scent: string | null; size: string | null; status: string; branch: string; sold_receipt_no: string | null }>(
-      `select barcode, scent, size, status, branch, sold_receipt_no from sku_units where sku = $1`, [code]);
+    // match ignoring spaces + case so a sticker read as "LAB03696A" still finds "LAB 03696 A".
+    // Return the STORED sku so the bill links to the exact canonical value.
+    const [u] = await q<{ sku: string; barcode: string | null; scent: string | null; size: string | null; status: string; branch: string; sold_receipt_no: string | null }>(
+      `select sku, barcode, scent, size, status, branch, sold_receipt_no from sku_units
+       where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g')) limit 1`, [code]);
     if (!u) return { ok: false, error: `ไม่พบ SKU "${code}" ในระบบ` };
     if (u.status === "sold") return { ok: false, error: `SKU นี้ขายไปแล้ว${u.sold_receipt_no ? ` (บิล ${u.sold_receipt_no})` : ""}` };
     if (u.status !== "in_stock") return { ok: false, error: `SKU นี้สถานะ ${u.status} ขายไม่ได้` };
     if (normalizeBranch(u.branch) !== normalizeBranch(branch)) return { ok: false, error: `SKU นี้อยู่สาขา ${branchName(u.branch)} ไม่ใช่สาขานี้` };
     const want = String(barcode || "").trim();
     if (want && u.barcode && u.barcode !== want) return { ok: false, error: "SKU นี้เป็นของสินค้าอื่น (บาร์โค้ดไม่ตรง)" };
-    return { ok: true, sku: code, barcode: u.barcode, scent: u.scent, size: u.size };
+    return { ok: true, sku: u.sku, barcode: u.barcode, scent: u.scent, size: u.size };
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
     console.error("[checkSku]", e);
@@ -46,7 +49,8 @@ export async function addSkuUnit(input: { sku: string; barcode: string; branch: 
   try {
     const [p] = await q<{ scent: string | null; size: string | null }>(`select scent, size from products where barcode = $1`, [barcode]);
     if (!p) return { ok: false, error: "ไม่พบสินค้าตามบาร์โค้ดนี้" };
-    const [ex] = await q<{ status: string }>(`select status from sku_units where sku = $1`, [sku]);
+    const [ex] = await q<{ status: string }>(
+      `select status from sku_units where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g')) limit 1`, [sku]);
     if (ex) return { ok: false, error: ex.status === "sold" ? `SKU "${sku}" ขายไปแล้ว` : `SKU "${sku}" มีในระบบอยู่แล้ว` };
     await q(`insert into sku_units (sku, barcode, scent, size, branch, received_by, status, received_at)
              values ($1,$2,$3,$4,$5,$6,'in_stock', now())`,
