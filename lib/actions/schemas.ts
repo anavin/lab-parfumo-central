@@ -106,6 +106,7 @@ export const billSchema = z.object({
     unit_price: z.coerce.number().min(0).max(99999999).optional(),
     discount: z.coerce.number().min(0).max(99999999).optional(),
     payment_channel: z.string().trim().max(60).optional(),   // per-item override (else bill default)
+    skus: z.array(z.string().trim().max(60)).max(999).optional(),   // serialized SKUs sold on this line (phase 3)
   })).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(50),
   attachments: z.array(z.string().startsWith("data:image/", "ไฟล์แนบไม่ถูกต้อง").max(3_000_000)).max(6).optional(),
   // when payment_channel = the split marker: how the bill total was split across channels

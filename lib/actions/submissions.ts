@@ -63,6 +63,16 @@ async function genBillRefTx(run: TxRun, saleDate: string, source: string): Promi
   return prefix + String((mx?.n ?? 0) + 1).padStart(3, "0");
 }
 
+// phase 3: return a sale's serialized SKUs to in_stock when that sale is removed or rejected, so a
+// bounced/deleted bill never leaves its units stuck as "sold". Idempotent & fail-soft (no table = no-op).
+async function freeSkusForSubmission(id: number) {
+  try {
+    await q(`update sku_units set status='in_stock', sold_submission_id=null, sold_receipt_no=null,
+                    sold_branch=null, sold_at=null
+             where sold_submission_id=$1`, [id]);
+  } catch (e: any) { if (e?.code !== "42P01") console.error("[freeSkusForSubmission]", e); }
+}
+
 type SubmitResult = { ok: true; ref: string } | { ok: false; error: string };
 export async function submitBill(input: unknown): Promise<SubmitResult> {
   const user = await requirePermission("my_sales");
@@ -108,6 +118,24 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
          it.item, it.barcode || null, it.size || null, it.qty, it.unit_price ?? 0, disc, total,
          pc, d.nation]);
       await run(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [row.id]);
+      // phase 3: mark each scanned SKU sold, linked to this bill. Atomic with the line insert —
+      // a SKU that isn't in_stock at this branch for this product aborts the whole bill (no
+      // partial sale). Guarded so a pre-0036 DB (no table) simply skips SKU marking.
+      const skus = Array.from(new Set((it.skus ?? []).map((s) => String(s || "").trim()).filter(Boolean)));
+      for (const sku of skus) {
+        try {
+          const upd = await run<{ sku: string }>(
+            `update sku_units set status='sold', sold_submission_id=$2, sold_receipt_no=$3,
+                    sold_branch=$4, sold_at=now()
+             where sku=$1 and status='in_stock' and branch=upper($5)
+               and (coalesce(barcode,'')='' or barcode=$6) returning sku`,
+            [sku, row.id, ref, resolveBranch(d.source), resolveBranch(d.source), it.barcode || ""]);
+          if (!upd.length) throw new Error(`SKU ${sku} ขายไม่ได้ (ไม่พบ/ขายไปแล้ว/คนละสินค้าหรือสาขา)`);
+        } catch (e: any) {
+          if (e?.code === "42P01") break;   // sku_units not migrated → skip SKU marking entirely
+          throw e;                          // real mismatch → abort the bill
+        }
+      }
       count++; sum += total;
     }
     for (const t of tenders) {
@@ -149,6 +177,7 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
     return { ok: true, ref };   // so the UI can offer a "print receipt" link for the bill just saved
   } catch (e: any) {
     console.error("[submitBill]", e);
+    if (typeof e?.message === "string" && e.message.startsWith("SKU ")) return { ok: false, error: e.message };
     return { ok: false, error: "บันทึกบิลไม่สำเร็จ กรุณาลองใหม่" };
   }
 }
@@ -346,6 +375,7 @@ export async function deleteMySubmission(id: number) {
   const user = await requirePermission("my_sales");
   await ownRow(id, user.id, ["pending", "rejected"]);   // allow removing a bounced entry
   const [ref] = await q<{ receipt_no: string | null }>(`select receipt_no from submissions where id = $1`, [id]);
+  await freeSkusForSubmission(id);   // return this line's SKUs to stock before the row goes
   await q(`delete from submissions where id = $1`, [id]);
   // if that was the bill's last line, remove its now-orphaned photo + split records
   if (ref?.receipt_no) {
@@ -497,6 +527,7 @@ export async function rejectSubmission(id: number, note?: string) {
   await q(
     `update submissions set status='rejected', reviewed_by=$2, reviewed_at=now(), review_note=$3, updated_at=now() where id=$1`,
     [id, admin.id, note?.trim() || null]);
+  await freeSkusForSubmission(id);   // a rejected sale isn't a sale → its SKUs go back to stock
   await logAudit("reject", "submission", id, `ตีกลับของ ${s.ba || "-"}${note ? ` · ${note}` : ""}`);
   revalidatePath("/review"); revalidatePath("/my");
 }
@@ -622,6 +653,7 @@ export async function restoreSubmission(id: number): Promise<{ ok: boolean; erro
 export async function purgeSubmission(id: number): Promise<{ ok: boolean; error?: string }> {
   await requirePermission("trash");
   const [ref] = await q<{ receipt_no: string | null }>(`select receipt_no from submissions where id = $1`, [id]);
+  await freeSkusForSubmission(id);   // return this line's SKUs to stock before the row goes
   await q(`delete from submissions where id = $1`, [id]);
   if (ref?.receipt_no) {
     const [left] = await q<{ n: number }>(`select count(*)::int n from submissions where receipt_no = $1`, [ref.receipt_no]);
@@ -645,7 +677,7 @@ export async function rejectMany(ids: number[], note?: string) {
         `update submissions set status='rejected', reviewed_by=$2, reviewed_at=now(), review_note=$3, updated_at=now()
          where id=$1 and status <> 'approved' returning id, receipt_no`,
         [id, admin.id, note?.trim() || null]);
-      if (res.length) { ok++; if (res[0].receipt_no) refs.add(res[0].receipt_no); }
+      if (res.length) { ok++; if (res[0].receipt_no) refs.add(res[0].receipt_no); await freeSkusForSubmission(id); }
     } catch (e) { console.error("[rejectMany] failed", id, e); }
   }
   // a rejected split bill's per-channel amounts must stop counting toward cash

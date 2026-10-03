@@ -414,6 +414,16 @@ export async function skuUnits(branch: string | null = null): Promise<SkuUnitRow
   catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
+/** Barcodes that currently have ≥1 in_stock serialized unit at a branch. The sale page uses this
+ *  to decide which lines REQUIRE a SKU scan (products with SKU stock) vs which sell freely
+ *  (testers / old stock with no SKU). Empty before 0036 is migrated. */
+export async function skuBarcodesInStock(branch: string | null = null): Promise<string[]> {
+  const sql = `select distinct barcode from sku_units
+    where status='in_stock' and coalesce(barcode,'') <> '' and ($1::text is null or branch = upper($1))`;
+  try { return (await q<{ barcode: string }>(sql, [branch])).map((r) => r.barcode); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Write today's stock snapshot (remaining per barcode) for every active branch into
  *  stock_daily — one bulk upsert per branch. Called nightly by /api/cron/snapshot. */
 export async function snapshotStockNow(): Promise<{ ok: boolean; snap_date: string; rows: number; branches: number; error?: string }> {
