@@ -775,6 +775,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const [skuInput, setSkuInput] = useState("");
   const [skuErr, setSkuErr] = useState<string | null>(null);
   const [skuBusy, setSkuBusy] = useState(false);
+  const [skuScanning, setSkuScanning] = useState(false);
   const [acOpen, setAcOpen] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);   // surfaced so WebView issues are visible
   const nameRef = useRef<HTMLInputElement>(null);
@@ -818,16 +819,16 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const line = q * up - dc;
   const skus = it.skus ?? [];
   const skuDone = skus.length >= q && q > 0;
-  const addSku = async (raw: string) => {
+  const addSku = async (raw: string): Promise<ScanResult> => {
     const code = String(raw || "").trim();
-    if (!code) return;
-    if (skus.includes(code)) { setSkuErr("สแกน SKU นี้ซ้ำแล้ว"); setSkuInput(""); return; }
+    if (!code) return { ok: false, label: "", sub: "" };
+    if (skus.includes(code)) { setSkuErr("สแกน SKU นี้ซ้ำแล้ว"); setSkuInput(""); return { ok: false, label: `SKU ${code}`, sub: "สแกนซ้ำแล้ว" }; }
     setSkuBusy(true); setSkuErr(null);
     try {
       const r = await checkSku(code, branch, it.barcode);
-      if (r.ok) { onChange({ skus: [...skus, r.sku], qty: Math.max(q, skus.length + 1) }); setSkuInput(""); }
-      else { setSkuErr(r.error); }
-    } catch { setSkuErr("ตรวจ SKU ไม่สำเร็จ"); }
+      if (r.ok) { onChange({ skus: [...skus, r.sku], qty: Math.max(q, skus.length + 1) }); setSkuInput(""); return { ok: true, label: r.scent || it.item, sub: `SKU ${skus.length + 1} ชิ้น` }; }
+      setSkuErr(r.error); return { ok: false, label: `SKU ${code}`, sub: r.error };
+    } catch { setSkuErr("ตรวจ SKU ไม่สำเร็จ"); return { ok: false, label: `SKU ${code}`, sub: "ตรวจไม่สำเร็จ" }; }
     finally { setSkuBusy(false); }
   };
   const removeSku = (s: string) => onChange({ skus: skus.filter((x) => x !== s) });
@@ -912,14 +913,21 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
               ))}
             </div>
           )}
-          <input value={skuInput} inputMode="text"
-            onChange={(e) => { setSkuInput(e.target.value); setSkuErr(null); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSku(skuInput); } }}
-            disabled={skuBusy}
-            placeholder={skuDone ? "สแกนครบแล้ว (เพิ่มได้ถ้าจำนวนมากขึ้น)" : "สแกน/พิมพ์รหัส SKU ที่ขวด แล้ว Enter"}
-            className="w-full h-[40px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
+          <div className="flex gap-1.5">
+            <button type="button" onClick={() => setSkuScanning(true)}
+              className="shrink-0 h-[40px] px-3 inline-flex items-center gap-1.5 rounded-lg bg-brand text-white text-sm font-medium active:scale-95">
+              <ScanLine className="w-4 h-4" /> สแกน
+            </button>
+            <input value={skuInput} inputMode="text"
+              onChange={(e) => { setSkuInput(e.target.value); setSkuErr(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSku(skuInput); } }}
+              disabled={skuBusy}
+              placeholder={skuDone ? "สแกนครบแล้ว (เพิ่มได้)" : "หรือพิมพ์รหัส SKU แล้ว Enter"}
+              className="flex-1 min-w-0 h-[40px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
+          </div>
           {skuErr && <div className="text-[11px] text-danger mt-1">{skuErr}</div>}
-          {!skuDone && !skuErr && <div className="text-[11px] text-muted mt-1">ยังขาดอีก {Math.max(0, q - skus.length)} ชิ้น</div>}
+          {!skuDone && !skuErr && <div className="text-[11px] text-muted mt-1">ยังขาดอีก {Math.max(0, q - skus.length)} ชิ้น — กดปุ่มสแกนเปิดกล้อง หรือยิงเครื่องสแกน</div>}
+          {skuScanning && <BarcodeScanner continuous knownCodes={null} onDetected={(c) => addSku(c)} onClose={() => setSkuScanning(false)} />}
         </div>
       )}
       <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">
