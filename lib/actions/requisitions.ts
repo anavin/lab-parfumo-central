@@ -6,7 +6,7 @@ import { requisitionSchema } from "./schemas";
 import { logAudit } from "@/lib/audit";
 import { requirePermission, requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
-import { resolveBranch } from "@/lib/branches";
+import { resolveBranch, normalizeBranch } from "@/lib/branches";
 import { ctwEnabled, ctwSendRequisition, ctwGetRequisition, ctwReceive } from "@/lib/ctw-client";
 
 export type ReqItemInput = { barcode: string; scent: string; size: string; qty: number; product_id?: number | null };
@@ -203,7 +203,7 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
     let ctwLines: { id: number; received_qty: number; remark?: string }[] | null = null;
     let poNumber = "";
     let ctwWarn: string | undefined;
-    let shipped: { barcode?: string | null; product?: string | null; size?: string | null }[] = [];
+    let shipped: { sku?: string | null; barcode?: string | null; product?: string | null; size?: string | null }[] = [];
     let fromPush = false;   // goods pushed to us → warehouse already closed its side (don't call back)
 
     try {
@@ -297,6 +297,28 @@ export async function receiveRequisition(id: number, lines: { id: number; receiv
       return { ok: true };
     });
     if (!res.ok) return res;
+
+    // Record each serialized SKU as in_stock at this branch (phase-1 SKU tracking). Done AFTER the
+    // stock commit and wrapped so a missing table (0036 not yet migrated) or a bad row can never
+    // break receiving. Re-receiving a unit refreshes its receipt info but won't un-sell it.
+    if (shipped.length) {
+      try {
+        const [h] = await q<{ branch_label: string | null }>(`select branch_label from purchase_orders where id=$1`, [id]);
+        const unitBranch = normalizeBranch(h?.branch_label);
+        for (const s of shipped) {
+          const sku = String(s.sku || "").trim();
+          if (!sku) continue;   // not serialized → nothing to track
+          await q(`insert into sku_units (sku, barcode, scent, size, branch, po_id, po_number, received_by, status, received_at)
+                   values ($1,$2,$3,$4,$5,$6,$7,$8,'in_stock', now())
+                   on conflict (sku) do update set
+                     barcode = excluded.barcode, scent = excluded.scent, size = excluded.size,
+                     branch = excluded.branch, po_id = excluded.po_id, po_number = excluded.po_number,
+                     received_by = excluded.received_by, received_at = now(),
+                     status = case when sku_units.status = 'sold' then sku_units.status else 'in_stock' end`,
+            [sku, String(s.barcode || "").trim() || null, s.product ?? null, s.size ?? null, unitBranch, id, poNumber || null, me.id]);
+        }
+      } catch (e: any) { if (e?.code !== "42P01") console.error("[receiveRequisition sku_units]", e); }
+    }
 
     // (C) close the requisition on the warehouse AFTER branch stock is committed — ONLY in the pull
     // flow. In the push flow the warehouse already closed its side when it sent, so skip the callback.

@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
-import { Package, Activity, ShieldAlert, FlaskConical } from "lucide-react";
+import { Package, Activity, ShieldAlert, FlaskConical, Barcode } from "lucide-react";
 
-type TabId = "stock" | "move" | "tester" | "loss";
+type TabId = "stock" | "move" | "tester" | "sku" | "loss";
 
-// สลับแท็บบนหน้า /stock — คงเหลือ (matrix) · การเคลื่อนไหว (heatmap ขายรายวัน) · เทสเตอร์ · ป้องกันของหาย
+// สลับแท็บบนหน้า /stock — คงเหลือ (matrix) · การเคลื่อนไหว (heatmap ขายรายวัน) · เทสเตอร์ · SKU · ป้องกันของหาย
 // ทุกแท็บ mount ค้างไว้ (ใช้ hidden) เพื่อไม่ให้ state (การแก้จำนวน/ตัวกรอง) รีเซ็ตตอนสลับ
-// loss = null → ไม่มีสิทธิ์ (ผู้จัดการ/แอดมิน/ปฏิบัติการเท่านั้น) → ซ่อนแท็บป้องกันของหาย
-export function StockTabs({ matrix, movement, tester = null, loss = null, lossAlert = false }:
-  { matrix: React.ReactNode; movement: React.ReactNode; tester?: React.ReactNode; loss?: React.ReactNode; lossAlert?: boolean }) {
+// loss/sku = null → ไม่มีสิทธิ์ (ผู้จัดการ/แอดมิน/ปฏิบัติการเท่านั้น) → ซ่อนแท็บนั้น
+export function StockTabs({ matrix, movement, tester = null, sku = null, loss = null, lossAlert = false }:
+  { matrix: React.ReactNode; movement: React.ReactNode; tester?: React.ReactNode; sku?: React.ReactNode; loss?: React.ReactNode; lossAlert?: boolean }) {
   const [tab, setTab] = useState<TabId>("stock");
   const Btn = ({ id, icon: Icon, label, dot }: { id: TabId; icon: any; label: string; dot?: boolean }) => (
     <button onClick={() => setTab(id)}
@@ -24,11 +24,13 @@ export function StockTabs({ matrix, movement, tester = null, loss = null, lossAl
         <Btn id="stock" icon={Package} label="คงเหลือ" />
         <Btn id="move" icon={Activity} label="การเคลื่อนไหว" />
         {tester && <Btn id="tester" icon={FlaskConical} label="เทสเตอร์" />}
+        {sku && <Btn id="sku" icon={Barcode} label="SKU" />}
         {loss && <Btn id="loss" icon={ShieldAlert} label="ป้องกันของหาย" dot={lossAlert} />}
       </div>
       <div hidden={tab !== "stock"}>{matrix}</div>
       <div hidden={tab !== "move"}>{movement}</div>
       {tester && <div hidden={tab !== "tester"}>{tester}</div>}
+      {sku && <div hidden={tab !== "sku"}>{sku}</div>}
       {loss && <div hidden={tab !== "loss"}>{loss}</div>}
     </div>
   );

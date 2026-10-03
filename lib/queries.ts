@@ -394,6 +394,26 @@ export async function testerStock(branch: string | null = null): Promise<TesterR
   catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return []; throw e; }
 }
 
+export type SkuUnitRow = {
+  sku: string; barcode: string | null; scent: string | null; size: string | null;
+  branch: string; status: string; received_at: string; po_number: string | null;
+  sold_receipt_no: string | null; sold_branch: string | null; sold_at: string | null;
+};
+/** Serialized SKU units for the SKU-tracking view (phase 1–2). Each row is one physical unit
+ *  received from the warehouse. status in_stock = still on the shelf; sold = linked to a bill
+ *  (phase 3). Branch filter matches the branch it was received at. Empty before 0036 is migrated. */
+export async function skuUnits(branch: string | null = null): Promise<SkuUnitRow[]> {
+  const sql = `
+    select sku, barcode, scent, size, branch, status,
+           received_at::text received_at, po_number,
+           sold_receipt_no, sold_branch, sold_at::text sold_at
+    from sku_units
+    where ($1::text is null or branch = upper($1))
+    order by (status <> 'in_stock'), scent nulls last, size, received_at desc`;
+  try { return await q<SkuUnitRow>(sql, [branch]); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Write today's stock snapshot (remaining per barcode) for every active branch into
  *  stock_daily — one bulk upsert per branch. Called nightly by /api/cron/snapshot. */
 export async function snapshotStockNow(): Promise<{ ok: boolean; snap_date: string; rows: number; branches: number; error?: string }> {
