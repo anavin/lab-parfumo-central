@@ -1087,7 +1087,7 @@ export async function recentlyApprovedSubmissions(branch?: string) {
     from submissions s
     join users u on u.id = s.created_by
     left join users r on r.id = s.reviewed_by
-    where s.status = 'approved' and s.reviewed_at >= now() - interval '14 days'${filter}${await aliveAnd("s")}
+    where s.status = 'approved' and s.reviewed_at >= now() - interval '30 days'${filter}${await aliveAnd("s")}
     order by s.entry_date desc, s.created_at`, branch ? [branch] : []);
 }
 
