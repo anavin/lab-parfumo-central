@@ -24,7 +24,7 @@ export default async function MyCountPage() {
   // so a product sold down to 0 (or oversold) still shows under "มีความเคลื่อนไหว".
   const [stock, variance, allUnits] = await Promise.all([stockLive(branch), countVariance(branch), skuUnits(branch)]);
   // SKU count mode reconciles only what the system believes is on the shelf now (in_stock)
-  const inStockUnits = allUnits.filter((u) => u.status === "in_stock").map((u) => ({ sku: u.sku, barcode: u.barcode, scent: u.scent, size: u.size }));
+  const inStockUnits = allUnits.filter((u) => u.status === "in_stock").map((u) => ({ sku: u.sku, barcode: u.barcode, scent: u.scent, size: u.size, po_number: u.po_number }));
   const expected = stock.filter((r) => (Number(r.remaining) || 0) > 0 || (Number(r.sold) || 0) > 0)
     .map((r) => ({ barcode: r.barcode, scent: r.scent, size: r.size, remaining: r.remaining, sold: r.sold }));
 

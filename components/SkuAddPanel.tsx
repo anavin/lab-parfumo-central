@@ -32,7 +32,7 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
 
   // one pipeline for every scan/entry: a product barcode SWITCHES the current product;
   // anything else is treated as a SKU sticker and enrolled under the current product.
-  const handle = async (raw: string): Promise<ScanResult> => {
+  const handle = async (raw: string, fromScan = true): Promise<ScanResult> => {
     const code = String(raw || "").trim();
     if (!code || !branch) return { ok: false, label: "", sub: "" };
     setBusy(true);
@@ -46,6 +46,12 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
       }
       const cur = prodRef.current;
       if (!cur) { const r: ScanResult = { ok: false, title: "ยังไม่ได้เลือกกลิ่น", label: `SKU ${code}`, sub: "ยิงบาร์โค้ดสินค้าก่อน 1 ครั้ง" }; setMsg(r); return r; }
+      // กันพลาด: ยิงโค้ดตัวเลขล้วนแบบบาร์โค้ด (8+ หลัก) ที่ไม่พบสินค้า → น่าจะเป็นบาร์โค้ดสินค้าที่ไม่มีในระบบ
+      // ไม่ใช่ SKU รายขวด → ไม่เก็บ (กัน SKU ขยะ). ถ้าเป็น SKU ตัวเลขจริง ให้พิมพ์เองที่ช่องด้านล่าง
+      if (fromScan && /^\d{8,}$/.test(code)) {
+        const r: ScanResult = { ok: false, title: "ไม่เก็บ (เหมือนบาร์โค้ดสินค้า)", label: code, sub: "ตัวเลขล้วนแบบบาร์โค้ด แต่ไม่พบสินค้า — ถ้าเป็น SKU จริงให้พิมพ์เองที่ช่องด้านล่าง" };
+        setMsg(r); return r;
+      }
       const added = await addSkuUnit({ sku: code, barcode: cur.barcode, branch });
       if (added.ok) {
         setTotal((t) => t + 1); setProdCount((c) => c + 1); setManual(""); router.refresh();
@@ -137,9 +143,9 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
                 )}
               </div>
               <div className="flex gap-1.5">
-                <input value={manual} onChange={(e) => setManual(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handle(manual); } }} disabled={busy || !prod}
+                <input value={manual} onChange={(e) => setManual(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handle(manual, false); } }} disabled={busy || !prod}
                   placeholder={prod ? "พิมพ์รหัส SKU แล้ว Enter" : "เลือกกลิ่นก่อน"} className="flex-1 min-w-0 h-[40px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand disabled:opacity-50" />
-                <button onClick={() => handle(manual)} disabled={busy || !prod || !manual.trim()} className="shrink-0 h-[40px] px-3 rounded-lg bg-brand-dark text-white text-sm font-medium disabled:opacity-40">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "เก็บ"}</button>
+                <button onClick={() => handle(manual, false)} disabled={busy || !prod || !manual.trim()} className="shrink-0 h-[40px] px-3 rounded-lg bg-brand-dark text-white text-sm font-medium disabled:opacity-40">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "เก็บ"}</button>
               </div>
             </div>
           </details>
