@@ -25,19 +25,24 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
   const [mode, setMode] = useState<"qty" | "sku" | "collect">("qty");   // นับตามจำนวน / สแกน SKU รายชิ้น / เก็บ SKU
   const [showCodes, setShowCodes] = useState(true);   // show every product's SKU codes by default
-  // สรุป SKU ที่มีในระบบต่อสินค้า (สาขานี้) — จัดกลุ่มตามบาร์โค้ด (กันขนาด "10 ml" vs "10 ml." แตกเป็นคนละแถว)
-  const skuGroups = useMemo(() => {
+  // สรุป SKU ในระบบ — จัดกลุ่ม "กลิ่น → ขนาด" (ขนาดรวมตามบาร์โค้ด กัน "10 ml" vs "10 ml." แตกแถว)
+  const scentGroups = useMemo(() => {
     const mlOf = (z: string) => { const m = z.match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
     const cleanSize = (z: string) => z.replace(/\s+/g, " ").trim().replace(/\s*\.\s*$/, "");   // "10 ml." → "10 ml"
-    const g = new Map<string, { key: string; scent: string; size: string; n: number; skus: string[] }>();
+    const byScent = new Map<string, Map<string, { key: string; size: string; n: number; skus: string[] }>>();
     for (const u of skuUnits) {
+      const scent = u.scent || "-";
       const bc = (u.barcode || "").trim();
-      const key = bc ? `bc:${bc}` : `nm:${(u.scent || "").toLowerCase()}|${cleanSize(u.size || "").toLowerCase()}`;
-      const r = g.get(key) || { key, scent: u.scent || "-", size: cleanSize(u.size || ""), n: 0, skus: [] };
+      const sizeKey = bc ? `bc:${bc}` : `sz:${cleanSize(u.size || "").toLowerCase()}`;
+      let sm = byScent.get(scent); if (!sm) { sm = new Map(); byScent.set(scent, sm); }
+      const r = sm.get(sizeKey) || { key: `${scent}|${sizeKey}`, size: cleanSize(u.size || ""), n: 0, skus: [] };
       r.n++; if (u.sku) r.skus.push(u.sku);
-      g.set(key, r);
+      sm.set(sizeKey, r);
     }
-    return [...g.values()].sort((a, b) => a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
+    return [...byScent.entries()].map(([scent, sm]) => {
+      const sizes = [...sm.values()].sort((a, b) => mlOf(a.size) - mlOf(b.size));
+      return { scent, total: sizes.reduce((s, x) => s + x.n, 0), sizes };
+    }).sort((a, b) => a.scent.localeCompare(b.scent, "th"));
   }, [skuUnits]);
 
   const base = useMemo<Item[]>(() =>
@@ -168,7 +173,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
           <div className="rounded-xl border border-line bg-surface p-3">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium text-ink">SKU ในระบบ (สาขานี้)</div>
-              {skuGroups.length > 0 && (
+              {scentGroups.length > 0 && (
                 <button onClick={() => setShowCodes((v) => !v)} className="text-xs text-brand-dark border border-line rounded-lg px-2 py-1 hover:bg-canvas">
                   {showCodes ? "ซ่อนรหัส SKU" : "แสดงรหัส SKU"}
                 </button>
@@ -181,25 +186,37 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
                 <div className="text-xl font-bold tabular-nums text-ink">{num(skuUnits.length)} <span className="text-sm font-normal text-muted">ชิ้น</span></div>
               </div>
               <div className="rounded-lg bg-canvas p-2.5">
-                <div className="text-[11px] text-muted">จำนวนสินค้า</div>
-                <div className="text-xl font-bold tabular-nums text-ink">{num(skuGroups.length)} <span className="text-sm font-normal text-muted">รายการ</span></div>
+                <div className="text-[11px] text-muted">จำนวนกลิ่น</div>
+                <div className="text-xl font-bold tabular-nums text-ink">{num(scentGroups.length)} <span className="text-sm font-normal text-muted">กลิ่น</span></div>
               </div>
             </div>
-            {skuGroups.length === 0 ? (
+            {scentGroups.length === 0 ? (
               <div className="text-xs text-muted py-2">ยังไม่มี SKU — เริ่มเก็บด้านบน (ยิงบาร์โค้ดสินค้า แล้วยิงสติกเกอร์ SKU)</div>
             ) : (
               <div className="-mx-1">
-                {skuGroups.map((g) => (
-                  <div key={g.key} className="border-t border-line-soft first:border-t-0 px-1 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-ink">{g.scent} <span className="text-muted font-normal">{g.size}</span></span>
-                      <span className="shrink-0 inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-brand-soft text-brand-dark text-xs font-bold tabular-nums">{num(g.n)}</span>
+                {scentGroups.map((g) => (
+                  <div key={g.scent} className="border-t border-line-soft first:border-t-0 py-2">
+                    {/* กลิ่น (หัวหลัก) */}
+                    <div className="flex items-center justify-between gap-2 px-1">
+                      <span className="text-[15px] font-semibold text-ink">{g.scent}</span>
+                      <span className="shrink-0 inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-brand-soft text-brand-dark text-xs font-bold tabular-nums">{num(g.total)}</span>
                     </div>
-                    {showCodes && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {g.skus.slice().sort().map((s) => <span key={s} className="font-mono text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 text-muted">{s}</span>)}
-                      </div>
-                    )}
+                    {/* ขนาด (sub) */}
+                    <div className="mt-1.5 pl-3 border-l-2 border-line-soft ml-1 space-y-1.5">
+                      {g.sizes.map((s) => (
+                        <div key={s.key}>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-muted min-w-[4.5rem]">{s.size || "—"}</span>
+                            <span className="tabular-nums font-medium text-ink">{num(s.n)} <span className="text-xs font-normal text-muted">ชิ้น</span></span>
+                          </div>
+                          {showCodes && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {s.skus.slice().sort().map((code) => <span key={code} className="font-mono text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 text-muted">{code}</span>)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
