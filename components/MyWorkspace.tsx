@@ -292,7 +292,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
           📅 บันทึกย้อนหลัง — บิลนี้จะลง <b>วันที่ {new Date(date + "T00:00:00").toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "2-digit" })}</b> (วันที่คุณกำลังดู)
         </div>
       )}
-      {bill && <BillForm state={bill} setState={setBill} pending={pending} fullName={fullName} autoScan={autoScan} laserMode={laserMode}
+      {bill && <BillForm state={bill} setState={setBill as (s: BillState | ((prev: BillState) => BillState)) => void} pending={pending} fullName={fullName} autoScan={autoScan} laserMode={laserMode}
         stockMap={stockMap} promo={promo} skuBarcodes={skuBarcodes} onCancel={() => setBill(null)} onSubmit={submitTheBill} />}
 
       {edit && <SaleForm state={edit} setState={setEdit} pending={pending} fullName={fullName}
@@ -358,7 +358,7 @@ function NationPicker({ value, onChange, invalid, big }: { value: string; onChan
 
 // ---------------------------------------------------------------- bill builder
 function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false, stockMap = null, promo = null, skuBarcodes = [] }: {
-  state: BillState; setState: (s: BillState) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null; promo?: Promo; skuBarcodes?: string[];
+  state: BillState; setState: (s: BillState | ((prev: BillState) => BillState)) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null; promo?: Promo; skuBarcodes?: string[];
 }) {
   // products that have serialized SKU stock → their lines REQUIRE scanning a SKU per unit
   const skuSet = useMemo(() => new Set(skuBarcodes), [skuBarcodes]);
@@ -377,55 +377,67 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const [missing, setMissing] = useState<string[]>([]);
   const [qrKey, setQrKey] = useState(0);   // bump to re-pop the K Shop QR (even on same-value pick)
   const bumpQr = (v: string) => { if (isKShop(v)) setQrKey((k) => k + 1); };
-  const set = (patch: Partial<BillState>) => setState({ ...state, ...patch });
+  const set = (patch: Partial<BillState>) => setState((prev) => ({ ...prev, ...patch }));
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
   const [confirmSku, setConfirmSku] = useState<string | null>(null);   // SKU incomplete → warn, but allow saving
   const [showDisc, setShowDisc] = useState(false);                 // end-of-bill discount hidden by default (tap to open)
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
-  const updateItem = (key: number, patch: Partial<BillItem>) => setState({ ...state, items: state.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) });
-  const addItem = (patch: Partial<BillItem> = {}) => setState({ ...state, items: [...state.items, newItem(patch)] });
+  // All item mutations use functional updates so rapid hardware-scanner shots (two bottles fired
+  // back-to-back, before a re-render) each see the LATEST items — a stale-closure write would
+  // otherwise clobber the first scan and record qty 1 for a 2-bottle sale.
+  const updateItem = (key: number, patch: Partial<BillItem>) => setState((prev) => ({ ...prev, items: prev.items.map((it) => (it.key === key ? { ...it, ...patch } : it)) }));
+  const addItem = (patch: Partial<BillItem> = {}) => setState((prev) => ({ ...prev, items: [...prev.items, newItem(patch)] }));
   // manual add: append an empty row and mark it so its card scrolls up + focuses the search box
-  const addManual = () => { const it = newItem(); setFocusKey(it.key); setState({ ...state, items: [...state.items, it] }); };
-  const removeItem = (key: number) => setState({ ...state, items: state.items.filter((it) => it.key !== key) });
+  const addManual = () => { const it = newItem(); setFocusKey(it.key); setState((prev) => ({ ...prev, items: [...prev.items, it] })); };
+  const removeItem = (key: number) => setState((prev) => ({ ...prev, items: prev.items.filter((it) => it.key !== key) }));
   const clearMiss = (f: string) => setMissing((m) => m.filter((x) => x !== f));
 
   const onScanned = async (code: string): Promise<ScanResult> => {
     const p = await lookupBarcode(code);
     if (p) {
-      // POS convention: scanning the same product again bumps its quantity
-      // instead of adding a duplicate line.
-      const existing = state.items.find((it) => it.barcode === p.barcode && String(it.item || "").trim());
-      if (existing) {
-        const qty = (Number(existing.qty) || 0) + 1;
-        updateItem(existing.key, { qty });
-        return { ok: true, label: p.scent, sub: `จำนวน ${qty} ชิ้น` };
-      }
+      // POS convention: scanning the same product again bumps its quantity instead of adding a
+      // duplicate line. The find-or-add runs INSIDE the functional update so two fast scans don't
+      // race (a stale read would drop the 2nd bottle → qty 1 for a 2-bottle sale).
       const pat = withPromo({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 }, promo);
-      addItem(pat);
-      const sub = [p.size, pat.unit_price ? `฿${Number(pat.unit_price).toLocaleString()}${pat.list_price ? " (โปร)" : ""}` : ""].filter(Boolean).join(" · ");
-      return { ok: true, label: p.scent, sub };
+      let result: ScanResult = { ok: true, label: p.scent };
+      setState((prev) => {
+        const existing = prev.items.find((it) => it.barcode === p.barcode && String(it.item || "").trim());
+        if (existing) {
+          const qty = (Number(existing.qty) || 0) + 1;
+          result = { ok: true, label: p.scent, sub: `จำนวน ${qty} ชิ้น` };
+          return { ...prev, items: prev.items.map((it) => (it.key === existing.key ? { ...it, qty } : it)) };
+        }
+        result = { ok: true, label: p.scent, sub: [p.size, pat.unit_price ? `฿${Number(pat.unit_price).toLocaleString()}${pat.list_price ? " (โปร)" : ""}` : ""].filter(Boolean).join(" · ") };
+        return { ...prev, items: [...prev.items, newItem(pat)] };
+      });
+      return result;
     }
     // not a product barcode → maybe a serialized SKU sticker. One scan per bottle: identify the
     // product from the SKU, attach it, bump qty. Easiest flow — cashier just keeps scanning.
     const sk = await checkSku(code, state.source);
     if (sk.ok) {
-      if (state.items.some((it) => (it.skus ?? []).includes(sk.sku)))
-        return { ok: false, label: `SKU ${sk.sku}`, sub: "สแกนซ้ำแล้ว" };
       const bc = sk.barcode || "";
-      const line = bc ? state.items.find((it) => it.barcode === bc && String(it.item || "").trim()) : undefined;
-      if (line) {
-        const skus = [...(line.skus ?? []), sk.sku];
-        updateItem(line.key, { skus, qty: Math.max(Number(line.qty) || 1, skus.length) });
-        return { ok: true, label: sk.scent || line.item, sub: `สแกน SKU แล้ว ${skus.length} ชิ้น` };
-      }
-      const prod = bc ? await lookupBarcode(bc) : null;
+      const prod = bc ? await lookupBarcode(bc) : null;   // awaited BEFORE the (synchronous) updater
       const pat = prod
         ? withPromo({ item: prod.scent, barcode: prod.barcode, size: prod.size || "", unit_price: prod.price ?? 0 }, promo)
         : { item: sk.scent || "", barcode: bc, size: sk.size || "" };
-      addItem({ ...pat, skus: [sk.sku], qty: 1 });
-      return { ok: true, label: sk.scent || prod?.scent || bc || sk.sku, sub: "สแกน SKU แล้ว 1 ชิ้น" };
+      let result: ScanResult = { ok: true, label: sk.scent || bc };
+      let dup = false;
+      setState((prev) => {
+        if (prev.items.some((it) => (it.skus ?? []).includes(sk.sku))) { dup = true; return prev; }
+        const line = bc ? prev.items.find((it) => it.barcode === bc && String(it.item || "").trim()) : undefined;
+        if (line) {
+          const skus = [...(line.skus ?? []), sk.sku];
+          result = { ok: true, label: sk.scent || line.item, sub: `สแกน SKU แล้ว ${skus.length} ชิ้น` };
+          return { ...prev, items: prev.items.map((it) => (it.key === line.key ? { ...it, skus, qty: Math.max(Number(it.qty) || 1, skus.length) } : it)) };
+        }
+        result = { ok: true, label: sk.scent || prod?.scent || bc || sk.sku, sub: "สแกน SKU แล้ว 1 ชิ้น" };
+        return { ...prev, items: [...prev.items, newItem({ ...pat, skus: [sk.sku], qty: 1 })] };
+      });
+      if (dup) return { ok: false, label: `SKU ${sk.sku}`, sub: "สแกนซ้ำแล้ว" };
+      return result;
     }
     // a real SKU that can't be sold (already sold / wrong branch) → show why, don't add a line
     if (sk.error && !sk.error.includes("ไม่พบ")) return { ok: false, label: `SKU ${code}`, sub: sk.error };
