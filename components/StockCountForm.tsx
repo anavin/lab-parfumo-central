@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
-import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye } from "lucide-react";
+import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye, ChevronDown } from "lucide-react";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { num } from "@/lib/format";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -24,14 +24,18 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
   const [mode, setMode] = useState<"qty" | "sku" | "collect">("qty");   // นับตามจำนวน / สแกน SKU รายชิ้น / เก็บ SKU
-  // สรุปจำนวน SKU ที่มีในระบบต่อกลิ่น (สาขานี้) — โชว์ในแท็บ "เก็บ SKU" ให้คนเก็บเห็นของที่มีแล้ว
+  const [skuOpen, setSkuOpen] = useState<string | null>(null);   // which product group's SKU list is expanded
+  // สรุป SKU ที่มีในระบบต่อสินค้า (สาขานี้) — จัดกลุ่มตามบาร์โค้ด (กันขนาด "10 ml" vs "10 ml." แตกเป็นคนละแถว)
   const skuGroups = useMemo(() => {
     const mlOf = (z: string) => { const m = z.match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
-    const g = new Map<string, { scent: string; size: string; n: number }>();
+    const cleanSize = (z: string) => z.replace(/\s+/g, " ").trim().replace(/\s*\.\s*$/, "");   // "10 ml." → "10 ml"
+    const g = new Map<string, { key: string; scent: string; size: string; n: number; skus: string[] }>();
     for (const u of skuUnits) {
-      const k = `${u.scent || ""}|${u.size || ""}`;
-      const r = g.get(k) || { scent: u.scent || "-", size: u.size || "", n: 0 };
-      r.n++; g.set(k, r);
+      const bc = (u.barcode || "").trim();
+      const key = bc ? `bc:${bc}` : `nm:${(u.scent || "").toLowerCase()}|${cleanSize(u.size || "").toLowerCase()}`;
+      const r = g.get(key) || { key, scent: u.scent || "-", size: cleanSize(u.size || ""), n: 0, skus: [] };
+      r.n++; if (u.sku) r.skus.push(u.sku);
+      g.set(key, r);
     }
     return [...g.values()].sort((a, b) => a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
   }, [skuUnits]);
@@ -166,14 +170,27 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
             {skuGroups.length === 0 ? (
               <div className="text-xs text-muted py-2">ยังไม่มี SKU — เริ่มเก็บด้านบน (ยิงบาร์โค้ดสินค้า แล้วยิงสติกเกอร์ SKU)</div>
             ) : (
-              <div className="max-h-72 overflow-auto -mx-1">
-                {skuGroups.map((g) => (
-                  <div key={g.scent + g.size} className="flex items-center justify-between px-1 py-1.5 border-t border-line-soft first:border-t-0 text-sm">
-                    <span className="text-ink">{g.scent} <span className="text-muted">{g.size}</span></span>
-                    <span className="tabular-nums font-semibold text-ink">{num(g.n)}</span>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="text-[11px] text-muted mb-1">แตะรายการเพื่อดูรหัส SKU ที่เก็บ</div>
+                <div className="max-h-72 overflow-auto -mx-1">
+                  {skuGroups.map((g) => (
+                    <div key={g.key} className="border-t border-line-soft first:border-t-0">
+                      <button onClick={() => setSkuOpen(skuOpen === g.key ? null : g.key)} className="w-full flex items-center justify-between px-1 py-1.5 text-sm text-left hover:bg-canvas/60">
+                        <span className="text-ink">{g.scent} <span className="text-muted">{g.size}</span></span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="tabular-nums font-semibold text-ink">{num(g.n)}</span>
+                          <ChevronDown className={"w-3.5 h-3.5 text-muted transition-transform " + (skuOpen === g.key ? "rotate-180" : "")} />
+                        </span>
+                      </button>
+                      {skuOpen === g.key && (
+                        <div className="flex flex-wrap gap-1 px-1 pb-2">
+                          {g.skus.slice().sort().map((s) => <span key={s} className="font-mono text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 text-ink">{s}</span>)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
