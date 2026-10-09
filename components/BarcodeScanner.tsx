@@ -444,11 +444,11 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
           {/* manual barcode entry — type the digits under the barcode when it won't scan */}
           {manual && (
             <div className="absolute inset-0 z-20 bg-black/95 flex flex-col items-center justify-center px-6" onClick={(e) => e.stopPropagation()}>
-              <div className="text-white/90 text-sm mb-3 text-center">พิมพ์เลขบาร์โค้ด (ตัวเลขใต้แถบบาร์โค้ด)</div>
-              <input autoFocus inputMode="numeric" value={manualVal}
-                onChange={(e) => setManualVal(e.target.value.replace(/[^\dA-Za-z]/g, ""))}
+              <div className="text-white/90 text-sm mb-3 text-center">พิมพ์รหัสใต้แถบบาร์โค้ด (ตัวเลข/ตัวอักษร)</div>
+              <input autoFocus inputMode="text" autoCapitalize="characters" autoCorrect="off" spellCheck={false} value={manualVal}
+                onChange={(e) => setManualVal(e.target.value.replace(/[^\dA-Za-z ]/g, ""))}
                 onKeyDown={(e) => { if (e.key === "Enter") submitManual(); }}
-                className="w-full max-w-xs text-center text-lg tracking-wider rounded-xl px-4 py-3 bg-white text-black outline-none" placeholder="เช่น 8857128012026" />
+                className="w-full max-w-xs text-center text-lg tracking-wider rounded-xl px-4 py-3 bg-white text-black outline-none" placeholder="เช่น 8857128012026 หรือ Lab50 TA0038" />
               <div className="flex gap-2 mt-4 w-full max-w-xs">
                 <button onClick={() => { setManual(false); setManualVal(""); }} className="flex-1 py-3 rounded-xl border border-white/30 text-white/80">ยกเลิก</button>
                 <button onClick={submitManual} disabled={!manualVal.trim()} className="flex-1 py-3 rounded-xl bg-brand text-white font-semibold disabled:opacity-50">ตกลง</button>
