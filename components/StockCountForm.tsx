@@ -4,6 +4,7 @@ import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
 import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye } from "lucide-react";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
+import { num } from "@/lib/format";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 import { SkuCountMode } from "@/components/SkuCountMode";
@@ -23,6 +24,17 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
   const [mode, setMode] = useState<"qty" | "sku" | "collect">("qty");   // นับตามจำนวน / สแกน SKU รายชิ้น / เก็บ SKU
+  // สรุปจำนวน SKU ที่มีในระบบต่อกลิ่น (สาขานี้) — โชว์ในแท็บ "เก็บ SKU" ให้คนเก็บเห็นของที่มีแล้ว
+  const skuGroups = useMemo(() => {
+    const mlOf = (z: string) => { const m = z.match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+    const g = new Map<string, { scent: string; size: string; n: number }>();
+    for (const u of skuUnits) {
+      const k = `${u.scent || ""}|${u.size || ""}`;
+      const r = g.get(k) || { scent: u.scent || "-", size: u.size || "", n: 0 };
+      r.n++; g.set(k, r);
+    }
+    return [...g.values()].sort((a, b) => a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
+  }, [skuUnits]);
 
   const base = useMemo<Item[]>(() =>
     expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)), changed: (Number(e.sold) || 0) > 0, verified: false })).sort(byName), [expected]);
@@ -148,6 +160,22 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
         <div>
           <p className="text-xs text-muted mb-2">ยิงบาร์โค้ดสินค้า 1 ครั้งเพื่อเลือกกลิ่น แล้วยิงสติกเกอร์ SKU ที่ขวดทีละใบ (ลงทะเบียนของที่ยังไม่มี SKU ในระบบ)</p>
           <SkuAddPanel branch={branch} defaultOpen />
+          {/* สรุป SKU ที่มีในระบบ (สาขานี้) — อัปเดตทุกครั้งที่เก็บ ให้เห็นว่าเก็บไปแล้วเท่าไหร่ */}
+          <div className="rounded-xl border border-line bg-surface p-3">
+            <div className="text-sm font-medium text-ink mb-2">SKU ในระบบ (สาขานี้) · {num(skuUnits.length)} ชิ้น</div>
+            {skuGroups.length === 0 ? (
+              <div className="text-xs text-muted py-2">ยังไม่มี SKU — เริ่มเก็บด้านบน (ยิงบาร์โค้ดสินค้า แล้วยิงสติกเกอร์ SKU)</div>
+            ) : (
+              <div className="max-h-72 overflow-auto -mx-1">
+                {skuGroups.map((g) => (
+                  <div key={g.scent + g.size} className="flex items-center justify-between px-1 py-1.5 border-t border-line-soft first:border-t-0 text-sm">
+                    <span className="text-ink">{g.scent} <span className="text-muted">{g.size}</span></span>
+                    <span className="tabular-nums font-semibold text-ink">{num(g.n)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : mode === "sku" ? (
         <SkuCountMode units={skuUnits} />
