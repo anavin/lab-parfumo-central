@@ -3,7 +3,7 @@
    (cache-first, never stale-wrong); navigations are network-first with a
    friendly offline fallback. Dynamic data / API / RSC are never cached, so no
    stale auth or figures. Bump VERSION to roll the cache. */
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = "lp-static-" + VERSION;
 const OFFLINE_URL = "/offline";
 
