@@ -192,9 +192,9 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
                 <div className="text-[11px] text-muted">รวมทั้งหมด</div>
                 <div className="text-xl font-bold tabular-nums text-ink">{num(totals.all)}</div>
               </div>
-              <div className="rounded-lg bg-success-soft/50 p-2.5">
-                <div className="text-[11px] text-success">เก็บหน้าร้าน</div>
-                <div className="text-xl font-bold tabular-nums text-success">{num(totals.store)}</div>
+              <div className="rounded-lg bg-brand-soft/60 p-2.5">
+                <div className="text-[11px] text-brand-dark">เก็บหน้าร้าน</div>
+                <div className="text-xl font-bold tabular-nums text-brand-dark">{num(totals.store)}</div>
               </div>
               <div className="rounded-lg bg-canvas p-2.5">
                 <div className="text-[11px] text-muted">จากคลัง/เก่า</div>
@@ -244,7 +244,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {chips.slice().sort((a, b) => a.code.localeCompare(b.code)).map((c) => (
                                     <span key={c.code} title={c.store ? "เก็บหน้าร้าน" : "จากคลัง/เก่า"}
-                                      className={"font-mono text-[11px] rounded px-1.5 py-0.5 border " + (c.store ? "bg-success-soft border-success/40 text-success" : "bg-canvas border-line text-muted")}>{c.code}</span>
+                                      className={"font-mono text-[11px] rounded px-1.5 py-0.5 border " + (c.store ? "bg-brand-soft border-brand/40 text-brand-dark" : "bg-canvas border-line text-muted")}>{c.code}</span>
                                   ))}
                                 </div>
                               )}
@@ -259,7 +259,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
             )}
             {showCodes && scentGroups.length > 0 && (
               <div className="flex items-center gap-3 mt-2 text-[11px] text-muted">
-                <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-success-soft border border-success/40" /> เก็บหน้าร้าน</span>
+                <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-brand-soft border border-brand/40" /> เก็บหน้าร้าน</span>
                 <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-canvas border border-line" /> จากคลัง/เก่า</span>
               </div>
             )}
