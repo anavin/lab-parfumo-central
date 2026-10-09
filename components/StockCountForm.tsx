@@ -188,7 +188,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
             {skuGroups.length === 0 ? (
               <div className="text-xs text-muted py-2">ยังไม่มี SKU — เริ่มเก็บด้านบน (ยิงบาร์โค้ดสินค้า แล้วยิงสติกเกอร์ SKU)</div>
             ) : (
-              <div className="max-h-96 overflow-auto -mx-1">
+              <div className="-mx-1">
                 {skuGroups.map((g) => (
                   <div key={g.key} className="border-t border-line-soft first:border-t-0 px-1 py-2">
                     <div className="flex items-center justify-between gap-2">
