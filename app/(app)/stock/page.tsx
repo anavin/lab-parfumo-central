@@ -11,6 +11,7 @@ import { StockTrend } from "@/components/StockTrend";
 import { StockLoss, type LossRow } from "@/components/StockLoss";
 import { TesterStock } from "@/components/TesterStock";
 import { SkuTracker } from "@/components/SkuTracker";
+import { SkuReconcile } from "@/components/SkuReconcile";
 import { StockAdjust } from "@/components/StockAdjust";
 import { BranchStockClose } from "@/components/BranchStockClose";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -165,6 +166,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           tester={<TesterStock rows={testers} branch={branch} />}
           /* SKU tracking เป็นข้อมูลติดตามเชิงจัดการ → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (requisitions) */
           sku={canRequisition ? <SkuTracker rows={skus} branch={branch} /> : null}
+          reconcile={canRequisition ? <SkuReconcile stock={rows} skus={skus} branch={branch} /> : null}
           /* ป้องกันของหายมีข้อมูลอ่อนไหว → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (สิทธิ์ requisitions) */
           loss={canRequisition ? <StockLoss rows={lossRows} summary={lossSummary} branch={branch} signals={signals} coverage={coverage} /> : null}
         />
