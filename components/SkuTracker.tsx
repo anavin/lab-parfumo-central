@@ -8,7 +8,9 @@ import { updateSkuUnit, deleteSkuUnit } from "@/lib/actions/sku";
 import { SkuAddPanel } from "@/components/SkuAddPanel";
 import type { SkuUnitRow } from "@/lib/queries";
 
-type Filter = "in_stock" | "sold" | "all";
+type Filter = "in_stock" | "sold" | "all" | "today";
+const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+const bkkDate = (iso: string | null) => { if (!iso) return ""; const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); };
 
 // ติดตาม SKU รายชิ้น — รับเข้ามาเป็น in_stock, ขายแล้วผูกกับบิล (เฟส 3)
 // ใช้เช็คว่าแต่ละ SKU อยู่ไหน / ขายไปบิลใด / เหลือกี่ชิ้น เพื่อตามของขาด-หาย
@@ -26,21 +28,26 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
     if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ");
   };
 
+  const today = bkkToday();
   const counts = useMemo(() => {
-    let inStock = 0, sold = 0, other = 0;
-    for (const r of rows) r.status === "in_stock" ? inStock++ : r.status === "sold" ? sold++ : other++;
-    return { inStock, sold, other, total: rows.length };
-  }, [rows]);
+    let inStock = 0, sold = 0, other = 0, todayN = 0;
+    for (const r of rows) {
+      r.status === "in_stock" ? inStock++ : r.status === "sold" ? sold++ : other++;
+      if (bkkDate(r.received_at) === today) todayN++;
+    }
+    return { inStock, sold, other, total: rows.length, today: todayN };
+  }, [rows, today]);
 
   const shown = useMemo(() => {
     const t = qText.trim().toLowerCase();
     return rows.filter((r) => {
       if (filter === "in_stock" && r.status !== "in_stock") return false;
       if (filter === "sold" && r.status !== "sold") return false;
+      if (filter === "today" && bkkDate(r.received_at) !== today) return false;
       if (!t) return true;
       return [r.sku, r.scent, r.size, r.sold_receipt_no].some((v) => String(v || "").toLowerCase().includes(t));
-    });
-  }, [rows, filter, qText]);
+    }).sort((a, b) => String(b.received_at || "").localeCompare(String(a.received_at || "")));   // newest-collected first
+  }, [rows, filter, qText, today]);
 
   const Pill = ({ id, label, n }: { id: Filter; label: string; n: number }) => (
     <button onClick={() => setFilter(id)}
@@ -79,6 +86,7 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
         <Pill id="in_stock" label="คงเหลือ" n={counts.inStock} />
         <Pill id="sold" label="ขายแล้ว" n={counts.sold} />
         <Pill id="all" label="ทั้งหมด" n={counts.total} />
+        <Pill id="today" label="เก็บวันนี้" n={counts.today} />
         <div className="relative ml-auto">
           <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input value={qText} onChange={(e) => setQText(e.target.value)} placeholder="ค้นหา SKU / กลิ่น / เลขบิล"
