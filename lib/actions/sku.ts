@@ -35,7 +35,7 @@ export async function checkSku(sku: string, branch: string, barcode?: string): P
   }
 }
 
-export type SkuAdd = { ok: true; scent: string | null; size: string | null } | { ok: false; error: string };
+export type SkuAdd = { ok: true; scent: string | null; size: string | null; already?: boolean } | { ok: false; error: string };
 /** Manually register an existing SKU sticker into stock at a branch (for stock that didn't arrive
  *  with a SKU from the warehouse). Picks the product by barcode, records the unit as in_stock.
  *  Manager-only. Rejects a SKU that already exists (so a sold unit can't be silently reset). */
@@ -50,9 +50,13 @@ export async function addSkuUnit(input: { sku: string; barcode: string; branch: 
   try {
     const [p] = await q<{ scent: string | null; size: string | null }>(`select scent, size from products where barcode = $1`, [barcode]);
     if (!p) return { ok: false, error: "ไม่พบสินค้าตามบาร์โค้ดนี้" };
-    const [ex] = await q<{ status: string }>(
-      `select status from sku_units where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g')) limit 1`, [sku]);
-    if (ex) return { ok: false, error: ex.status === "sold" ? `SKU "${sku}" ขายไปแล้ว` : `SKU "${sku}" มีในระบบอยู่แล้ว` };
+    const [ex] = await q<{ status: string; scent: string | null; size: string | null }>(
+      `select status, scent, size from sku_units where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g')) limit 1`, [sku]);
+    if (ex) {
+      if (ex.status === "sold") return { ok: false, error: `SKU "${sku}" ขายไปแล้ว` };
+      // already in_stock → nothing to do, but it's fine (the bottle is already tracked), not an error
+      return { ok: true, scent: ex.scent, size: ex.size, already: true };
+    }
     await q(`insert into sku_units (sku, barcode, scent, size, branch, received_by, status, received_at)
              values ($1,$2,$3,$4,$5,$6,'in_stock', now())`,
       [sku, barcode, p.scent, p.size, branch, me.id]);

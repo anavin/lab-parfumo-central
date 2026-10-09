@@ -54,7 +54,11 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
       }
       const added = await addSkuUnit({ sku: code, barcode: cur.barcode, branch });
       if (added.ok) {
-        setTotal((t) => t + 1); setProdCount((c) => c + 1); setManual(""); router.refresh();
+        setManual("");
+        if (added.already) {   // มีอยู่แล้ว = ขวดนี้ถูกบันทึกไว้แล้ว (ไม่ใช่ error) ไม่ต้องนับเพิ่ม/รีเฟรช
+          const r: ScanResult = { ok: true, title: "มีอยู่แล้ว ✓", label: added.scent || cur.scent, sub: `${code} อยู่ในระบบแล้ว` }; setMsg(r); return r;
+        }
+        setTotal((t) => t + 1); setProdCount((c) => c + 1); router.refresh();
         const r: ScanResult = { ok: true, title: "เก็บ SKU แล้ว", label: cur.scent, sub: code }; setMsg(r); return r;
       }
       const r: ScanResult = { ok: false, title: "เก็บไม่ได้", label: `SKU ${code}`, sub: added.error }; setMsg(r); return r;
