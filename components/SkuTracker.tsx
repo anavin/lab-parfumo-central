@@ -1,14 +1,14 @@
 "use client";
 import { Fragment, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Barcode, Search, PackageCheck, ShoppingCart, Plus, ScanLine, Check, X, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Barcode, Search, PackageCheck, ShoppingCart, Plus, ScanLine, Check, X, Loader2, Pencil, Trash2, AlertTriangle, Undo2 } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName, branchOptions } from "@/lib/branches";
-import { updateSkuUnit, deleteSkuUnit } from "@/lib/actions/sku";
+import { updateSkuUnit, deleteSkuUnit, clearSkuFlag } from "@/lib/actions/sku";
 import { SkuAddPanel } from "@/components/SkuAddPanel";
 import type { SkuUnitRow } from "@/lib/queries";
 
-type Filter = "in_stock" | "sold" | "all" | "today";
+type Filter = "in_stock" | "sold" | "all" | "today" | "flagged";
 const bkkToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const bkkDate = (iso: string | null) => { if (!iso) return ""; const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); };
 
@@ -27,15 +27,29 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
     setBusySku(null);
     if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ");
   };
+  const unflag = async (sku: string) => {
+    setBusySku(sku);
+    const r = await clearSkuFlag(sku);
+    setBusySku(null);
+    if (r.ok) router.refresh(); else alert(r.error ?? "ล้างธงไม่สำเร็จ");
+  };
+  const returnToStock = async (sku: string) => {
+    if (!confirm(`คืน SKU "${sku}" กลับเข้าสต๊อก (เปลี่ยนจากขายแล้ว → คงเหลือ)?`)) return;
+    setBusySku(sku);
+    const r = await updateSkuUnit({ sku, status: "in_stock" });
+    setBusySku(null);
+    if (r.ok) router.refresh(); else alert(r.error ?? "คืนสต๊อกไม่สำเร็จ");
+  };
 
   const today = bkkToday();
   const counts = useMemo(() => {
-    let inStock = 0, sold = 0, other = 0, todayN = 0;
+    let inStock = 0, sold = 0, other = 0, todayN = 0, flagged = 0;
     for (const r of rows) {
       r.status === "in_stock" ? inStock++ : r.status === "sold" ? sold++ : other++;
       if (bkkDate(r.received_at) === today) todayN++;
+      if (r.shelf_flag_at) flagged++;
     }
-    return { inStock, sold, other, total: rows.length, today: todayN };
+    return { inStock, sold, other, total: rows.length, today: todayN, flagged };
   }, [rows, today]);
 
   const shown = useMemo(() => {
@@ -44,6 +58,7 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
       if (filter === "in_stock" && r.status !== "in_stock") return false;
       if (filter === "sold" && r.status !== "sold") return false;
       if (filter === "today" && bkkDate(r.received_at) !== today) return false;
+      if (filter === "flagged" && !r.shelf_flag_at) return false;
       if (!t) return true;
       return [r.sku, r.scent, r.size, r.sold_receipt_no].some((v) => String(v || "").toLowerCase().includes(t));
     }).sort((a, b) => String(b.received_at || "").localeCompare(String(a.received_at || "")));   // newest-collected first
@@ -82,11 +97,19 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
         </div>
       </div>
 
+      {counts.flagged > 0 && (
+        <button onClick={() => setFilter("flagged")} className="w-full text-left flex items-center gap-2 mb-3 rounded-xl border border-warn/40 bg-warn-soft/50 px-3 py-2.5 hover:bg-warn-soft">
+          <AlertTriangle className="w-5 h-5 text-warn shrink-0" />
+          <span className="text-sm text-warn"><b>พบ {num(counts.flagged)} รายการ: ขายแล้วแต่เจอบนชั้น</b> — พนักงานสแกนตอนเก็บ SKU · แตะเพื่อดู แล้วเลือกคืนสต๊อก/ล้างธง</span>
+        </button>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <Pill id="in_stock" label="คงเหลือ" n={counts.inStock} />
         <Pill id="sold" label="ขายแล้ว" n={counts.sold} />
         <Pill id="all" label="ทั้งหมด" n={counts.total} />
         <Pill id="today" label="เก็บวันนี้" n={counts.today} />
+        {counts.flagged > 0 && <Pill id="flagged" label="⚠ เจอบนชั้น" n={counts.flagged} />}
         <div className="relative ml-auto">
           <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input value={qText} onChange={(e) => setQText(e.target.value)} placeholder="ค้นหา SKU / กลิ่น / เลขบิล"
@@ -115,12 +138,14 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
             <tbody>
               {shown.map((r) => (
                 <Fragment key={r.sku}>
-                  <tr className="border-t border-line-soft">
+                  <tr className={"border-t border-line-soft " + (r.shelf_flag_at ? "bg-warn-soft/40" : "")}>
                     <td className="px-3 py-2 font-mono text-[13px] text-ink whitespace-nowrap">{r.sku}</td>
                     <td className="px-3 py-2 text-ink whitespace-nowrap">{r.scent || "—"}</td>
                     <td className="px-3 py-2 text-muted whitespace-nowrap">{r.size || "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
-                      {r.status === "in_stock"
+                      {r.shelf_flag_at
+                        ? <span className="text-[11px] whitespace-nowrap rounded-full px-2 py-0.5 bg-warn-soft text-warn font-medium" title="ขายแล้วแต่สแกนเจอบนชั้น"><AlertTriangle className="w-3 h-3 inline -mt-0.5" /> ขายแล้ว·เจอบนชั้น</span>
+                        : r.status === "in_stock"
                         ? <span className="chip-success text-[11px]">คงเหลือ</span>
                         : r.status === "sold"
                         ? <span className="chip-muted text-[11px]">ขายแล้ว</span>
@@ -131,7 +156,13 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
                       {r.sold_receipt_no ? <>{r.sold_receipt_no}{r.sold_branch ? ` · ${branchName(r.sold_branch)}` : ""}</> : "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-right">
-                      <div className="inline-flex gap-1">
+                      <div className="inline-flex gap-1 items-center">
+                        {r.shelf_flag_at && (
+                          <>
+                            <button onClick={() => returnToStock(r.sku)} disabled={busySku === r.sku} className="inline-flex items-center gap-1 text-[11px] text-success border border-success/40 rounded-lg px-2 py-1 hover:bg-success-soft" title="คืนเข้าสต๊อก (ของกลับมา)"><Undo2 className="w-3.5 h-3.5" /> คืนสต๊อก</button>
+                            <button onClick={() => unflag(r.sku)} disabled={busySku === r.sku} className="text-[11px] text-muted border border-line rounded-lg px-2 py-1 hover:bg-canvas" title="ล้างธง (ตรวจแล้วปกติ)">ล้างธง</button>
+                          </>
+                        )}
                         <button onClick={() => setEditSku(editSku === r.sku ? null : r.sku)} className="p-1.5 rounded-lg text-muted hover:bg-canvas" title="แก้ไข"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => del(r.sku)} disabled={busySku === r.sku} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-canvas" title="ลบ">
                           {busySku === r.sku ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

@@ -398,20 +398,25 @@ export type SkuUnitRow = {
   sku: string; barcode: string | null; scent: string | null; size: string | null;
   branch: string; status: string; received_at: string; po_number: string | null;
   sold_receipt_no: string | null; sold_branch: string | null; sold_at: string | null;
+  shelf_flag_at: string | null;
 };
 /** Serialized SKU units for the SKU-tracking view (phase 1–2). Each row is one physical unit
  *  received from the warehouse. status in_stock = still on the shelf; sold = linked to a bill
  *  (phase 3). Branch filter matches the branch it was received at. Empty before 0036 is migrated. */
 export async function skuUnits(branch: string | null = null): Promise<SkuUnitRow[]> {
-  const sql = `
+  const sel = (flag: string) => `
     select sku, barcode, scent, size, branch, status,
            received_at::text received_at, po_number,
-           sold_receipt_no, sold_branch, sold_at::text sold_at
+           sold_receipt_no, sold_branch, sold_at::text sold_at, ${flag} shelf_flag_at
     from sku_units
     where ($1::text is null or branch = upper($1))
     order by (status <> 'in_stock'), scent nulls last, size, received_at desc`;
-  try { return await q<SkuUnitRow>(sql, [branch]); }
-  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+  try { return await q<SkuUnitRow>(sel("shelf_flag_at::text"), [branch]); }
+  catch (e: any) {
+    if (e?.code === "42P01") return [];
+    if (e?.code === "42703") return q<SkuUnitRow>(sel("null::text"), [branch]);   // shelf_flag_at not migrated (pre-0037)
+    throw e;
+  }
 }
 
 /** Barcodes that currently have ≥1 in_stock serialized unit at a branch. The sale page uses this

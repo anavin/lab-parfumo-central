@@ -61,6 +61,7 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
         setTotal((t) => t + 1); setProdCount((c) => c + 1); router.refresh();
         const r: ScanResult = { ok: true, title: "เก็บ SKU แล้ว", label: cur.scent, sub: code }; setMsg(r); return r;
       }
+      if (added.soldOnShelf) { const r: ScanResult = { ok: false, title: "⚠ ขายแล้วแต่เจอบนชั้น", label: `SKU ${code}`, sub: "บันทึกให้ผู้จัดการตรวจแล้ว" }; setMsg(r); return r; }
       const r: ScanResult = { ok: false, title: "เก็บไม่ได้", label: `SKU ${code}`, sub: added.error }; setMsg(r); return r;
     } finally { setBusy(false); }
   };

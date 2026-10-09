@@ -35,7 +35,7 @@ export async function checkSku(sku: string, branch: string, barcode?: string): P
   }
 }
 
-export type SkuAdd = { ok: true; scent: string | null; size: string | null; already?: boolean } | { ok: false; error: string };
+export type SkuAdd = { ok: true; scent: string | null; size: string | null; already?: boolean } | { ok: false; error: string; soldOnShelf?: boolean };
 /** Manually register an existing SKU sticker into stock at a branch (for stock that didn't arrive
  *  with a SKU from the warehouse). Picks the product by barcode, records the unit as in_stock.
  *  Manager-only. Rejects a SKU that already exists (so a sold unit can't be silently reset). */
@@ -53,7 +53,13 @@ export async function addSkuUnit(input: { sku: string; barcode: string; branch: 
     const [ex] = await q<{ status: string; scent: string | null; size: string | null }>(
       `select status, scent, size from sku_units where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g')) limit 1`, [sku]);
     if (ex) {
-      if (ex.status === "sold") return { ok: false, error: `SKU "${sku}" ขายไปแล้ว` };
+      if (ex.status === "sold") {
+        // sold but physically on the shelf → real anomaly. Flag it for the manager (audit), fail-soft.
+        try { await q(`update sku_units set shelf_flag_at = now(), shelf_flag_by = $2
+                       where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g'))`, [sku, me.id]); } catch {}
+        revalidatePath("/stock");
+        return { ok: false, error: `SKU "${sku}" ขายไปแล้วแต่เจอบนชั้น — บันทึกให้ผู้จัดการตรวจแล้ว`, soldOnShelf: true };
+      }
       // already in_stock → nothing to do, but it's fine (the bottle is already tracked), not an error
       return { ok: true, scent: ex.scent, size: ex.size, already: true };
     }
@@ -89,6 +95,7 @@ export async function updateSkuUnit(input: { sku: string; barcode?: string; bran
     if (input.status) {
       sets.push(`status=$${i++}`); args.push(input.status);
       if (input.status !== "sold") sets.push(`sold_submission_id=null`, `sold_receipt_no=null`, `sold_branch=null`, `sold_at=null`);
+      sets.push(`shelf_flag_at=null`, `shelf_flag_by=null`);   // changing status resolves the shelf anomaly
     }
     if (!sets.length) return { ok: true };
     await q(`update sku_units set ${sets.join(", ")} where sku = $1`, args);
@@ -98,6 +105,22 @@ export async function updateSkuUnit(input: { sku: string; barcode?: string; bran
     if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง SKU" };
     console.error("[updateSkuUnit]", e);
     return { ok: false, error: "แก้ไขไม่สำเร็จ ลองใหม่" };
+  }
+}
+
+/** Dismiss the "sold but found on shelf" flag without changing status (manager confirmed it's fine). */
+export async function clearSkuFlag(sku: string): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("requisitions");
+  const s = String(sku || "").trim();
+  if (!s) return { ok: false, error: "ไม่มีรหัส SKU" };
+  try {
+    await q(`update sku_units set shelf_flag_at = null, shelf_flag_by = null where sku = $1`, [s]);
+    revalidatePath("/stock");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง SKU" };
+    console.error("[clearSkuFlag]", e);
+    return { ok: false, error: "ล้างธงไม่สำเร็จ" };
   }
 }
 
