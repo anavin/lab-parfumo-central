@@ -355,6 +355,9 @@ export async function updateMySale(id: number, input: unknown) {
      d.payment_channel || null, d.nation || null]);
   await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
   await applyEditTenders(id, d, total);
+  // editing can change product/qty, which the scanned SKU links can't track → free them so they
+  // never point at the wrong product/quantity. Re-scan if SKU tracking is needed for the edited sale.
+  await freeSkusForSubmission(id);
   await logAudit("update", "submission", id, `แก้ไข: ${d.item}`);
   revalidatePath("/my"); revalidatePath("/review");
 }
@@ -429,6 +432,7 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
        d.payment_channel || null, d.nation || null]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
     await applyEditTenders(id, d, total);
+    await freeSkusForSubmission(id);   // edit may change product/qty → drop stale SKU links (re-scan if needed)
     const diff = diffDetail(row,
       { item: d.item, size: d.size || "", qty: d.qty, unit_price: d.unit_price ?? 0, discount, total, payment_channel: d.payment_channel || "", nation: d.nation || "", receipt_no: d.receipt_no || "" },
       { item: "สินค้า", size: "ขนาด", qty: "จำนวน", unit_price: "ราคา", discount: "ส่วนลด", total: "รวม", payment_channel: "ช่องทาง", nation: "สัญชาติ", receipt_no: "เลขใบเสร็จ" });
@@ -616,7 +620,7 @@ export async function trashMany(ids: number[]): Promise<{ ok: boolean; error?: s
       const res = await q<{ id: number; receipt_no: string | null }>(
         `update submissions set deleted_at = now(), updated_at = now()
          where id = $1 and status <> 'approved' and deleted_at is null returning id, receipt_no`, [id]);
-      if (res.length) { ok++; if (res[0].receipt_no) refs.add(res[0].receipt_no); }
+      if (res.length) { ok++; if (res[0].receipt_no) refs.add(res[0].receipt_no); await freeSkusForSubmission(id); }
     }
   } catch (e: any) {
     if (e?.code === "42703") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบถังขยะบิลบนเซิร์ฟเวอร์ (ต้องรัน SQL 0011 ก่อน)" };
