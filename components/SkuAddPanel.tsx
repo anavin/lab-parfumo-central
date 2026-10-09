@@ -41,17 +41,17 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
         .then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (p && p.barcode) {
         setProduct({ barcode: p.barcode, scent: p.scent, size: p.size || "" });
-        const r: ScanResult = { ok: true, label: `${p.scent} ${p.size || ""}`.trim(), sub: "เลือกกลิ่นแล้ว — ยิงสติกเกอร์ SKU ได้เลย" };
+        const r: ScanResult = { ok: true, title: "เลือกกลิ่นแล้ว", label: `${p.scent} ${p.size || ""}`.trim(), sub: "ยิงสติกเกอร์ SKU ของขวดนี้ได้เลย" };
         setMsg(r); return r;
       }
       const cur = prodRef.current;
-      if (!cur) { const r: ScanResult = { ok: false, label: `SKU ${code}`, sub: "ยิงบาร์โค้ดสินค้าก่อน (เลือกกลิ่น)" }; setMsg(r); return r; }
+      if (!cur) { const r: ScanResult = { ok: false, title: "ยังไม่ได้เลือกกลิ่น", label: `SKU ${code}`, sub: "ยิงบาร์โค้ดสินค้าก่อน 1 ครั้ง" }; setMsg(r); return r; }
       const added = await addSkuUnit({ sku: code, barcode: cur.barcode, branch });
       if (added.ok) {
         setTotal((t) => t + 1); setProdCount((c) => c + 1); setManual(""); router.refresh();
-        const r: ScanResult = { ok: true, label: cur.scent, sub: `เก็บ SKU ${code}` }; setMsg(r); return r;
+        const r: ScanResult = { ok: true, title: "เก็บ SKU แล้ว", label: cur.scent, sub: code }; setMsg(r); return r;
       }
-      const r: ScanResult = { ok: false, label: `SKU ${code}`, sub: added.error }; setMsg(r); return r;
+      const r: ScanResult = { ok: false, title: "เก็บไม่ได้", label: `SKU ${code}`, sub: added.error }; setMsg(r); return r;
     } finally { setBusy(false); }
   };
 

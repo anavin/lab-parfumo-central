@@ -40,11 +40,11 @@ export function SkuCountMode({ units }: { units: Unit[] }) {
     const u = byKey.get(key);
     if (!u) {
       setUnknown((x) => (x.includes(code) ? x : [...x, code]));
-      return { ok: false, label: `SKU ${code}`, sub: "นอกระบบ/คนละสาขา" };
+      return { ok: false, title: "นอกระบบ/คนละสาขา", label: `SKU ${code}`, sub: "ไม่ใช่ของสาขานี้ หรือขายไปแล้ว" };
     }
-    if (found.has(key)) return { ok: false, label: u.scent || code, sub: "สแกนซ้ำแล้ว" };
+    if (found.has(key)) return { ok: false, title: "สแกนซ้ำแล้ว", label: u.scent || code, sub: `${u.size || ""}`.trim() };
     setFound((s) => new Set(s).add(key));
-    return { ok: true, label: `${u.scent || ""} ${u.size || ""}`.trim(), sub: "เจอแล้ว ✓" };
+    return { ok: true, title: "เจอแล้ว", label: `${u.scent || ""} ${u.size || ""}`.trim(), sub: "" };
   };
   const onManual = () => { const r = take(manual); if (r.ok) setManual(""); setLast(r); };
 

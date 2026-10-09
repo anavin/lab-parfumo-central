@@ -22,7 +22,7 @@ function relaxUpcEanChecksum() {
   }
 }
 
-export type ScanResult = { ok: boolean; label: string; sub?: string };
+export type ScanResult = { ok: boolean; label: string; sub?: string; title?: string };
 
 // Camera barcode scanner (iOS Safari + Android Chrome, rear camera).
 // - single mode: fires onDetected once, then closes.
@@ -430,7 +430,7 @@ export function BarcodeScanner({ onDetected, onClose, continuous = false, knownC
                 {result.ok ? <Check className="w-11 h-11" strokeWidth={2.5} /> : <AlertTriangle className="w-10 h-10" />}
               </div>
               <div className={"text-sm font-semibold mb-3 " + (result.ok ? "text-green-400" : "text-amber-400")}>
-                {result.ok ? "เพิ่มลงบิลแล้ว" : "ไม่พบในระบบ — เพิ่มไว้ให้กรอกชื่อเอง"}
+                {result.title ?? (result.ok ? "เพิ่มลงบิลแล้ว" : "ไม่พบในระบบ — เพิ่มไว้ให้กรอกชื่อเอง")}
               </div>
               <div className="text-white text-2xl font-bold leading-snug">{result.label}</div>
               {result.sub && <div className="text-white/60 text-base mt-1">{result.sub}</div>}

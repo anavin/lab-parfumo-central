@@ -436,11 +436,11 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
         result = { ok: true, label: sk.scent || prod?.scent || bc || sk.sku, sub: "สแกน SKU แล้ว 1 ชิ้น" };
         return { ...prev, items: [...prev.items, newItem({ ...pat, skus: [sk.sku], qty: 1 })] };
       });
-      if (dup) return { ok: false, label: `SKU ${sk.sku}`, sub: "สแกนซ้ำแล้ว" };
+      if (dup) return { ok: false, title: "สแกนซ้ำแล้ว", label: `SKU ${sk.sku}`, sub: "" };
       return result;
     }
     // a real SKU that can't be sold (already sold / wrong branch) → show why, don't add a line
-    if (sk.error && !sk.error.includes("ไม่พบ")) return { ok: false, label: `SKU ${code}`, sub: sk.error };
+    if (sk.error && !sk.error.includes("ไม่พบ")) return { ok: false, title: "สแกน SKU ไม่ได้", label: `SKU ${code}`, sub: sk.error };
     addItem({ barcode: code });
     return { ok: false, label: `บาร์โค้ด ${code}`, sub: "" };
   };
@@ -843,13 +843,13 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const addSku = async (raw: string): Promise<ScanResult> => {
     const code = String(raw || "").trim();
     if (!code) return { ok: false, label: "", sub: "" };
-    if (skus.includes(code)) { setSkuErr("สแกน SKU นี้ซ้ำแล้ว"); setSkuInput(""); return { ok: false, label: `SKU ${code}`, sub: "สแกนซ้ำแล้ว" }; }
+    if (skus.includes(code)) { setSkuErr("สแกน SKU นี้ซ้ำแล้ว"); setSkuInput(""); return { ok: false, title: "สแกนซ้ำแล้ว", label: `SKU ${code}`, sub: "" }; }
     setSkuBusy(true); setSkuErr(null);
     try {
       const r = await checkSku(code, branch, it.barcode);
-      if (r.ok) { onChange({ skus: [...skus, r.sku], qty: Math.max(q, skus.length + 1) }); setSkuInput(""); return { ok: true, label: r.scent || it.item, sub: `SKU ${skus.length + 1} ชิ้น` }; }
-      setSkuErr(r.error); return { ok: false, label: `SKU ${code}`, sub: r.error };
-    } catch { setSkuErr("ตรวจ SKU ไม่สำเร็จ"); return { ok: false, label: `SKU ${code}`, sub: "ตรวจไม่สำเร็จ" }; }
+      if (r.ok) { onChange({ skus: [...skus, r.sku], qty: Math.max(q, skus.length + 1) }); setSkuInput(""); return { ok: true, title: "เพิ่ม SKU แล้ว", label: r.scent || it.item, sub: `SKU ${skus.length + 1} ชิ้น` }; }
+      setSkuErr(r.error); return { ok: false, title: "สแกน SKU ไม่ได้", label: `SKU ${code}`, sub: r.error };
+    } catch { setSkuErr("ตรวจ SKU ไม่สำเร็จ"); return { ok: false, title: "สแกน SKU ไม่ได้", label: `SKU ${code}`, sub: "ตรวจไม่สำเร็จ" }; }
     finally { setSkuBusy(false); }
   };
   const removeSku = (s: string) => onChange({ skus: skus.filter((x) => x !== s) });
