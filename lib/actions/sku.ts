@@ -1,7 +1,7 @@
 "use server";
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth/require-user";
+import { requirePermission, requireAnyPermission } from "@/lib/auth/require-user";
 import { normalizeBranch, branchName } from "@/lib/branches";
 
 export type SkuCheck =
@@ -40,7 +40,8 @@ export type SkuAdd = { ok: true; scent: string | null; size: string | null } | {
  *  with a SKU from the warehouse). Picks the product by barcode, records the unit as in_stock.
  *  Manager-only. Rejects a SKU that already exists (so a sold unit can't be silently reset). */
 export async function addSkuUnit(input: { sku: string; barcode: string; branch: string }): Promise<SkuAdd> {
-  const me = await requirePermission("requisitions");
+  // sales staff enroll SKUs while counting stock; managers add them from the /stock SKU tab
+  const me = await requireAnyPermission(["my_sales", "requisitions"]);
   const sku = String(input.sku || "").trim();
   const barcode = String(input.barcode || "").trim();
   const branch = normalizeBranch(input.branch);

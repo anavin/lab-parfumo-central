@@ -7,6 +7,7 @@ import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 import { SkuCountMode } from "@/components/SkuCountMode";
+import { SkuAddPanel } from "@/components/SkuAddPanel";
 
 // verified = พนักงานลงมือกับแถวนี้จริง (พิมพ์/กด +−/สแกน) — ไม่ใช่ปล่อยค่าที่ระบบเติมให้
 type Item = { barcode: string; scent: string; size: string; expected: number; counted: string; changed: boolean; verified: boolean };
@@ -21,7 +22,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
-  const [mode, setMode] = useState<"qty" | "sku">("qty");   // นับตามจำนวน vs สแกน SKU รายชิ้น
+  const [mode, setMode] = useState<"qty" | "sku" | "collect">("qty");   // นับตามจำนวน / สแกน SKU รายชิ้น / เก็บ SKU
 
   const base = useMemo<Item[]>(() =>
     expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)), changed: (Number(e.sold) || 0) > 0, verified: false })).sort(byName), [expected]);
@@ -138,11 +139,17 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
     <div className="space-y-3 pb-24">
       {/* เลือกวิธีนับ: ตามจำนวน (เดิม) หรือ สแกน SKU รายชิ้น (รู้ว่าขวดไหนหาย) */}
       <div className="inline-flex gap-1 p-1 rounded-xl border border-line bg-surface">
-        <button onClick={() => setMode("qty")} className={"px-3.5 py-2 text-sm font-medium rounded-lg transition " + (mode === "qty" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>นับตามจำนวน</button>
-        <button onClick={() => setMode("sku")} className={"px-3.5 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>สแกน SKU รายชิ้น</button>
+        <button onClick={() => setMode("qty")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "qty" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>นับตามจำนวน</button>
+        <button onClick={() => setMode("sku")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>สแกน SKU</button>
+        <button onClick={() => setMode("collect")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "collect" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เก็บ SKU</button>
       </div>
 
-      {mode === "sku" ? (
+      {mode === "collect" ? (
+        <div>
+          <p className="text-xs text-muted mb-2">เลือกสินค้า แล้วยิงสติกเกอร์ SKU ที่ขวดทีละใบ เพื่อลงทะเบียนเข้าสต๊อก (ของที่ยังไม่มี SKU ในระบบ)</p>
+          <SkuAddPanel branch={branch} defaultOpen />
+        </div>
+      ) : mode === "sku" ? (
         <SkuCountMode units={skuUnits} />
       ) : (
       <>
