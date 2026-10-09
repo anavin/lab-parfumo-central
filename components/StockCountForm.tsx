@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
-import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye, ChevronDown } from "lucide-react";
+import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye } from "lucide-react";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { num } from "@/lib/format";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -24,7 +24,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
   const [mode, setMode] = useState<"qty" | "sku" | "collect">("qty");   // นับตามจำนวน / สแกน SKU รายชิ้น / เก็บ SKU
-  const [skuOpen, setSkuOpen] = useState<string | null>(null);   // which product group's SKU list is expanded
+  const [showCodes, setShowCodes] = useState(true);   // show every product's SKU codes by default
   // สรุป SKU ที่มีในระบบต่อสินค้า (สาขานี้) — จัดกลุ่มตามบาร์โค้ด (กันขนาด "10 ml" vs "10 ml." แตกเป็นคนละแถว)
   const skuGroups = useMemo(() => {
     const mlOf = (z: string) => { const m = z.match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
@@ -166,31 +166,43 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
           <SkuAddPanel branch={branch} defaultOpen />
           {/* สรุป SKU ที่มีในระบบ (สาขานี้) — อัปเดตทุกครั้งที่เก็บ ให้เห็นว่าเก็บไปแล้วเท่าไหร่ */}
           <div className="rounded-xl border border-line bg-surface p-3">
-            <div className="text-sm font-medium text-ink mb-2">SKU ในระบบ (สาขานี้) · {num(skuUnits.length)} ชิ้น</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium text-ink">SKU ในระบบ (สาขานี้)</div>
+              {skuGroups.length > 0 && (
+                <button onClick={() => setShowCodes((v) => !v)} className="text-xs text-brand-dark border border-line rounded-lg px-2 py-1 hover:bg-canvas">
+                  {showCodes ? "ซ่อนรหัส SKU" : "แสดงรหัส SKU"}
+                </button>
+              )}
+            </div>
+            {/* ยอดรวม */}
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="rounded-lg bg-canvas p-2.5">
+                <div className="text-[11px] text-muted">รวมทั้งหมด</div>
+                <div className="text-xl font-bold tabular-nums text-ink">{num(skuUnits.length)} <span className="text-sm font-normal text-muted">ชิ้น</span></div>
+              </div>
+              <div className="rounded-lg bg-canvas p-2.5">
+                <div className="text-[11px] text-muted">จำนวนสินค้า</div>
+                <div className="text-xl font-bold tabular-nums text-ink">{num(skuGroups.length)} <span className="text-sm font-normal text-muted">รายการ</span></div>
+              </div>
+            </div>
             {skuGroups.length === 0 ? (
               <div className="text-xs text-muted py-2">ยังไม่มี SKU — เริ่มเก็บด้านบน (ยิงบาร์โค้ดสินค้า แล้วยิงสติกเกอร์ SKU)</div>
             ) : (
-              <>
-                <div className="text-[11px] text-muted mb-1">แตะรายการเพื่อดูรหัส SKU ที่เก็บ</div>
-                <div className="max-h-72 overflow-auto -mx-1">
-                  {skuGroups.map((g) => (
-                    <div key={g.key} className="border-t border-line-soft first:border-t-0">
-                      <button onClick={() => setSkuOpen(skuOpen === g.key ? null : g.key)} className="w-full flex items-center justify-between px-1 py-1.5 text-sm text-left hover:bg-canvas/60">
-                        <span className="text-ink">{g.scent} <span className="text-muted">{g.size}</span></span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="tabular-nums font-semibold text-ink">{num(g.n)}</span>
-                          <ChevronDown className={"w-3.5 h-3.5 text-muted transition-transform " + (skuOpen === g.key ? "rotate-180" : "")} />
-                        </span>
-                      </button>
-                      {skuOpen === g.key && (
-                        <div className="flex flex-wrap gap-1 px-1 pb-2">
-                          {g.skus.slice().sort().map((s) => <span key={s} className="font-mono text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 text-ink">{s}</span>)}
-                        </div>
-                      )}
+              <div className="max-h-96 overflow-auto -mx-1">
+                {skuGroups.map((g) => (
+                  <div key={g.key} className="border-t border-line-soft first:border-t-0 px-1 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-ink">{g.scent} <span className="text-muted font-normal">{g.size}</span></span>
+                      <span className="shrink-0 inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-brand-soft text-brand-dark text-xs font-bold tabular-nums">{num(g.n)}</span>
                     </div>
-                  ))}
-                </div>
-              </>
+                    {showCodes && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {g.skus.slice().sort().map((s) => <span key={s} className="font-mono text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 text-muted">{s}</span>)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
