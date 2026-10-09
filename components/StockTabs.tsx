@@ -20,7 +20,7 @@ export function StockTabs({ matrix, movement, tester = null, sku = null, reconci
   );
   return (
     <div>
-      <div className="inline-flex gap-1 p-1 mb-3 rounded-xl border border-line bg-surface">
+      <div className="flex flex-wrap gap-1 p-1 mb-3 rounded-xl border border-line bg-surface">
         <Btn id="stock" icon={Package} label="คงเหลือ" />
         <Btn id="move" icon={Activity} label="การเคลื่อนไหว" />
         {tester && <Btn id="tester" icon={FlaskConical} label="เทสเตอร์" />}
