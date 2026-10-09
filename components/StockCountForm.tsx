@@ -146,7 +146,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
 
       {mode === "collect" ? (
         <div>
-          <p className="text-xs text-muted mb-2">เลือกสินค้า แล้วยิงสติกเกอร์ SKU ที่ขวดทีละใบ เพื่อลงทะเบียนเข้าสต๊อก (ของที่ยังไม่มี SKU ในระบบ)</p>
+          <p className="text-xs text-muted mb-2">ยิงบาร์โค้ดสินค้า 1 ครั้งเพื่อเลือกกลิ่น แล้วยิงสติกเกอร์ SKU ที่ขวดทีละใบ (ลงทะเบียนของที่ยังไม่มี SKU ในระบบ)</p>
           <SkuAddPanel branch={branch} defaultOpen />
         </div>
       ) : mode === "sku" ? (
