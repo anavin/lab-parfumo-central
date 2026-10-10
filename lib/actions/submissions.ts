@@ -131,7 +131,7 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
                and status='in_stock' and branch=upper($5)
                and (coalesce(barcode,'')='' or barcode=$6) returning sku`,
             [sku, row.id, ref, resolveBranch(d.source), resolveBranch(d.source), it.barcode || ""]);
-          if (!upd.length) throw new Error(`SKU ${sku} ขายไม่ได้ (ไม่พบ/ขายไปแล้ว/คนละสินค้าหรือสาขา)`);
+          if (!upd.length) { const err: any = new Error(`SKU ${sku} ขายไม่ได้ (ไม่พบ/ขายไปแล้ว/คนละสินค้าหรือสาขา)`); err.skuError = true; throw err; }
         } catch (e: any) {
           if (e?.code === "42P01") break;   // sku_units not migrated → skip SKU marking entirely
           throw e;                          // real mismatch → abort the bill
@@ -178,7 +178,7 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
     return { ok: true, ref };   // so the UI can offer a "print receipt" link for the bill just saved
   } catch (e: any) {
     console.error("[submitBill]", e);
-    if (typeof e?.message === "string" && e.message.startsWith("SKU ")) return { ok: false, error: e.message };
+    if (e?.skuError) return { ok: false, error: e.message };
     return { ok: false, error: "บันทึกบิลไม่สำเร็จ กรุณาลองใหม่" };
   }
 }
@@ -345,6 +345,7 @@ export async function updateMySale(id: number, input: unknown) {
   const sub = d.qty * (d.unit_price ?? 0);
   const discount = Math.min(sub, d.discount ?? 0);
   const total = sub - discount;
+  const [before] = await q<{ barcode: string | null; qty: number }>(`select barcode, qty::float qty from submissions where id=$1`, [id]);
   await q(
     `update submissions set
        entry_date=$2, source=$3, sale_time=$4, receipt_no=$5, item=$6, barcode=$7, size=$8,
@@ -355,9 +356,9 @@ export async function updateMySale(id: number, input: unknown) {
      d.payment_channel || null, d.nation || null]);
   await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
   await applyEditTenders(id, d, total);
-  // editing can change product/qty, which the scanned SKU links can't track → free them so they
-  // never point at the wrong product/quantity. Re-scan if SKU tracking is needed for the edited sale.
-  await freeSkusForSubmission(id);
+  // free linked SKUs ONLY when the product or qty actually changed (the links can't follow those).
+  // A trivial edit (nation/time/price) keeps them, so legitimately-sold units aren't released.
+  if ((before?.barcode || null) !== (d.barcode || null) || Number(before?.qty) !== Number(d.qty)) await freeSkusForSubmission(id);
   await logAudit("update", "submission", id, `แก้ไข: ${d.item}`);
   revalidatePath("/my"); revalidatePath("/review");
 }
@@ -432,7 +433,8 @@ export async function updateSubmissionByAdmin(id: number, input: unknown) {
        d.payment_channel || null, d.nation || null]);
     await q(`update submissions s set product_id = p.id from products p where p.barcode = s.barcode and s.id = $1`, [id]);
     await applyEditTenders(id, d, total);
-    await freeSkusForSubmission(id);   // edit may change product/qty → drop stale SKU links (re-scan if needed)
+    // only drop SKU links when product or qty actually changed (keep them for a nation/price edit)
+    if ((row.barcode || null) !== (d.barcode || null) || Number(row.qty) !== Number(d.qty)) await freeSkusForSubmission(id);
     const diff = diffDetail(row,
       { item: d.item, size: d.size || "", qty: d.qty, unit_price: d.unit_price ?? 0, discount, total, payment_channel: d.payment_channel || "", nation: d.nation || "", receipt_no: d.receipt_no || "" },
       { item: "สินค้า", size: "ขนาด", qty: "จำนวน", unit_price: "ราคา", discount: "ส่วนลด", total: "รวม", payment_channel: "ช่องทาง", nation: "สัญชาติ", receipt_no: "เลขใบเสร็จ" });

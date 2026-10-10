@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ScanLine, Check, HelpCircle, PackageSearch } from "lucide-react";
 import { beep } from "@/lib/feedback";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
@@ -13,6 +13,7 @@ const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
 // รายงานเฉยๆ ไม่แก้สถานะ — ของที่สแกนไม่เจอ = ของหาย/วางผิดที่ ให้คนไปตรวจเอง
 export function SkuCountMode({ units }: { units: Unit[] }) {
   const [found, setFound] = useState<Set<string>>(new Set());   // normalized sku keys scanned
+  const foundRef = useRef<Set<string>>(found);   // synchronous mirror so rapid scans dedup correctly
   const [unknown, setUnknown] = useState<string[]>([]);         // scanned but not an in-stock unit here
   const [scanning, setScanning] = useState(false);
   const [last, setLast] = useState<ScanResult | null>(null);
@@ -42,8 +43,8 @@ export function SkuCountMode({ units }: { units: Unit[] }) {
       setUnknown((x) => (x.includes(code) ? x : [...x, code]));
       return { ok: false, title: "นอกระบบ/คนละสาขา", label: `SKU ${code}`, sub: "ไม่ใช่ของสาขานี้ หรือขายไปแล้ว" };
     }
-    if (found.has(key)) return { ok: false, title: "สแกนซ้ำแล้ว", label: u.scent || code, sub: `${u.size || ""}`.trim() };
-    setFound((s) => new Set(s).add(key));
+    if (foundRef.current.has(key)) return { ok: false, title: "สแกนซ้ำแล้ว", label: u.scent || code, sub: `${u.size || ""}`.trim() };
+    const next = new Set(foundRef.current); next.add(key); foundRef.current = next; setFound(next);
     return { ok: true, title: "เจอแล้ว", label: `${u.scent || ""} ${u.size || ""}`.trim(), sub: "" };
   };
   const onManual = () => { const r = take(manual); if (r.ok) setManual(""); setLast(r); };

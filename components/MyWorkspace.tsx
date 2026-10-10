@@ -401,18 +401,15 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       // duplicate line. The find-or-add runs INSIDE the functional update so two fast scans don't
       // race (a stale read would drop the 2nd bottle → qty 1 for a 2-bottle sale).
       const pat = withPromo({ item: p.scent, barcode: p.barcode, size: p.size || "", unit_price: p.price ?? 0 }, promo);
-      let result: ScanResult = { ok: true, label: p.scent };
+      // mutation via functional updater (race-safe); feedback toast computed from current state (best-effort)
+      const existing = state.items.find((it) => it.barcode === p.barcode && String(it.item || "").trim());
       setState((prev) => {
-        const existing = prev.items.find((it) => it.barcode === p.barcode && String(it.item || "").trim());
-        if (existing) {
-          const qty = (Number(existing.qty) || 0) + 1;
-          result = { ok: true, label: p.scent, sub: `จำนวน ${qty} ชิ้น` };
-          return { ...prev, items: prev.items.map((it) => (it.key === existing.key ? { ...it, qty } : it)) };
-        }
-        result = { ok: true, label: p.scent, sub: [p.size, pat.unit_price ? `฿${Number(pat.unit_price).toLocaleString()}${pat.list_price ? " (โปร)" : ""}` : ""].filter(Boolean).join(" · ") };
+        const ex = prev.items.find((it) => it.barcode === p.barcode && String(it.item || "").trim());
+        if (ex) return { ...prev, items: prev.items.map((it) => (it.key === ex.key ? { ...it, qty: (Number(it.qty) || 0) + 1 } : it)) };
         return { ...prev, items: [...prev.items, newItem(pat)] };
       });
-      return result;
+      if (existing) return { ok: true, label: p.scent, sub: `จำนวน ${(Number(existing.qty) || 0) + 1} ชิ้น` };
+      return { ok: true, label: p.scent, sub: [p.size, pat.unit_price ? `฿${Number(pat.unit_price).toLocaleString()}${pat.list_price ? " (โปร)" : ""}` : ""].filter(Boolean).join(" · ") };
     }
     // not a product barcode → maybe a serialized SKU sticker. One scan per bottle: identify the
     // product from the SKU, attach it, bump qty. Easiest flow — cashier just keeps scanning.
@@ -423,21 +420,16 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       const pat = prod
         ? withPromo({ item: prod.scent, barcode: prod.barcode, size: prod.size || "", unit_price: prod.price ?? 0 }, promo)
         : { item: sk.scent || "", barcode: bc, size: sk.size || "" };
-      let result: ScanResult = { ok: true, label: sk.scent || bc };
-      let dup = false;
+      if (state.items.some((it) => (it.skus ?? []).includes(sk.sku))) return { ok: false, title: "สแกนซ้ำแล้ว", label: `SKU ${sk.sku}`, sub: "อยู่ในบิลนี้แล้ว" };
+      const line = bc ? state.items.find((it) => it.barcode === bc && String(it.item || "").trim()) : undefined;
       setState((prev) => {
-        if (prev.items.some((it) => (it.skus ?? []).includes(sk.sku))) { dup = true; return prev; }
-        const line = bc ? prev.items.find((it) => it.barcode === bc && String(it.item || "").trim()) : undefined;
-        if (line) {
-          const skus = [...(line.skus ?? []), sk.sku];
-          result = { ok: true, label: sk.scent || line.item, sub: `สแกน SKU แล้ว ${skus.length} ชิ้น` };
-          return { ...prev, items: prev.items.map((it) => (it.key === line.key ? { ...it, skus, qty: Math.max(Number(it.qty) || 1, skus.length) } : it)) };
-        }
-        result = { ok: true, label: sk.scent || prod?.scent || bc || sk.sku, sub: "สแกน SKU แล้ว 1 ชิ้น" };
+        if (prev.items.some((it) => (it.skus ?? []).includes(sk.sku))) return prev;   // authoritative dup guard
+        const l = bc ? prev.items.find((it) => it.barcode === bc && String(it.item || "").trim()) : undefined;
+        if (l) { const skus = [...(l.skus ?? []), sk.sku]; return { ...prev, items: prev.items.map((it) => (it.key === l.key ? { ...it, skus, qty: Math.max(Number(it.qty) || 1, skus.length) } : it)) }; }
         return { ...prev, items: [...prev.items, newItem({ ...pat, skus: [sk.sku], qty: 1 })] };
       });
-      if (dup) return { ok: false, title: "สแกนซ้ำแล้ว", label: `SKU ${sk.sku}`, sub: "" };
-      return result;
+      if (line) return { ok: true, label: sk.scent || line.item, sub: `สแกน SKU แล้ว ${(line.skus?.length ?? 0) + 1} ชิ้น` };
+      return { ok: true, label: sk.scent || prod?.scent || bc || sk.sku, sub: "สแกน SKU แล้ว 1 ชิ้น" };
     }
     // a real SKU that can't be sold (already sold / wrong branch) → show why, don't add a line
     if (sk.error && !sk.error.includes("ไม่พบ")) return { ok: false, title: "สแกน SKU ไม่ได้", label: `SKU ${code}`, sub: sk.error };
@@ -601,7 +593,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
       {/* items */}
       <div className="space-y-2 mb-3">
-        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} max={capFor(it)} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} promo={promo} skuRequired={needsSku(it)} branch={state.source} />)}
+        {state.items.map((it, i) => <ItemCard key={it.key} it={it} index={i} max={capFor(it)} autoFocus={it.key === focusKey} onChange={(p) => updateItem(it.key, p)} onRemove={() => removeItem(it.key)} showPayment={state.splitPay} paymentDefault={state.payment_channel} promo={promo} skuRequired={needsSku(it)} branch={state.source} skuUsed={(code) => state.items.some((o) => o.key !== it.key && (o.skus ?? []).includes(code))} />)}
         {state.items.length === 0 && <div className="text-center text-sm text-muted py-6 border border-dashed border-line rounded-xl">ยังไม่มีสินค้า — กด “สแกนเพิ่ม” หรือ “เพิ่มเอง”</div>}
       </div>
 
@@ -791,7 +783,7 @@ const Cell = ({ label, children, active = false }: { label: string; children: Re
   <div><span className={`block text-[10px] text-center mb-0.5 ${active ? "text-danger font-semibold" : "text-muted"}`}>{label}</span>{children}</div>
 );
 
-function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false, max = null, promo = null, skuRequired = false, branch = "" }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean; max?: number | null; promo?: Promo; skuRequired?: boolean; branch?: string }) {
+function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault = "", autoFocus = false, max = null, promo = null, skuRequired = false, branch = "", skuUsed }: { it: BillItem; index: number; onChange: (p: Partial<BillItem>) => void; onRemove: () => void; showPayment?: boolean; paymentDefault?: string; autoFocus?: boolean; max?: number | null; promo?: Promo; skuRequired?: boolean; branch?: string; skuUsed?: (code: string) => boolean }) {
   const [res, setRes] = useState<any[]>([]);
   const [skuInput, setSkuInput] = useState("");
   const [skuErr, setSkuErr] = useState<string | null>(null);
@@ -843,7 +835,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const addSku = async (raw: string): Promise<ScanResult> => {
     const code = String(raw || "").trim();
     if (!code) return { ok: false, label: "", sub: "" };
-    if (skus.includes(code)) { setSkuErr("สแกน SKU นี้ซ้ำแล้ว"); setSkuInput(""); return { ok: false, title: "สแกนซ้ำแล้ว", label: `SKU ${code}`, sub: "" }; }
+    if (skus.includes(code) || skuUsed?.(code)) { setSkuErr("SKU นี้ถูกสแกนในบิลนี้แล้ว"); setSkuInput(""); return { ok: false, title: "สแกนซ้ำแล้ว", label: `SKU ${code}`, sub: "อยู่ในบิลนี้แล้ว" }; }
     setSkuBusy(true); setSkuErr(null);
     try {
       const r = await checkSku(code, branch, it.barcode);
@@ -884,7 +876,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       {/* qty · price · discount — wider now that size moved up */}
       <div className="grid grid-cols-3 gap-2.5 pl-7">
         <Cell label={max != null ? `จำนวน · เหลือ ${max}` : "จำนวน"}>
-          <Select value={String(q || 1)} onValueChange={(v) => onChange({ qty: Number(v) })} options={qtyOptions(it.qty, max)} className="py-2.5 justify-center min-h-[44px]" />
+          <Select value={String(q || 1)} onValueChange={(v) => { const nq = Number(v); onChange(skus.length > nq ? { qty: nq, skus: skus.slice(0, nq) } : { qty: nq }); }} options={qtyOptions(it.qty, max)} className="py-2.5 justify-center min-h-[44px]" />
           {hasPromo && <div className="h-[15px] mt-0.5" />}
         </Cell>
         <Cell label="ราคา">

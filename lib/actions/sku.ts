@@ -63,11 +63,13 @@ export async function addSkuUnit(input: { sku: string; barcode: string; branch: 
       // already in_stock → nothing to do, but it's fine (the bottle is already tracked), not an error
       return { ok: true, scent: ex.scent, size: ex.size, already: true };
     }
-    await q(`insert into sku_units (sku, barcode, scent, size, branch, received_by, status, received_at)
-             values ($1,$2,$3,$4,$5,$6,'in_stock', now())`,
+    // ON CONFLICT guards the gap between the check above and this insert (two staff/double-tap
+    // enrolling the same sku at once) — no primary-key crash; a lost race reads as "already".
+    const ins = await q<{ sku: string }>(`insert into sku_units (sku, barcode, scent, size, branch, received_by, status, received_at)
+             values ($1,$2,$3,$4,$5,$6,'in_stock', now()) on conflict (sku) do nothing returning sku`,
       [sku, barcode, p.scent, p.size, branch, me.id]);
     revalidatePath("/stock");
-    return { ok: true, scent: p.scent, size: p.size };
+    return { ok: true, scent: p.scent, size: p.size, already: ins.length === 0 };
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU (รัน migration 0036)" };
     console.error("[addSkuUnit]", e);
