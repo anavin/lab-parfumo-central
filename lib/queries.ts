@@ -419,6 +419,17 @@ export async function skuUnits(branch: string | null = null): Promise<SkuUnitRow
   }
 }
 
+export type ShelfCaptureRow = { id: number; barcode: string | null; sku: string; scent: string | null; size: string | null; captured_at: string };
+/** Fresh shelf-capture rows (barcode + SKU per bottle) for a branch, newest first. Empty pre-0038. */
+export async function shelfCaptures(branch: string | null = null): Promise<ShelfCaptureRow[]> {
+  const sql = `select id, barcode, sku, scent, size, captured_at::text captured_at
+    from shelf_capture
+    where ($1::text is null or branch = upper($1))
+    order by captured_at desc`;
+  try { return await q<ShelfCaptureRow>(sql, [branch]); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Barcodes that currently have ≥1 in_stock serialized unit at a branch. The sale page uses this
  *  to decide which lines REQUIRE a SKU scan (products with SKU stock) vs which sell freely
  *  (testers / old stock with no SKU). Empty before 0036 is migrated. */

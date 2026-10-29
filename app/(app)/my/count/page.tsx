@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { ClipboardCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
-import { stockLive, countVariance, skuUnits } from "@/lib/queries";
+import { stockLive, countVariance, skuUnits, shelfCaptures } from "@/lib/queries";
 import { PageHeader } from "@/components/ui";
 import { StockCountForm } from "@/components/StockCountForm";
 
@@ -22,7 +22,7 @@ export default async function MyCountPage() {
 
   // items to count: what's in stock (remaining>0) OR anything that has moved (sold>0) —
   // so a product sold down to 0 (or oversold) still shows under "มีความเคลื่อนไหว".
-  const [stock, variance, allUnits] = await Promise.all([stockLive(branch), countVariance(branch), skuUnits(branch)]);
+  const [stock, variance, allUnits, captures] = await Promise.all([stockLive(branch), countVariance(branch), skuUnits(branch), shelfCaptures(branch)]);
   // SKU count mode reconciles only what the system believes is on the shelf now (in_stock)
   const inStockUnits = allUnits.filter((u) => u.status === "in_stock").map((u) => ({ sku: u.sku, barcode: u.barcode, scent: u.scent, size: u.size, po_number: u.po_number }));
   const expected = stock.filter((r) => (Number(r.remaining) || 0) > 0 || (Number(r.sold) || 0) > 0)
@@ -43,7 +43,7 @@ export default async function MyCountPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={ClipboardCheck} title="นับสต๊อก"
         subtitle={`${branchName(branch)} · สแกนหรือกรอกจำนวนที่นับได้จริง`} />
-      <StockCountForm expected={expected} branch={branch} staleKeys={staleKeys} skuUnits={inStockUnits} />
+      <StockCountForm expected={expected} branch={branch} staleKeys={staleKeys} skuUnits={inStockUnits} captures={captures} />
     </div>
   );
 }

@@ -9,6 +9,8 @@ import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 import { SkuCountMode } from "@/components/SkuCountMode";
 import { SkuAddPanel } from "@/components/SkuAddPanel";
+import { ShelfCaptureMode } from "@/components/ShelfCaptureMode";
+import type { ShelfCaptureRow } from "@/lib/queries";
 
 // verified = พนักงานลงมือกับแถวนี้จริง (พิมพ์/กด +−/สแกน) — ไม่ใช่ปล่อยค่าที่ระบบเติมให้
 type Item = { barcode: string; scent: string; size: string; expected: number; counted: string; changed: boolean; verified: boolean };
@@ -17,13 +19,13 @@ const sizeNum = (s: string) => parseInt(String(s).replace(/[^\d]/g, ""), 10) || 
 const byName = (a: Item, b: Item) => (a.scent || "").localeCompare(b.scent || "") || sizeNum(a.size) - sizeNum(b.size);
 const keyOf = (r: { barcode: string; size: string }) => `${r.barcode}__${r.size}`;
 
-export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = [] }:
-  { expected: { barcode: string; scent: string; size: string; remaining: number; sold: number }[]; branch: string; staleKeys?: string[]; skuUnits?: { sku: string; barcode: string | null; scent: string | null; size: string | null; po_number?: string | null }[] }) {
+export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = [], captures = [] }:
+  { expected: { barcode: string; scent: string; size: string; remaining: number; sold: number }[]; branch: string; staleKeys?: string[]; skuUnits?: { sku: string; barcode: string | null; scent: string | null; size: string | null; po_number?: string | null }[]; captures?: ShelfCaptureRow[] }) {
   const router = useRouter();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
-  const [mode, setMode] = useState<"qty" | "sku" | "collect">("qty");   // นับตามจำนวน / สแกน SKU รายชิ้น / เก็บ SKU
+  const [mode, setMode] = useState<"qty" | "sku" | "collect" | "capture">("qty");   // นับตามจำนวน / สแกน SKU / เก็บ SKU / เก็บข้อมูลใหม่
   const [showCodes, setShowCodes] = useState(true);   // show every product's SKU codes by default
   const [srcFilter, setSrcFilter] = useState<"all" | "store" | "warehouse">("all");   // แหล่งที่มา: เก็บหน้าร้าน vs จากคลัง
   // สรุป SKU ในระบบ — จัดกลุ่ม "กลิ่น → ขนาด" + แยกที่มา (เก็บหน้าร้าน = ไม่มีใบเบิก / จากคลัง = มีใบเบิก/backfill)
@@ -170,9 +172,12 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
         <button onClick={() => setMode("qty")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "qty" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>นับตามจำนวน</button>
         <button onClick={() => setMode("sku")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>สแกน SKU</button>
         <button onClick={() => setMode("collect")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "collect" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เก็บ SKU</button>
+        <button onClick={() => setMode("capture")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "capture" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เก็บข้อมูลใหม่</button>
       </div>
 
-      {mode === "collect" ? (
+      {mode === "capture" ? (
+        <ShelfCaptureMode captures={captures} branch={branch} />
+      ) : mode === "collect" ? (
         <div>
           <p className="text-xs text-muted mb-2">ยิงบาร์โค้ดสินค้า 1 ครั้งเพื่อเลือกกลิ่น แล้วยิงสติกเกอร์ SKU ที่ขวดทีละใบ (ลงทะเบียนของที่ยังไม่มี SKU ในระบบ)</p>
           <SkuAddPanel branch={branch} defaultOpen />
