@@ -21,12 +21,14 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState(0);
+  const [prodCount, setProdCount] = useState(0);   // captured for the current (sticky) scent this round
   const [bcInput, setBcInput] = useState("");
   const [skuInput, setSkuInput] = useState("");
 
-  const setPend = (p: Pending | null) => { pendingRef.current = p; setPending(p); };
+  const setPend = (p: Pending | null) => { pendingRef.current = p; setPending(p); setProdCount(0); };
 
-  // one pipeline: a product barcode selects the current bottle; anything else is its SKU → capture the pair
+  // one pipeline: a product barcode SETS the current scent (sticky); anything else is a SKU → capture
+  // the pair and KEEP the scent, so same-scent bottles only need one barcode scan then many SKU scans.
   const handle = async (raw: string, fromScan = true): Promise<ScanResult> => {
     const code = String(raw || "").trim();
     if (!code || !branch) return { ok: false, label: "", sub: "" };
@@ -35,17 +37,17 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
       const p = await fetch(`/api/products/barcode?code=${encodeURIComponent(code)}`, { headers: { accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (p && p.barcode) {
-        setPend({ barcode: p.barcode, scent: p.scent, size: p.size || "" });
+        setPend({ barcode: p.barcode, scent: p.scent, size: p.size || "" });   // sticky scent (resets count)
         setBcInput(""); setSkuInput("");
-        const r: ScanResult = { ok: true, title: "เลือกขวด", label: `${p.scent} ${p.size || ""}`.trim(), sub: "ยิงสติกเกอร์ SKU ของขวดนี้" };
+        const r: ScanResult = { ok: true, title: "เลือกกลิ่นแล้ว", label: `${p.scent} ${p.size || ""}`.trim(), sub: "ยิงสติกเกอร์ SKU ของกลิ่นนี้ได้เรื่อยๆ" };
         setMsg(r); return r;
       }
-      // not a product → treat as SKU for the current bottle
+      // not a product → treat as SKU for the CURRENT (sticky) scent; scent stays for the next bottle
       const cur = pendingRef.current;
-      if (!cur) { const r: ScanResult = { ok: false, title: "ยิงบาร์โค้ดสินค้าก่อน", label: `SKU ${code}`, sub: "1 ขวด = ยิงบาร์โค้ด แล้วยิง SKU" }; setMsg(r); return r; }
+      if (!cur) { const r: ScanResult = { ok: false, title: "ยิงบาร์โค้ดสินค้าก่อน", label: `SKU ${code}`, sub: "ยิงบาร์โค้ด 1 ครั้ง แล้วยิง SKU ของกลิ่นนั้น" }; setMsg(r); return r; }
       const res = await captureShelfUnit({ barcode: cur.barcode, sku: code, branch });
       if (res.ok) {
-        setPend(null); setBcInput(""); setSkuInput(""); setAdded((a) => a + 1); router.refresh();
+        setSkuInput(""); setAdded((a) => a + 1); setProdCount((c) => c + 1); router.refresh();   // KEEP scent
         const r: ScanResult = { ok: !res.warn, title: res.warn ? "เก็บแล้ว (มีข้อสังเกต)" : "เก็บแล้ว ✓", label: `${cur.scent} ${cur.size}`.trim(), sub: res.warn || `SKU ${code}` };
         setMsg(r); return r;
       }
@@ -67,24 +69,28 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted">1 ขวด = <b className="text-ink">ยิงบาร์โค้ดสินค้า</b> แล้ว <b className="text-ink">ยิงสติกเกอร์ SKU</b> → บันทึกเป็นคู่ · เก็บเป็นชุดข้อมูลใหม่ไว้เทียบกับระบบ</p>
+      <p className="text-xs text-muted">ยิง<b className="text-ink">บาร์โค้ดสินค้า 1 ครั้ง</b>เพื่อเลือกกลิ่น แล้ว<b className="text-ink">ยิงสติกเกอร์ SKU</b>ของกลิ่นนั้นได้เรื่อยๆ · เปลี่ยนกลิ่น = ยิงบาร์โค้ดใหม่</p>
 
-      {/* current bottle */}
-      <div className={"rounded-xl border p-3 " + (pending ? "border-brand/50 bg-brand-soft/40" : "border-line bg-surface")}>
-        <div className="grid grid-cols-2 gap-2">
-          <div className={"rounded-lg border px-2.5 py-2 " + (pending ? "border-success/40 bg-success-soft/40" : "border-line")}>
-            <div className="text-[11px] text-muted flex items-center gap-1"><Barcode className="w-3 h-3" /> 1) บาร์โค้ดสินค้า</div>
-            <div className="text-sm font-medium text-ink mt-0.5 truncate">{pending ? `${pending.scent} ${pending.size}` : "— ยิงก่อน —"}</div>
+      {/* current scent (sticky) */}
+      <div className={"rounded-xl border px-3 py-2.5 " + (pending ? "border-brand/50 bg-brand-soft/40" : "border-line bg-surface")}>
+        {pending ? (
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[11px] text-muted">กลิ่นปัจจุบัน — ยิง SKU ได้เลย</div>
+              <div className="text-base font-semibold text-ink leading-tight truncate">{pending.scent} <span className="text-muted font-normal">{pending.size}</span></div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right"><div className="text-[11px] text-muted">เก็บกลิ่นนี้</div><div className="text-xl font-bold tabular-nums text-brand-dark">{prodCount}</div></div>
+              <button onClick={() => setPend(null)} className="text-xs text-muted border border-line rounded-lg px-2 py-1 hover:bg-canvas">เปลี่ยน</button>
+            </div>
           </div>
-          <div className="rounded-lg border border-line px-2.5 py-2">
-            <div className="text-[11px] text-muted flex items-center gap-1"><ScanLine className="w-3 h-3" /> 2) สติกเกอร์ SKU</div>
-            <div className="text-sm text-muted mt-0.5">{pending ? "ยิง SKU ได้เลย" : "เลือกขวดก่อน"}</div>
-          </div>
-        </div>
+        ) : (
+          <div className="text-sm text-muted"><b className="text-ink">ยิงบาร์โค้ดสินค้า</b> 1 ครั้งเพื่อเลือกกลิ่น แล้วยิงสติกเกอร์ SKU ทีละขวด</div>
+        )}
       </div>
 
       <button onClick={() => setScanning(true)} className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-xl bg-brand text-white text-base font-medium active:scale-95">
-        <ScanLine className="w-5 h-5" /> สแกน (บาร์โค้ด → SKU)
+        <ScanLine className="w-5 h-5" /> สแกน (บาร์โค้ดสินค้า / สติกเกอร์ SKU)
       </button>
 
       {msg && (
