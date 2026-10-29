@@ -1,11 +1,11 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ScanLine, Check, HelpCircle, Trash2, Barcode, Loader2 } from "lucide-react";
+import { ScanLine, Check, HelpCircle, Trash2, Barcode, Loader2, Pencil, X } from "lucide-react";
 import { beep } from "@/lib/feedback";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
-import { captureShelfUnit, deleteShelfCapture } from "@/lib/actions/shelf-capture";
+import { captureShelfUnit, deleteShelfCapture, updateShelfCapture } from "@/lib/actions/shelf-capture";
 import { num } from "@/lib/format";
 import type { ShelfCaptureRow } from "@/lib/queries";
 
@@ -57,7 +57,8 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
     handle(code).then((r) => { beep(r.ok ? "ok" : "error"); try { navigator.vibrate?.(r.ok ? 40 : [60, 40, 60]); } catch {} });
   });
 
-  const del = async (id: number) => { setBusy(true); const r = await deleteShelfCapture(id); setBusy(false); if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ"); };
+  const del = async (id: number) => { if (!confirm("ลบรายการนี้?")) return; setBusy(true); const r = await deleteShelfCapture(id); setBusy(false); if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ"); };
+  const [editId, setEditId] = useState<number | null>(null);
 
   const scents = useMemo(() => new Set(captures.map((c) => c.scent || c.barcode || "")).size, [captures]);
   const fmt = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }); };
@@ -118,18 +119,80 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
       ) : (
         <div className="rounded-xl border border-line overflow-hidden">
           {captures.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 px-3 py-2 border-t border-line-soft first:border-t-0 text-sm">
-              <div className="flex-1 min-w-0">
-                <div className="text-ink truncate">{c.scent || <span className="text-warn">ไม่พบสินค้า</span>} <span className="text-muted">{c.size || ""}</span></div>
-                <div className="font-mono text-[11px] text-muted">{c.sku}{c.barcode ? ` · ${c.barcode}` : ""} · {fmt(c.captured_at)}</div>
+            <div key={c.id} className="border-t border-line-soft first:border-t-0">
+              <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="text-ink truncate">{c.scent || <span className="text-warn">ไม่พบสินค้า</span>} <span className="text-muted">{c.size || ""}</span></div>
+                  <div className="font-mono text-[11px] text-muted">{c.sku}{c.barcode ? ` · ${c.barcode}` : ""} · {fmt(c.captured_at)}</div>
+                </div>
+                <button onClick={() => setEditId(editId === c.id ? null : c.id)} disabled={busy} className="p-1.5 rounded-lg text-muted hover:bg-canvas shrink-0" title="แก้ไข"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => del(c.id)} disabled={busy} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-canvas shrink-0" title="ลบ"><Trash2 className="w-4 h-4" /></button>
               </div>
-              <button onClick={() => del(c.id)} disabled={busy} className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-canvas shrink-0" title="ลบ"><Trash2 className="w-4 h-4" /></button>
+              {editId === c.id && <CaptureRowEditor row={c} onDone={() => setEditId(null)} />}
             </div>
           ))}
         </div>
       )}
 
       {scanning && <BarcodeScanner continuous knownCodes={null} onDetected={(c) => handle(c)} onClose={() => setScanning(false)} />}
+    </div>
+  );
+}
+
+// แก้ไขรายการที่เก็บ: แก้รหัส SKU และ/หรือเปลี่ยนสินค้า (ค้นหา)
+function CaptureRowEditor({ row, onDone }: { row: ShelfCaptureRow; onDone: () => void }) {
+  const router = useRouter();
+  const [sku, setSku] = useState(row.sku);
+  const [query, setQuery] = useState("");
+  const [res, setRes] = useState<any[]>([]);
+  const [acOpen, setAcOpen] = useState(false);
+  const [prod, setProd] = useState<{ barcode: string; scent: string; size: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const search = (v: string) => {
+    setQuery(v); setProd(null);
+    if (timer.current) clearTimeout(timer.current);
+    const t = v.trim();
+    if (!t) { setAcOpen(false); setRes([]); return; }
+    timer.current = setTimeout(() => {
+      fetch(`/api/products/search?q=${encodeURIComponent(t)}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : [])).then((r) => { setRes(Array.isArray(r) ? r : []); setAcOpen(true); }).catch(() => { setRes([]); setAcOpen(true); });
+    }, 250);
+  };
+  const save = async () => {
+    setBusy(true); setErr(null);
+    const patch: { id: number; sku?: string; barcode?: string } = { id: row.id };
+    if (sku.trim() && sku.trim() !== row.sku) patch.sku = sku.trim();
+    if (prod && prod.barcode !== row.barcode) patch.barcode = prod.barcode;
+    const r = await updateShelfCapture(patch);
+    setBusy(false);
+    if (r.ok) { router.refresh(); onDone(); } else setErr(r.error ?? "แก้ไขไม่สำเร็จ");
+  };
+  const inp = "h-[38px] border border-line rounded-lg px-2.5 text-sm bg-surface focus:outline-none focus:border-brand";
+
+  return (
+    <div className="px-3 pb-3 pt-1 bg-canvas/50 space-y-2">
+      <div className="text-[11px] text-muted">ปัจจุบัน: {row.scent || "—"} {row.size || ""} · <span className="font-mono">{row.sku}</span></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label className="block"><span className="text-[11px] text-muted">รหัส SKU</span>
+          <input value={sku} onChange={(e) => { setSku(e.target.value); setErr(null); }} className={inp + " w-full font-mono"} /></label>
+        <div className="relative"><span className="text-[11px] text-muted">เปลี่ยนสินค้า (เว้นว่าง = คงเดิม)</span>
+          <input value={query} onChange={(e) => search(e.target.value)} placeholder="ค้นหากลิ่น/บาร์โค้ด" className={inp + " w-full"} />
+          {acOpen && res.length > 0 && (
+            <div className="absolute z-20 mt-1 w-full max-h-40 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
+              {res.map((p: any) => <button key={p.id} onMouseDown={() => { setProd({ barcode: p.barcode, scent: p.scent, size: p.size }); setQuery(`${p.scent} ${p.size}`); setAcOpen(false); }} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> {p.size} <span className="text-muted">· {p.barcode}</span></button>)}
+            </div>
+          )}
+          {prod && <div className="text-[11px] text-success mt-0.5">→ {prod.scent} {prod.size}</div>}
+        </div>
+      </div>
+      {err && <div className="text-[12px] text-danger">{err}</div>}
+      <div className="flex gap-2">
+        <button onClick={save} disabled={busy} className="inline-flex items-center gap-1.5 bg-brand text-white text-sm font-medium rounded-lg px-3 py-1.5 disabled:opacity-50">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} บันทึก</button>
+        <button onClick={onDone} className="inline-flex items-center gap-1 text-sm text-muted border border-line rounded-lg px-3 py-1.5 hover:bg-canvas"><X className="w-4 h-4" /> ยกเลิก</button>
+      </div>
     </div>
   );
 }

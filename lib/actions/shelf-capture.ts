@@ -41,6 +41,36 @@ export async function captureShelfUnit(input: { barcode: string; sku: string; br
   }
 }
 
+/** Edit a captured row: fix its SKU and/or re-point it to the right product (by barcode). */
+export async function updateShelfCapture(input: { id: number; sku?: string; barcode?: string }): Promise<{ ok: boolean; error?: string }> {
+  await requireAnyPermission(["my_sales", "requisitions", "stock"]);
+  try {
+    const [row] = await q<{ branch: string }>(`select branch from shelf_capture where id = $1`, [input.id]);
+    if (!row) return { ok: false, error: "ไม่พบรายการ" };
+    const sets: string[] = []; const args: any[] = [input.id]; let i = 2;
+    const sku = input.sku != null ? String(input.sku).trim() : undefined;
+    if (sku) {
+      const [dup] = await q<{ one: number }>(`select 1 one from shelf_capture where id <> $1 and branch = $2 and ${NORM("sku")} = ${NORM("$3")} limit 1`, [input.id, row.branch, sku]);
+      if (dup) return { ok: false, error: `SKU "${sku}" มีในรายการแล้ว` };
+      sets.push(`sku=$${i++}`); args.push(sku);
+    }
+    const barcode = input.barcode != null ? String(input.barcode).trim() : undefined;
+    if (barcode) {
+      const [p] = await q<{ scent: string | null; size: string | null }>(`select scent, size from products where barcode = $1`, [barcode]);
+      if (!p) return { ok: false, error: "ไม่พบสินค้าตามบาร์โค้ด" };
+      sets.push(`barcode=$${i++}`, `scent=$${i++}`, `size=$${i++}`); args.push(barcode, p.scent, p.size);
+    }
+    if (!sets.length) return { ok: true };
+    await q(`update shelf_capture set ${sets.join(", ")} where id = $1`, args);
+    revalidatePath("/my/count"); revalidatePath("/stock");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง" };
+    console.error("[updateShelfCapture]", e);
+    return { ok: false, error: "แก้ไขไม่สำเร็จ" };
+  }
+}
+
 /** Remove one captured row (wrong scan). */
 export async function deleteShelfCapture(id: number): Promise<{ ok: boolean; error?: string }> {
   await requireAnyPermission(["my_sales", "requisitions", "stock"]);
