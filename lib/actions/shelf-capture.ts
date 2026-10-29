@@ -71,6 +71,23 @@ export async function updateShelfCapture(input: { id: number; sku?: string; barc
   }
 }
 
+/** Clear the whole capture round for a branch (start fresh). Manager-only so staff can't wipe
+ *  a round by accident. Returns how many rows were removed. Does NOT touch sku_units. */
+export async function clearShelfCaptures(branch: string): Promise<{ ok: boolean; cleared?: number; error?: string }> {
+  await requireAnyPermission(["requisitions", "stock"]);
+  const b = normalizeBranch(branch);
+  if (!b) return { ok: false, error: "ไม่ได้ระบุสาขา" };
+  try {
+    const rows = await q<{ id: number }>(`delete from shelf_capture where branch = upper($1) returning id`, [b]);
+    revalidatePath("/my/count"); revalidatePath("/stock");
+    return { ok: true, cleared: rows.length };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง" };
+    console.error("[clearShelfCaptures]", e);
+    return { ok: false, error: "ล้างข้อมูลไม่สำเร็จ" };
+  }
+}
+
 /** Remove one captured row (wrong scan). */
 export async function deleteShelfCapture(id: number): Promise<{ ok: boolean; error?: string }> {
   await requireAnyPermission(["my_sales", "requisitions", "stock"]);

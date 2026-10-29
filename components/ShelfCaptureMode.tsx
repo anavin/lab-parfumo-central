@@ -1,12 +1,14 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ScanLine, Check, HelpCircle, Trash2, Barcode, Loader2, Pencil, X } from "lucide-react";
+import { ScanLine, Check, HelpCircle, Trash2, Loader2, Pencil, X, Download, RotateCcw } from "lucide-react";
 import { beep } from "@/lib/feedback";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
-import { captureShelfUnit, deleteShelfCapture, updateShelfCapture } from "@/lib/actions/shelf-capture";
+import { captureShelfUnit, deleteShelfCapture, updateShelfCapture, clearShelfCaptures } from "@/lib/actions/shelf-capture";
 import { num } from "@/lib/format";
+import { downloadCsv } from "@/lib/csv";
+import { branchName } from "@/lib/branches";
 import type { ShelfCaptureRow } from "@/lib/queries";
 
 type Pending = { barcode: string; scent: string; size: string };
@@ -61,6 +63,22 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
 
   const del = async (id: number) => { if (!confirm("ลบรายการนี้?")) return; setBusy(true); const r = await deleteShelfCapture(id); setBusy(false); if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ"); };
   const [editId, setEditId] = useState<number | null>(null);
+  const [armClear, setArmClear] = useState(false);   // two-step confirm for wiping the round
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const exportCsv = () => {
+    const rows: (string | number | null)[][] = [["กลิ่น", "ขนาด", "SKU", "บาร์โค้ด", "เวลาเก็บ"]];
+    for (const c of captures) rows.push([c.scent || "", c.size || "", c.sku, c.barcode || "", new Date(c.captured_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })]);
+    const tag = (branch ? branchName(branch) : "all").replace(/\s+/g, "");
+    downloadCsv(`shelf-capture-${tag}-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  };
+  const doClear = async () => {
+    if (!branch) return;
+    if (!armClear) { setArmClear(true); if (armTimer.current) clearTimeout(armTimer.current); armTimer.current = setTimeout(() => setArmClear(false), 4000); return; }
+    setArmClear(false); setBusy(true);
+    const r = await clearShelfCaptures(branch); setBusy(false);
+    if (r.ok) { setPend(null); router.refresh(); } else alert(r.error ?? "ล้างไม่สำเร็จ");
+  };
 
   const scents = useMemo(() => new Set(captures.map((c) => c.scent || c.barcode || "")).size, [captures]);
   const fmt = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }); };
@@ -113,6 +131,21 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
           </div>
         </div>
       </details>
+
+      {/* round actions: export + start-new-round (clear) */}
+      {captures.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button onClick={exportCsv} className="inline-flex items-center gap-1.5 text-sm text-ink border border-line rounded-lg px-3 py-1.5 hover:bg-canvas">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button onClick={doClear} disabled={busy}
+            className={"ml-auto inline-flex items-center gap-1.5 text-sm rounded-lg px-3 py-1.5 border transition " +
+              (armClear ? "bg-danger text-white border-danger" : "text-danger border-danger/40 hover:bg-danger-soft")}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            {armClear ? `ยืนยันล้าง ${num(captures.length)} ขวด?` : "เริ่มรอบใหม่ (ล้างข้อมูล)"}
+          </button>
+        </div>
+      )}
 
       {/* summary + captured list */}
       <div className="grid grid-cols-2 gap-2">
