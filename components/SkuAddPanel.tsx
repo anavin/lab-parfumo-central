@@ -23,7 +23,10 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
   const [info, setInfo] = useState<Info | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
   const slotsRef = useRef<string[]>([]);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [slotRes, setSlotRes] = useState<(SlotRes | null)[]>([]);
+  // ยิง/กรอกเสร็จ → เด้งไปช่องว่างถัดไปให้พร้อมยิงต่อ
+  const focusEmpty = (arr: string[] = slotsRef.current) => { const ne = arr.findIndex((s) => !s.trim()); if (ne >= 0) setTimeout(() => inputRefs.current[ne]?.focus(), 0); };
   const [query, setQuery] = useState("");
   const [res, setRes] = useState<any[]>([]);
   const [acOpen, setAcOpen] = useState(false);
@@ -70,6 +73,7 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
       if (empty >= 0) { cur[empty] = code; setSlotRes((r) => { const n = [...r]; n[empty] = null; return n; }); }
       else { cur.push(code); setSlotRes((r) => [...r, null]); }
       setSlotList(cur);
+      focusEmpty(cur);   // เด้งไปช่องถัดไป
       return show({ ok: true, title: "ใส่ SKU แล้ว", label: `SKU ${code}`, sub: `${cur.filter((s) => s.trim()).length} ช่อง`, text: `ใส่ SKU ${code} (${cur.filter((s) => s.trim()).length} ช่อง)` });
     } finally { setBusy(false); }
   };
@@ -210,7 +214,8 @@ export function SkuAddPanel({ branch, defaultOpen = false }: { branch: string | 
                 <div key={i}>
                   <div className={"flex items-center gap-2 rounded-lg border bg-surface px-2 " + (st ? resMeta[st].cls : "border-line")}>
                     <span className="text-[11px] text-muted w-4 text-center shrink-0">{i + 1}</span>
-                    <input value={s} onChange={(e) => setSlot(i, e.target.value)}
+                    <input ref={(el) => { inputRefs.current[i] = el; }} value={s} onChange={(e) => setSlot(i, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); focusEmpty(); } }}
                       placeholder={`SKU #${i + 1}`} className="flex-1 min-w-0 h-[40px] bg-transparent text-sm font-mono focus:outline-none" />
                     {slots.length > 1 && <button onClick={() => removeSlot(i)} className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted hover:text-danger" aria-label="ลบช่อง"><X className="w-3.5 h-3.5" /></button>}
                   </div>
