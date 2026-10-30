@@ -6,8 +6,10 @@ import { RequisitionActions } from "@/components/RequisitionActions";
 import { RequisitionSheet } from "@/components/RequisitionSheet";
 import { RequisitionAttachments } from "@/components/RequisitionAttachments";
 import { RequisitionAssignee } from "@/components/RequisitionAssignee";
+import { ReceivedSkus } from "@/components/ReceivedSkus";
 import { getPoAttachments } from "@/lib/actions/po-attachments";
 import { listReceivers } from "@/lib/actions/requisitions";
+import { skuUnitsByPo } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,11 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
   const canAttach = po.status !== "received";   // lock attachments once the goods are received
   const receivers = await listReceivers(po.branch_label);   // salespeople of THIS branch, for the picker
 
+  // SKUs that actually entered stock under this requisition (for verifying the real pieces on receive)
+  const receivedSkus = await skuUnitsByPo(po.id);
+  const orderedByKey: Record<string, number> = {};
+  for (const it of items) { const k = `${nrm(it.scent)}|${nrm(it.size)}`; orderedByKey[k] = (orderedByKey[k] || 0) + (Number(it.qty) || 0); }
+
   return (
     // clean document canvas — same as the /print page, just with an action bar on top
     <div className="min-h-screen bg-neutral-100 text-black">
@@ -74,6 +81,13 @@ export default async function RequisitionDetail({ params }: { params: Promise<{ 
             ? <span className="chip-ok">รับของแล้ว</span>
             : (po.assigned_to ? null : <span className="text-xs text-warn-dark">· ยังไม่มอบหมาย → ยังไม่มีใครเห็นใบรับ</span>)}
         </div>
+
+        {/* SKU ที่รับเข้าสต๊อกจากใบเบิกนี้ — ตรวจของจริงทีละชิ้น (ไม่พิมพ์) */}
+        {receivedSkus.length > 0 && (
+          <div className="no-print mb-6">
+            <ReceivedSkus skus={receivedSkus} ordered={orderedByKey} poId={po.id} />
+          </div>
+        )}
 
         {/* attachments — kept accessible but out of the document itself */}
         <div className="no-print mb-6">

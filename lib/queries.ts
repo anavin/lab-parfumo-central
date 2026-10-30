@@ -430,6 +430,17 @@ export async function shelfCaptures(branch: string | null = null): Promise<Shelf
   catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
+export type ReceivedSkuRow = { sku: string; barcode: string | null; scent: string | null; size: string | null; status: string; received_at: string };
+/** Serialized SKUs that actually entered stock under one requisition (po_id) — what to verify on
+ *  receive. status reflects current state (in_stock / sold / returned / lost). Empty pre-0036. */
+export async function skuUnitsByPo(poId: number): Promise<ReceivedSkuRow[]> {
+  const sql = `select sku, barcode, scent, size, status, received_at::text received_at
+    from sku_units where po_id = $1
+    order by scent nulls last, size, sku`;
+  try { return await q<ReceivedSkuRow>(sql, [poId]); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Barcodes that currently have ≥1 in_stock serialized unit at a branch. The sale page uses this
  *  to decide which lines REQUIRE a SKU scan (products with SKU stock) vs which sell freely
  *  (testers / old stock with no SKU). Empty before 0036 is migrated. */
