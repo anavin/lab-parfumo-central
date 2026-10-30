@@ -8,7 +8,7 @@ const NORM = (col: string) => `upper(regexp_replace(${col}, '\\s', '', 'g'))`;
 
 export type CaptureResult =
   | { ok: true; scent: string | null; size: string | null; warn?: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; dup?: boolean };
 
 /** Capture one physical bottle (barcode + SKU) into the fresh shelf dataset. Resolves the product
  *  for display, flags a sticker whose SKU the system already ties to a different product, and
@@ -22,7 +22,7 @@ export async function captureShelfUnit(input: { barcode: string; sku: string; br
   if (!sku) return { ok: false, error: "ยังไม่ได้ยิง SKU" };
   try {
     const [dup] = await q<{ one: number }>(`select 1 one from shelf_capture where ${NORM("sku")} = ${NORM("$1")} and branch = upper($2) limit 1`, [sku, branch]);
-    if (dup) return { ok: false, error: `SKU "${sku}" เก็บไปแล้วในรอบนี้` };
+    if (dup) return { ok: false, error: `SKU "${sku}" เก็บไปแล้วในรอบนี้`, dup: true };
     const [p] = await q<{ scent: string | null; size: string | null }>(`select scent, size from products where barcode = $1`, [barcode]);
     let warn: string | undefined;
     try {

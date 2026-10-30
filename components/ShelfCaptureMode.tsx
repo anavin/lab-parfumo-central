@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ScanLine, Check, HelpCircle, Trash2, Loader2, Pencil, X, Download, RotateCcw } from "lucide-react";
+import { ScanLine, Check, Trash2, Loader2, Pencil, X, Download, RotateCcw, Search, Minus, Plus, AlertTriangle } from "lucide-react";
 import { beep } from "@/lib/feedback";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -11,55 +11,115 @@ import { downloadCsv } from "@/lib/csv";
 import { branchName } from "@/lib/branches";
 import type { ShelfCaptureRow } from "@/lib/queries";
 
-type Pending = { barcode: string; scent: string; size: string };
+type Prod = { barcode: string; scent: string; size: string };
+type SlotRes = "ok" | "warn" | "dup" | "duplocal" | "err";
+type SlotStatus = { status: SlotRes; msg?: string };
+const norm = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "");
 
-// เก็บข้อมูลสดจากหน้าสาขา รายขวด: ยิงบาร์โค้ดสินค้า → ยิง SKU → บันทึกเป็นคู่ (barcode+sku)
-// เป็นชุดข้อมูลใหม่แยกจาก sku_units ไว้เทียบกับระบบทีหลัง
+// เก็บข้อมูลสดจากหน้าสาขา รายขวดแบบ "ช่อง": ยิงบาร์โค้ดสินค้า → เลือกจำนวนขวด → กรอก/สแกน SKU ลงช่อง → เก็บทีเดียว
+// เช็คซ้ำ (ในรอบนี้ + ในรายการ) ไม่เก็บซ้ำ แจ้งเตือนรายช่อง · เป็นชุดข้อมูลใหม่แยกจาก sku_units ไว้เทียบทีหลัง
 export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureRow[]; branch: string | null }) {
   const router = useRouter();
-  const [pending, setPending] = useState<Pending | null>(null);
-  const pendingRef = useRef<Pending | null>(null);
-  const [msg, setMsg] = useState<ScanResult | null>(null);
+  const [prod, setProd] = useState<Prod | null>(null);
+  const prodRef = useRef<Prod | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);
+  const slotsRef = useRef<string[]>([]);
+  const [slotRes, setSlotRes] = useState<(SlotStatus | null)[]>([]);
+  const [query, setQuery] = useState("");
+  const [res, setRes] = useState<any[]>([]);
+  const [acOpen, setAcOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [added, setAdded] = useState(0);
-  const [prodCount, setProdCount] = useState(0);   // captured for the current (sticky) scent this round
-  const [bcInput, setBcInput] = useState("");
-  const [skuInput, setSkuInput] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; warn?: boolean; text: string } | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const setPend = (p: Pending | null) => { pendingRef.current = p; setPending(p); setProdCount(0); };
+  const setSlotList = (next: string[]) => { slotsRef.current = next; setSlots(next); };
+  const selectProduct = (p: Prod | null) => {
+    prodRef.current = p; setProd(p); setQuery(p ? `${p.scent} ${p.size}` : ""); setAcOpen(false); setSummary(null); setMsg(null);
+    if (p) { setSlotList([""]); setSlotRes([null]); } else { setSlotList([]); setSlotRes([]); }
+  };
 
-  // one pipeline: a product barcode SETS the current scent (sticky); anything else is a SKU → capture
-  // the pair and KEEP the scent, so same-scent bottles only need one barcode scan then many SKU scans.
-  const handle = async (raw: string, fromScan = true): Promise<ScanResult> => {
+  // route a scan/typed code: product barcode → switch product; else fill next empty SKU slot
+  const onScan = async (raw: string, fromScan = true): Promise<ScanResult> => {
     const code = String(raw || "").trim();
-    if (!code || !branch) return { ok: false, label: "", sub: "" };
+    if (!code || !branch) return { ok: false, label: "" };
+    const show = (r: ScanResult & { text?: string }): ScanResult => { setMsg({ ok: r.ok, warn: r.warn, text: r.text ?? `${r.title ?? ""}${r.sub ? " · " + r.sub : ""}`.trim() }); return r; };
     setBusy(true);
     try {
       const p = await fetch(`/api/products/barcode?code=${encodeURIComponent(code)}`, { headers: { accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (p && p.barcode) {
-        setPend({ barcode: p.barcode, scent: p.scent, size: p.size || "" });   // sticky scent (resets count)
-        setBcInput(""); setSkuInput("");
-        const r: ScanResult = { ok: true, title: "เลือกกลิ่นแล้ว", label: `${p.scent} ${p.size || ""}`.trim(), sub: "ยิงสติกเกอร์ SKU ของกลิ่นนี้ได้เรื่อยๆ" };
-        setMsg(r); return r;
+        if (prodRef.current?.barcode !== p.barcode) selectProduct({ barcode: p.barcode, scent: p.scent, size: p.size || "" });
+        return show({ ok: true, title: "เลือกกลิ่นแล้ว", label: `${p.scent} ${p.size || ""}`.trim(), text: `เลือกกลิ่น ${p.scent} ${p.size || ""} — ยิง/กรอก SKU ได้เลย` });
       }
-      // not a product → treat as SKU for the CURRENT (sticky) scent; scent stays for the next bottle
-      const cur = pendingRef.current;
-      if (!cur) { const r: ScanResult = { ok: false, title: "ยิงบาร์โค้ดสินค้าก่อน", label: `SKU ${code}`, sub: "ยิงบาร์โค้ด 1 ครั้ง แล้วยิง SKU ของกลิ่นนั้น" }; setMsg(r); return r; }
-      const res = await captureShelfUnit({ barcode: cur.barcode, sku: code, branch });
-      if (res.ok) {
-        setSkuInput(""); setAdded((a) => a + 1); setProdCount((c) => c + 1); router.refresh();   // KEEP scent
-        const r: ScanResult = { ok: !res.warn, title: res.warn ? "เก็บแล้ว (มีข้อสังเกต)" : "เก็บแล้ว ✓", label: `${cur.scent} ${cur.size}`.trim(), sub: res.warn || `SKU ${code}` };
-        setMsg(r); return r;
-      }
-      const r: ScanResult = { ok: false, title: "เก็บไม่ได้", label: `SKU ${code}`, sub: res.error }; setMsg(r); return r;
+      if (!prodRef.current) return show({ ok: false, title: "ยิงบาร์โค้ดสินค้าก่อน", label: `SKU ${code}`, text: "ยิงบาร์โค้ดสินค้าก่อน 1 ครั้ง" });
+      if (fromScan && /^\d{8,}$/.test(code)) return show({ ok: false, warn: true, title: "ไม่เก็บ (เหมือนบาร์โค้ดสินค้า)", label: code, text: `ไม่เก็บ "${code}" (เหมือนบาร์โค้ดสินค้า) — ถ้าเป็น SKU จริงให้พิมพ์เองในช่อง` });
+      if (slotsRef.current.some((s) => s && norm(s) === norm(code))) return show({ ok: false, warn: true, title: "ซ้ำในรายการ", label: `SKU ${code}`, text: `⚠ SKU "${code}" ซ้ำในรายการแล้ว` });
+      const cur = [...slotsRef.current];
+      const empty = cur.findIndex((s) => !s.trim());
+      if (empty >= 0) { cur[empty] = code; setSlotRes((r) => { const n = [...r]; n[empty] = null; return n; }); }
+      else { cur.push(code); setSlotRes((r) => [...r, null]); }
+      setSlotList(cur);
+      return show({ ok: true, title: "ใส่ SKU แล้ว", label: `SKU ${code}`, text: `ใส่ SKU ${code} (${cur.filter((s) => s.trim()).length} ช่อง)` });
     } finally { setBusy(false); }
   };
 
-  useBarcodeScanner(!!branch, (code) => {
-    handle(code).then((r) => { beep(r.ok ? "ok" : "error"); try { navigator.vibrate?.(r.ok ? 40 : [60, 40, 60]); } catch {} });
-  });
+  useBarcodeScanner(!!branch, (code) => { onScan(code).then((r) => { beep(r.ok ? "ok" : "error"); try { navigator.vibrate?.(r.ok ? 40 : [60, 40, 60]); } catch {} }); });
+
+  const setSlot = (i: number, v: string) => { const n = [...slotsRef.current]; n[i] = v; setSlotList(n); setSlotRes((r) => { const x = [...r]; x[i] = null; return x; }); setSummary(null); };
+  const addSlot = () => { setSlotList([...slotsRef.current, ""]); setSlotRes((r) => [...r, null]); };
+  const removeSlot = (i: number) => { setSlotList(slotsRef.current.filter((_, idx) => idx !== i)); setSlotRes((r) => r.filter((_, idx) => idx !== i)); };
+  const setCount = (n: number) => {
+    const cur = slotsRef.current; const want = Math.max(1, Math.min(99, n));
+    if (want === cur.length) return;
+    const next = want > cur.length ? [...cur, ...Array(want - cur.length).fill("")] : cur.slice(0, want);
+    setSlotList(next); setSlotRes(Array(next.length).fill(null));
+  };
+  const filled = slots.filter((s) => s.trim()).length;
+
+  const submit = async () => {
+    const cur = prodRef.current; if (!cur || !branch) return;
+    setBusy(true); setSummary(null); setMsg(null);
+    const seen = new Set<string>();
+    const resArr: (SlotStatus | null)[] = slots.map(() => null);
+    let saved = 0, warn = 0, dup = 0, err = 0;
+    for (let i = 0; i < slots.length; i++) {
+      const v = slots[i].trim();
+      if (!v) continue;
+      const key = norm(v);
+      if (seen.has(key)) { resArr[i] = { status: "duplocal" }; dup++; continue; }
+      seen.add(key);
+      const r = await captureShelfUnit({ barcode: cur.barcode, sku: v, branch });
+      if (r.ok && !r.warn) { resArr[i] = { status: "ok" }; saved++; }
+      else if (r.ok && r.warn) { resArr[i] = { status: "warn", msg: r.warn }; saved++; warn++; }
+      else if (!r.ok && r.dup) { resArr[i] = { status: "dup" }; dup++; }
+      else { resArr[i] = { status: "err", msg: (r as any).error }; err++; }
+    }
+    // stored ones (ok/warn) drop out; keep the problem slots so staff can fix them
+    const nextSlots: string[] = []; const nextRes: (SlotStatus | null)[] = [];
+    for (let i = 0; i < slots.length; i++) {
+      const st = resArr[i];
+      if (st && (st.status === "ok" || st.status === "warn")) continue;
+      nextSlots.push(slots[i]); nextRes.push(st);
+    }
+    if (nextSlots.length === 0) { nextSlots.push(""); nextRes.push(null); }
+    setSlotList(nextSlots); setSlotRes(nextRes);
+    setSummary(`เก็บแล้ว ${saved}${warn ? ` (ข้อสังเกต ${warn})` : ""}${dup ? ` · ซ้ำ ${dup} (ไม่เก็บ)` : ""}${err ? ` · ผิดพลาด ${err}` : ""}`);
+    setBusy(false);
+    if (saved > 0) router.refresh();
+  };
+
+  const search = (v: string) => {
+    setQuery(v);
+    if (timer.current) clearTimeout(timer.current);
+    const t = v.trim();
+    if (!t) { setAcOpen(false); setRes([]); return; }
+    timer.current = setTimeout(() => {
+      fetch(`/api/products/search?q=${encodeURIComponent(t)}`, { headers: { accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : [])).then((r) => { setRes(Array.isArray(r) ? r : []); setAcOpen(true); }).catch(() => { setRes([]); setAcOpen(true); });
+    }, 250);
+  };
 
   const del = async (id: number) => { if (!confirm("ลบรายการนี้?")) return; setBusy(true); const r = await deleteShelfCapture(id); setBusy(false); if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ"); };
   const [editId, setEditId] = useState<number | null>(null);
@@ -77,60 +137,96 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
     if (!armClear) { setArmClear(true); if (armTimer.current) clearTimeout(armTimer.current); armTimer.current = setTimeout(() => setArmClear(false), 4000); return; }
     setArmClear(false); setBusy(true);
     const r = await clearShelfCaptures(branch); setBusy(false);
-    if (r.ok) { setPend(null); router.refresh(); } else alert(r.error ?? "ล้างไม่สำเร็จ");
+    if (r.ok) { selectProduct(null); router.refresh(); } else alert(r.error ?? "ล้างไม่สำเร็จ");
   };
 
   const scents = useMemo(() => new Set(captures.map((c) => c.scent || c.barcode || "")).size, [captures]);
   const fmt = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }); };
+  const resMeta: Record<SlotRes, { cls: string; label: string }> = {
+    ok: { cls: "border-success bg-success-soft/50", label: "เก็บแล้ว" },
+    warn: { cls: "border-warn bg-warn-soft", label: "เก็บแล้ว (ข้อสังเกต)" },
+    dup: { cls: "border-warn bg-warn-soft", label: "ซ้ำในรอบนี้ — ไม่เก็บ" },
+    duplocal: { cls: "border-warn bg-warn-soft", label: "ซ้ำในรายการ — ไม่เก็บ" },
+    err: { cls: "border-danger bg-danger-soft", label: "เก็บไม่ได้" },
+  };
 
   if (!branch) return <div className="text-sm text-muted py-4">เลือกสาขาก่อนจึงจะเก็บข้อมูลได้</div>;
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted">ยิง<b className="text-ink">บาร์โค้ดสินค้า 1 ครั้ง</b>เพื่อเลือกกลิ่น แล้ว<b className="text-ink">ยิงสติกเกอร์ SKU</b>ของกลิ่นนั้นได้เรื่อยๆ · เปลี่ยนกลิ่น = ยิงบาร์โค้ดใหม่</p>
+      <p className="text-xs text-muted">ยิง<b className="text-ink">บาร์โค้ดสินค้า</b>เพื่อเลือกกลิ่น → <b className="text-ink">เลือกจำนวนขวด</b> → กรอก/สแกน SKU ลงช่อง → กด<b className="text-ink">เก็บ</b> · เช็คซ้ำให้อัตโนมัติ ไม่เก็บซ้ำ</p>
 
-      {/* current scent (sticky) */}
-      <div className={"rounded-xl border px-3 py-2.5 " + (pending ? "border-brand/50 bg-brand-soft/40" : "border-line bg-surface")}>
-        {pending ? (
-          <div className="flex items-center justify-between gap-2">
+      {!prod ? (
+        <>
+          {/* step 1: pick a product */}
+          <button onClick={() => setScanning(true)} className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-xl bg-brand text-white text-base font-medium active:scale-95">
+            <ScanLine className="w-5 h-5" /> ยิงบาร์โค้ดสินค้า เพื่อเลือกกลิ่น
+          </button>
+          <div className="relative">
+            <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input value={query} onChange={(e) => search(e.target.value)} placeholder="หรือค้นหากลิ่น / บาร์โค้ด"
+              className="w-full h-[40px] border border-line rounded-lg pl-8 pr-3 text-sm bg-surface focus:outline-none focus:border-brand" />
+            {acOpen && res.length > 0 && (
+              <div className="absolute z-20 mt-1 w-full max-h-44 overflow-auto bg-surface border border-line rounded-lg shadow-lg text-sm">
+                {res.map((p: any) => <button key={p.id} onMouseDown={() => selectProduct({ barcode: p.barcode, scent: p.scent, size: p.size })} className="block w-full text-left px-3 py-2 hover:bg-brand-soft"><b>{p.scent}</b> {p.size} <span className="text-muted">· {p.barcode}</span></button>)}
+              </div>
+            )}
+          </div>
+          {msg && <div className={"text-sm rounded-lg px-3 py-2 " + (msg.warn ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger")}>{msg.text}</div>}
+        </>
+      ) : (
+        <>
+          {/* current product */}
+          <div className="rounded-xl border border-brand/40 bg-brand-soft/30 px-3 py-2.5 flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-[11px] text-muted">กลิ่นปัจจุบัน — ยิง SKU ได้เลย</div>
-              <div className="text-base font-semibold text-ink leading-tight truncate">{pending.scent} <span className="text-muted font-normal">{pending.size}</span></div>
+              <div className="text-[11px] text-muted">กลิ่นปัจจุบัน</div>
+              <div className="text-base font-semibold text-ink leading-tight truncate">{prod.scent} <span className="text-muted font-normal">{prod.size}</span></div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="text-right"><div className="text-[11px] text-muted">เก็บกลิ่นนี้</div><div className="text-xl font-bold tabular-nums text-brand-dark">{prodCount}</div></div>
-              <button onClick={() => setPend(null)} className="text-xs text-muted border border-line rounded-lg px-2 py-1 hover:bg-canvas">เปลี่ยน</button>
-            </div>
+            <button onClick={() => selectProduct(null)} className="shrink-0 text-xs text-muted border border-line rounded-lg px-2 py-1 hover:bg-canvas">เปลี่ยน</button>
           </div>
-        ) : (
-          <div className="text-sm text-muted"><b className="text-ink">ยิงบาร์โค้ดสินค้า</b> 1 ครั้งเพื่อเลือกกลิ่น แล้วยิงสติกเกอร์ SKU ทีละขวด</div>
-        )}
-      </div>
 
-      <button onClick={() => setScanning(true)} className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-xl bg-brand text-white text-base font-medium active:scale-95">
-        <ScanLine className="w-5 h-5" /> สแกน (บาร์โค้ดสินค้า / สติกเกอร์ SKU)
-      </button>
+          {/* qty + scan */}
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-muted">จำนวนขวด</span>
+            <div className="inline-flex items-center rounded-lg border border-line bg-surface">
+              <button onClick={() => setCount(slots.length - 1)} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink disabled:opacity-40" disabled={slots.length <= 1}><Minus className="w-4 h-4" /></button>
+              <span className="w-8 text-center text-sm font-bold tabular-nums text-ink">{slots.length}</span>
+              <button onClick={() => setCount(slots.length + 1)} className="w-8 h-8 flex items-center justify-center text-muted hover:text-ink"><Plus className="w-4 h-4" /></button>
+            </div>
+            <button onClick={() => setScanning(true)} className="ml-auto inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-brand text-white text-sm font-medium active:scale-95"><ScanLine className="w-4 h-4" /> สแกน SKU</button>
+          </div>
 
-      {msg && (
-        <div className={"text-sm rounded-lg px-3 py-2 flex items-start gap-1.5 " + (msg.ok ? "bg-success-soft text-success" : "bg-warn-soft text-warn")}>
-          {msg.ok ? <Check className="w-4 h-4 mt-0.5 shrink-0" /> : <HelpCircle className="w-4 h-4 mt-0.5 shrink-0" />}
-          <span><b>{msg.title ?? msg.label}</b>{msg.sub ? ` · ${msg.sub}` : ""}</span>
-        </div>
+          {/* SKU slots */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {slots.map((s, i) => {
+              const st = slotRes[i];
+              return (
+                <div key={i}>
+                  <div className={"flex items-center gap-2 rounded-lg border bg-surface px-2 " + (st ? resMeta[st.status].cls : "border-line")}>
+                    <span className="text-[11px] text-muted w-4 text-center shrink-0">{i + 1}</span>
+                    <input value={s} onChange={(e) => setSlot(i, e.target.value)} placeholder={`SKU #${i + 1}`} className="flex-1 min-w-0 h-[40px] bg-transparent text-sm font-mono focus:outline-none" />
+                    {slots.length > 1 && <button onClick={() => removeSlot(i)} className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted hover:text-danger" aria-label="ลบช่อง"><X className="w-3.5 h-3.5" /></button>}
+                  </div>
+                  {st && <div className={"text-[11px] mt-0.5 flex items-center gap-1 " + (st.status === "ok" ? "text-success" : st.status === "err" ? "text-danger" : "text-warn-dark")}>
+                    {st.status === "ok" ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />} {st.msg || resMeta[st.status].label}
+                  </div>}
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={addSlot} className="inline-flex items-center gap-1 text-[12px] text-brand-dark border border-brand/40 rounded-lg px-2.5 py-1 hover:bg-brand-soft"><Plus className="w-3.5 h-3.5" /> เพิ่มช่อง</button>
+
+          {msg && <div className={"text-sm rounded-lg px-3 py-2 " + (msg.ok ? "bg-success-soft text-success" : msg.warn ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger")}>{msg.text}</div>}
+          {summary && <div className="text-sm rounded-lg px-3 py-2 bg-canvas text-ink border border-line">{summary}</div>}
+
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-muted">กรอกแล้ว <b className="text-ink tabular-nums">{filled}</b>/{slots.length} ชิ้น</span>
+            <button onClick={submit} disabled={busy || filled === 0} className="inline-flex items-center gap-1.5 rounded-lg bg-gold text-white text-sm font-semibold px-4 py-2 disabled:opacity-40 hover:bg-gold-dark">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} เก็บ ({filled})
+            </button>
+          </div>
+        </>
       )}
-
-      {/* manual fallback */}
-      <details className="rounded-lg border border-line bg-surface">
-        <summary className="px-3 py-2 text-xs text-muted cursor-pointer select-none">พิมพ์เอง (ถ้าสแกนไม่ติด)</summary>
-        <div className="px-3 pb-3 pt-1 space-y-2">
-          <input value={bcInput} onChange={(e) => setBcInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handle(bcInput, false); } }}
-            placeholder="บาร์โค้ดสินค้า แล้ว Enter" className="w-full h-[40px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
-          <div className="flex gap-1.5">
-            <input value={skuInput} onChange={(e) => setSkuInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handle(skuInput, false); } }} disabled={!pending}
-              placeholder={pending ? "SKU แล้ว Enter" : "เลือกขวดก่อน"} className="flex-1 min-w-0 h-[40px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand disabled:opacity-50" />
-            <button onClick={() => handle(skuInput, false)} disabled={busy || !pending || !skuInput.trim()} className="shrink-0 h-[40px] px-3 rounded-lg bg-brand-dark text-white text-sm font-medium disabled:opacity-40">{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "เก็บ"}</button>
-          </div>
-        </div>
-      </details>
 
       {/* round actions: export + start-new-round (clear) */}
       {captures.length > 0 && (
@@ -173,7 +269,7 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
         </div>
       )}
 
-      {scanning && <BarcodeScanner continuous knownCodes={null} onDetected={(c) => handle(c)} onClose={() => setScanning(false)} />}
+      {scanning && <BarcodeScanner continuous knownCodes={null} onDetected={(c) => onScan(c)} onClose={() => setScanning(false)} />}
     </div>
   );
 }
