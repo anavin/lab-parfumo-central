@@ -3,7 +3,8 @@ import { useState, useMemo, useTransition, useEffect, useContext, useRef } from 
 import { useRouter } from "next/navigation";
 import { ReviewDayContext } from "@/components/review-day-context";
 import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Plus, Receipt as ReceiptIcon, AlertTriangle, Undo2 } from "lucide-react";
-import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin, rejectMany } from "@/lib/actions/submissions";
+import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin, rejectMany, resolveSkuPhoto } from "@/lib/actions/submissions";
+import { Barcode, Loader2 } from "lucide-react";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -363,7 +364,10 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
 
                       {bill.ref && <AddItemAdmin refId={bill.ref} pending={pending} onDone={refresh} />}
                       <SplitBreakdown tenders={payments[bill.ref]} />
-                      {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
+                      {(() => { const slips = photos.filter((p) => !(p.note || "").startsWith("sku|")); return <>
+                        {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
+                        <SkuPhotoResolve photos={photos} onDone={refresh} />
+                      </>; })()}
 
                       {/* per-bill actions */}
                       <div className="flex gap-2 items-center justify-end mt-3 pt-2.5 border-t border-line">
@@ -473,7 +477,10 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 ))}
                               </ul>
                               <SplitBreakdown tenders={payments[bill.ref]} />
-                      {photos.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={photos} size={52} /></div>}
+                      {(() => { const slips = photos.filter((p) => !(p.note || "").startsWith("sku|")); return <>
+                        {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
+                        <SkuPhotoResolve photos={photos} onDone={refresh} />
+                      </>; })()}
                               <div className="flex items-center justify-end mt-3 pt-2.5 border-t border-line">
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
                                   className="mr-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-muted text-sm font-medium hover:bg-canvas hover:text-ink disabled:opacity-50">
@@ -625,6 +632,62 @@ function AddItemAdmin({ refId, pending, onDone }: { refId: string; pending: bool
         <button onClick={() => { setOpen(false); setText(""); setPicked(null); }} className="px-3 py-1.5 rounded-lg border border-line text-sm">ยกเลิก</button>
         <button onClick={add} disabled={busy || !(picked?.scent ?? text).trim()} className="btn btn-brand flex-1">{busy ? "กำลังเพิ่ม…" : "เพิ่มลงบิล"}</button>
       </div>
+    </div>
+  );
+}
+
+// SKU photos waiting to be read & cut: a sticker that wouldn't scan at the counter was photographed.
+// The reviewer reads the SKU off the photo and types it → that serial is marked sold & linked to the bill.
+function SkuPhotoResolve({ photos, onDone }: { photos: BillAttachment[]; onDone: () => void }) {
+  const pending = photos.filter((p) => (p.note || "").startsWith("sku|"));
+  if (!pending.length) return null;
+  return (
+    <div className="mt-2 pt-2 border-t border-amber-300/70">
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 mb-1.5">
+        <Barcode className="w-4 h-4" /> SKU รอตัดสต๊อก (สแกนไม่ติด — อ่านจากรูปแล้วกรอก) · {num(pending.length)}
+      </div>
+      <div className="space-y-2">
+        {pending.map((p) => <SkuPhotoRow key={p.id} att={p} onDone={onDone} />)}
+      </div>
+    </div>
+  );
+}
+
+function SkuPhotoRow({ att, onDone }: { att: BillAttachment; onDone: () => void }) {
+  const [sku, setSku] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [view, setView] = useState(false);
+  const item = (att.note || "").split("|").slice(2).join("|") || "SKU";
+  const src = att.data ?? `/api/attachment/${att.id}`;
+  const cut = async () => {
+    if (!sku.trim()) return;
+    setBusy(true); setErr(null);
+    const r = await resolveSkuPhoto(att.id, sku.trim());
+    setBusy(false);
+    if (r.ok) onDone(); else setErr(r.error ?? "ตัดไม่สำเร็จ");
+  };
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50/60 p-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="SKU" className="w-14 h-14 rounded-md object-cover border border-amber-300 cursor-zoom-in shrink-0" onClick={() => setView(true)} />
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] text-ink truncate mb-1">{item}</div>
+        <div className="flex gap-1.5">
+          <input value={sku} onChange={(e) => { setSku(e.target.value); setErr(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); cut(); } }}
+            placeholder="อ่าน SKU จากรูป แล้วพิมพ์" className="flex-1 min-w-0 h-[36px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
+          <button onClick={cut} disabled={busy || !sku.trim()} className="shrink-0 h-[36px] px-3 rounded-lg bg-amber-600 text-white text-sm font-medium disabled:opacity-40 inline-flex items-center gap-1">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} ตัดสต๊อก
+          </button>
+        </div>
+        {err && <div className="text-[11px] text-danger mt-1">{err}</div>}
+      </div>
+      {view && (
+        <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4" onClick={() => setView(false)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="SKU" className="max-w-full max-h-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }

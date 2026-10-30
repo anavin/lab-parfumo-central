@@ -109,6 +109,12 @@ export const billSchema = z.object({
     skus: z.array(z.string().trim().max(60)).max(999).optional(),   // serialized SKUs sold on this line (phase 3)
   })).min(1, "กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ").max(50),
   attachments: z.array(z.string().startsWith("data:image/", "ไฟล์แนบไม่ถูกต้อง").max(3_000_000)).max(6).optional(),
+  // SKU-fallback photos: a sticker that wouldn't scan → photographed so staff can read & cut it later
+  skuPhotos: z.array(z.object({
+    barcode: z.string().trim().max(64).optional(),
+    item: z.string().trim().max(200).optional(),
+    data: z.string().startsWith("data:image/", "ไฟล์แนบไม่ถูกต้อง").max(3_000_000),
+  })).max(20).optional(),
   // when payment_channel = the split marker: how the bill total was split across channels
   tenders: z.array(z.object({
     channel: z.string().trim().min(1).max(60),

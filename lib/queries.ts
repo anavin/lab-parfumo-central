@@ -1154,7 +1154,7 @@ export async function trashedSubmissions() {
 // heaviest column in the DB and pulling it on every force-dynamic render blew up
 // Supabase egress. List views get id-only rows and lazy-load the image bytes through
 // /api/attachment/[id] (cacheable). Insert/other paths may still carry `data`.
-export type BillAttachment = { id: number; bill_ref: string; created_by: number; data?: string };
+export type BillAttachment = { id: number; bill_ref: string; created_by: number; data?: string; note?: string | null };
 
 export type BillTender = { channel: string; amount: number };
 // bill_payments is added by a manual migration in prod; tolerate it being
@@ -1178,9 +1178,11 @@ export async function paymentsForRefs(refs: string[]): Promise<Record<string, Bi
 export async function attachmentsForRefs(refs: string[]): Promise<Record<string, BillAttachment[]>> {
   const uniq = [...new Set((refs || []).filter(Boolean))];
   if (!uniq.length) return {};
+  const sel = (noteCol: string) => `select id, bill_ref, created_by, ${noteCol} note from bill_attachments where bill_ref = any($1) order by id`;
   try {
-    const rows = await q<BillAttachment>(
-      `select id, bill_ref, created_by from bill_attachments where bill_ref = any($1) order by id`, [uniq]);
+    let rows: BillAttachment[];
+    try { rows = await q<BillAttachment>(sel("note"), [uniq]); }
+    catch (e: any) { if (e?.code === "42703") rows = await q<BillAttachment>(sel("null::text"), [uniq]); else throw e; }   // note not migrated (pre-0039)
     const map: Record<string, BillAttachment[]> = {};
     for (const r of rows) (map[r.bill_ref] ??= []).push(r);
     return map;

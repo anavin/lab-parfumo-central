@@ -84,7 +84,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ---- bill (multi-item) types ----
 // Per-item price is already discounted; discount_pct is an extra bill-level
 // discount (e.g. negotiated when buying several), distributed to each line.
-type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean; stock?: number | null; list_price?: number; skus?: string[] };
+type BillItem = { key: number; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel?: string; gift?: boolean; stock?: number | null; list_price?: number; skus?: string[]; skuPhotos?: string[] };
 // active promotion resolved to barcode → special price (see getActivePromotionForSale)
 export type Promo = { name: string; byBarcode: Record<string, { price: number; normal: number }> } | null;
 // apply the promo special price to a new/scanned item (keeps the normal price for a struck-through display)
@@ -193,13 +193,13 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
     wasOpen.current = open;
   });
 
-  const submitTheBill = (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => start(async () => {
+  const submitTheBill = (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number, skuPhotos?: { barcode: string; item: string; data: string }[]) => start(async () => {
     if (!bill) return;
     try {
       const res = await submitBill({
         sale_date: bill.sale_date, sale_time: bill.sale_time, source: bill.source,
         receipt_no: bill.receipt_no, payment_channel: bill.payment_channel, nation: bill.nation,
-        items, attachments: bill.attachments, tenders,
+        items, attachments: bill.attachments, tenders, skuPhotos,
       });
       if (!res.ok) { alert(res.error); return; }   // keep the bill open so nothing is lost
       setBill(null);
@@ -358,7 +358,7 @@ function NationPicker({ value, onChange, invalid, big }: { value: string; onChan
 
 // ---------------------------------------------------------------- bill builder
 function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, autoScan, laserMode = false, stockMap = null, promo = null, skuBarcodes = [] }: {
-  state: BillState; setState: (s: BillState | ((prev: BillState) => BillState)) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null; promo?: Promo; skuBarcodes?: string[];
+  state: BillState; setState: (s: BillState | ((prev: BillState) => BillState)) => void; onSubmit: (items: BillItemPayload[], tenders?: { channel: string; amount: number }[], net?: number, skuPhotos?: { barcode: string; item: string; data: string }[]) => void; onCancel: () => void; pending: boolean; fullName: string; autoScan: boolean; laserMode?: boolean; stockMap?: Record<string, number> | null; promo?: Promo; skuBarcodes?: string[];
 }) {
   // products that have serialized SKU stock → their lines REQUIRE scanning a SKU per unit
   const skuSet = useMemo(() => new Set(skuBarcodes), [skuBarcodes]);
@@ -380,7 +380,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
   const set = (patch: Partial<BillState>) => setState((prev) => ({ ...prev, ...patch }));
   const [focusKey, setFocusKey] = useState<number | null>(null);   // newest "เพิ่มเอง" card → scroll + focus its search
   const [confirmCancel, setConfirmCancel] = useState(false);       // confirm before discarding a bill with data
-  const [confirmSku, setConfirmSku] = useState<string | null>(null);   // SKU incomplete → warn, but allow saving
+  const [skuBlock, setSkuBlock] = useState<string | null>(null);   // SKU incomplete → HARD block (scan or photo required)
   const [showDisc, setShowDisc] = useState(false);                 // end-of-bill discount hidden by default (tap to open)
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);  // hardware-scan feedback
   const rootRef = useRef<HTMLDivElement>(null);                     // for scrolling to the first missing field on save
@@ -548,16 +548,23 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
     // slip is optional now — never blocks saving
     setMissing(m);
     if (m.length > 0) { scrollToMissing(m); return; }
-    // SKU is a soft warning, not a block: if a SKU-tracked line is short, confirm before saving
-    // (SKUs aren't fully rolled out yet, so the cashier can proceed without scanning).
-    const skuShort = state.items.filter((it) => needsSku(it) && (it.skus?.length ?? 0) < (Number(it.qty) || 0));
-    if (skuShort.length) { setConfirmSku(skuShort.map((it) => `${it.item} (${it.skus?.length ?? 0}/${Number(it.qty) || 0})`).join(", ")); return; }
+    // SKU is MANDATORY for SKU-tracked lines: every bottle needs a scanned SKU OR a fallback photo
+    // (sticker that wouldn't scan) before the bill can save. No skip.
+    const covOf = (it: BillItem) => (it.skus?.length ?? 0) + (it.skuPhotos?.length ?? 0);
+    const skuShort = state.items.filter((it) => needsSku(it) && covOf(it) < (Number(it.qty) || 0));
+    if (skuShort.length) {
+      setSkuBlock(skuShort.map((it) => `${it.item} (${covOf(it)}/${Number(it.qty) || 0})`).join(", "));
+      requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>('[data-sku-short="1"]')?.scrollIntoView({ block: "center", behavior: "smooth" }));
+      return;
+    }
+    setSkuBlock(null);
     doSubmit();
   };
   const doSubmit = () => {
     const items = lines.map((l) => ({ item: l.it.item, barcode: l.it.barcode, size: l.it.size, qty: Number(l.it.qty), unit_price: Number(l.it.unit_price), discount: l.discount, payment_channel: l.channel, skus: l.it.skus }));
+    const skuPhotos = state.items.flatMap((it) => (it.skuPhotos ?? []).map((data) => ({ barcode: it.barcode, item: it.item, data })));
     const outTenders = split ? tenders.map((t, i) => ({ channel: t.channel, amount: tenderAmount(i) })) : undefined;
-    onSubmit(items, outTenders, net);
+    onSubmit(items, outTenders, net, skuPhotos);
   };
   const errRing = (f: string) => (missing.includes(f) ? " ring-1 ring-danger border-danger" : "");
 
@@ -740,6 +747,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
       </details>
 
       {missing.length > 0 && <div className="alert-error mb-3 text-sm">กรุณาเติมข้อมูลให้ครบ: <b>{missing.join(" · ")}</b></div>}
+      {skuBlock && <div className="alert-error mb-3 text-sm">ต้องสแกน SKU ให้ครบทุกขวด (หรือถ่ายรูปถ้าสแกนไม่ติด) ก่อนบันทึก: <b>{skuBlock}</b></div>}
 
       <div className="border-t border-line pt-3">
         <div className="space-y-0.5 text-sm">
@@ -765,10 +773,6 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 
       <ConfirmDialog open={confirmCancel} title="ยกเลิกบิลนี้?" message="ข้อมูลที่กรอกไว้จะหายทั้งหมด" danger confirmLabel="ทิ้งบิล"
         onCancel={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); onCancel(); }} />
-
-      <ConfirmDialog open={!!confirmSku} title="ยังสแกน SKU ไม่ครบ" message={`${confirmSku ?? ""}\n\nบันทึกบิลต่อโดยไม่ผูก SKU ได้เลย (สินค้าที่สแกนแล้วจะยังผูกให้)`}
-        confirmLabel="บันทึกเลย" pending={pending}
-        onCancel={() => setConfirmSku(null)} onConfirm={() => { setConfirmSku(null); doSubmit(); }} />
 
       {scanning && <BarcodeScanner continuous knownCodes={knownCodes} onDetected={onScanned} onClose={() => setScanning(false)} />}
     </div>
@@ -831,7 +835,18 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   const dc = it.gift ? q * up : Math.min(q * up, Number(it.discount) || 0);
   const line = q * up - dc;
   const skus = it.skus ?? [];
-  const skuDone = skus.length >= q && q > 0;
+  const skuPhotos = it.skuPhotos ?? [];
+  const covered = skus.length + skuPhotos.length;   // scanned SKUs + photo fallbacks
+  const skuDone = covered >= q && q > 0;
+  const [skuCam, setSkuCam] = useState(false);
+  const [skuPhotoBusy, setSkuPhotoBusy] = useState(false);
+  const addSkuPhoto = async (f: File) => {
+    setSkuCam(false); setSkuPhotoBusy(true); setSkuErr(null);
+    try { const data = await compressImage(f); onChange({ skuPhotos: [...skuPhotos, data] }); }
+    catch { setSkuErr("แนบรูปไม่สำเร็จ ลองใหม่"); }
+    finally { setSkuPhotoBusy(false); }
+  };
+  const removeSkuPhoto = (i: number) => onChange({ skuPhotos: skuPhotos.filter((_, idx) => idx !== i) });
   const addSku = async (raw: string): Promise<ScanResult> => {
     const code = String(raw || "").trim();
     if (!code) return { ok: false, label: "", sub: "" };
@@ -911,10 +926,12 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
       )}
       {/* SKU รายชิ้น — เฉพาะสินค้าที่มี SKU ในสต๊อก ต้องสแกนให้ครบตามจำนวนก่อนบันทึก */}
       {skuRequired && (
-        <div className={`mt-2.5 ml-7 rounded-lg border p-2.5 ${skuDone ? "border-success/40 bg-success-soft/40" : "border-brand/40 bg-brand-soft/40"}`}>
+        <div data-sku-short={!skuDone ? "1" : undefined} className={`mt-2.5 ml-7 rounded-lg border p-2.5 ${skuDone ? "border-success/40 bg-success-soft/40" : "border-danger/50 bg-danger-soft/30"}`}>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-semibold text-ink">สแกน SKU ทีละขวด</span>
-            <span className={`text-[11px] font-bold tabular-nums ${skuDone ? "text-success" : "text-brand-dark"}`}>{skus.length}/{q} ชิ้น</span>
+            <span className="text-[11px] font-semibold text-ink">สแกน SKU ทีละขวด <span className="font-normal text-muted">(ต้องครบก่อนบันทึก)</span></span>
+            <span className={`text-[11px] font-bold tabular-nums ${skuDone ? "text-success" : "text-danger"}`}>
+              {covered}/{q} ชิ้น{skuPhotos.length > 0 ? ` · 📷${skuPhotos.length}` : ""}
+            </span>
           </div>
           {skus.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-1.5">
@@ -939,8 +956,30 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
               className="flex-1 min-w-0 h-[40px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
           </div>
           {skuErr && <div className="text-[11px] text-danger mt-1">{skuErr}</div>}
-          {!skuDone && !skuErr && <div className="text-[11px] text-muted mt-1">ยังขาดอีก {Math.max(0, q - skus.length)} ชิ้น — กดปุ่มสแกนเปิดกล้อง หรือยิงเครื่องสแกน</div>}
+
+          {/* photo fallback — when a sticker won't scan, snap it so staff can read & cut the SKU later */}
+          <div className="mt-2 pt-2 border-t border-line/50">
+            {skuPhotos.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-1.5">
+                {skuPhotos.map((src, i) => (
+                  <div key={i} className="relative w-12 h-12 rounded-md overflow-hidden border border-amber-400">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="SKU" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => removeSkuPhoto(i)} aria-label="ลบรูป" className="absolute top-0 right-0 w-4 h-4 rounded-bl bg-black/60 text-white flex items-center justify-center"><X className="w-2.5 h-2.5" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" onClick={() => setSkuCam(true)} disabled={skuPhotoBusy}
+              className="inline-flex items-center gap-1.5 h-[34px] px-2.5 rounded-lg border border-amber-400 text-amber-700 bg-amber-50 text-[12px] font-medium disabled:opacity-50">
+              <Camera className="w-4 h-4" /> ถ่ายรูป SKU (สแกนไม่ติด)
+            </button>
+            <span className="ml-2 text-[11px] text-muted">สแกนไม่ติด → ถ่ายรูปสติกเกอร์ไว้ตัดสต๊อกทีหลัง</span>
+          </div>
+
+          {!skuDone && !skuErr && <div className="text-[11px] text-danger mt-1.5 font-medium">ยังขาดอีก {Math.max(0, q - covered)} ชิ้น — สแกน SKU หรือถ่ายรูปให้ครบก่อนบันทึก</div>}
           {skuScanning && <BarcodeScanner continuous knownCodes={null} onDetected={(c) => addSku(c)} onClose={() => setSkuScanning(false)} />}
+          {skuCam && <CameraCapture onCapture={addSkuPhoto} onClose={() => setSkuCam(false)} />}
         </div>
       )}
       <div className="text-right text-sm mt-2.5 pt-2 border-t border-line/70">

@@ -73,6 +73,43 @@ async function freeSkusForSubmission(id: number) {
   } catch (e: any) { if (e?.code !== "42P01") console.error("[freeSkusForSubmission]", e); }
 }
 
+/** /review: a manager reads the SKU off a fallback photo and cuts that serial from stock, linking
+ *  it to the bill the photo belongs to. Marks the photo resolved (note → 'skudone|<sku>') so it drops
+ *  out of the pending list. Aggregate stock was already cut at the sale; this only resolves the serial. */
+export async function resolveSkuPhoto(attachmentId: number, skuInput: string): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("review");
+  const sku = String(skuInput || "").trim();
+  if (!sku) return { ok: false, error: "ไม่มีรหัส SKU" };
+  try {
+    const [att] = await q<{ bill_ref: string; note: string | null }>(`select bill_ref, note from bill_attachments where id = $1`, [attachmentId]);
+    if (!att) return { ok: false, error: "ไม่พบรูป" };
+    const noteBarcode = (att.note || "").startsWith("sku|") ? (att.note || "").split("|")[1] || "" : "";
+    // the bill line this photo belongs to (for the branch + submission link). Prefer the line whose
+    // barcode matches the tagged barcode; else any line of the bill.
+    const [line] = await q<{ id: number; source: string; barcode: string | null }>(
+      `select id, source, barcode from submissions where receipt_no = $1 and kind = 'sale'
+       order by (barcode is distinct from $2), id limit 1`, [att.bill_ref, noteBarcode || null]);
+    if (!line) return { ok: false, error: "ไม่พบบิลของรูปนี้" };
+    const branch = resolveBranch(line.source);
+    const wantBc = (noteBarcode || line.barcode || "").trim();
+    const upd = await q<{ sku: string }>(
+      `update sku_units set status='sold', sold_submission_id=$2, sold_receipt_no=$3, sold_branch=$4, sold_at=now()
+       where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g'))
+         and status='in_stock' and branch=upper($4)
+         and (coalesce(barcode,'')='' or $5='' or barcode=$5) returning sku`,
+      [sku, line.id, att.bill_ref, branch, wantBc]);
+    if (!upd.length) return { ok: false, error: `SKU "${sku}" ตัดไม่ได้ (ไม่พบ/ขายแล้ว/คนละสินค้าหรือสาขา)` };
+    try { await q(`update bill_attachments set note = $2 where id = $1`, [attachmentId, `skudone|${upd[0].sku}`]); } catch (e: any) { if (e?.code !== "42703") throw e; }
+    await logAudit("update", "submission", line.id, `ตัด SKU ${upd[0].sku} จากรูป (บิล ${att.bill_ref})`);
+    revalidatePath("/review"); revalidatePath("/stock");
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
+    console.error("[resolveSkuPhoto]", e);
+    return { ok: false, error: "ตัด SKU ไม่สำเร็จ" };
+  }
+}
+
 type SubmitResult = { ok: true; ref: string } | { ok: false; error: string };
 export async function submitBill(input: unknown): Promise<SubmitResult> {
   const user = await requirePermission("my_sales");
@@ -97,6 +134,10 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
 
   let ref = d.receipt_no?.trim() || "";
   let count = 0, sum = 0;
+  // does bill_attachments have the `note` column (0039)? If not, SKU photos still save as plain
+  // slips (just untagged) so a pre-migration env never breaks the sale.
+  let noteCol = true;
+  try { await q(`select note from bill_attachments limit 0`); } catch (e: any) { if (e?.code === "42703") noteCol = false; }
   try {
   // Whole bill in ONE transaction: the ref is generated here (under an advisory lock)
   // and line rows + split tenders + attachment rows all commit together, so a mid-loop
@@ -146,6 +187,15 @@ export async function submitBill(input: unknown): Promise<SubmitResult> {
     for (const a of d.attachments ?? []) {
       const [ins] = await run<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3) returning id`, [ref, user.id, a]);
       attachIds.push({ id: ins.id, data: a });
+    }
+    // SKU-fallback photos: stored like slips but tagged 'sku|barcode|item' so /review can list them
+    // as "รอตัดสต๊อก" and the manager can read the SKU off the photo and cut the serial.
+    for (const sp of d.skuPhotos ?? []) {
+      const tag = `sku|${(sp.barcode || "").trim()}|${(sp.item || "").trim()}`;
+      const [ins] = noteCol
+        ? await run<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data, note) values ($1,$2,$3,$4) returning id`, [ref, user.id, sp.data, tag])
+        : await run<{ id: number }>(`insert into bill_attachments (bill_ref, created_by, data) values ($1,$2,$3) returning id`, [ref, user.id, sp.data]);
+      attachIds.push({ id: ins.id, data: sp.data });
     }
   });
   // move slip images to Storage after the bill is committed (network call, not part of the DB tx).
