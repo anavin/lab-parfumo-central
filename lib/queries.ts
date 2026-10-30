@@ -352,6 +352,25 @@ export async function stockLive(branch: string | null = null) {
   }
 }
 
+/** For the "เก็บ SKU / ผูก SKU ให้ตรงยอด" panel: system stock remaining for one barcode at a branch,
+ *  plus how many serialized units are already enrolled (in_stock). gap = stock − skuCount = ขวดที่ยังไม่ผูก SKU. */
+export async function skuBindInfo(barcode: string, branch: string): Promise<{ stock: number; skuCount: number }> {
+  const sel = (cte: string) => `${cte} select coalesce(remaining,0)::float remaining from stock where barcode = $1 and branch = $2 limit 1`;
+  let stock = 0;
+  try { const [r] = await q<{ remaining: number }>(sel(STOCK_CTE), [barcode, branch]); stock = Number(r?.remaining || 0); }
+  catch (e: any) {
+    try {
+      if (e?.code === "42P01") { const [r] = await q<{ remaining: number }>(sel(STOCK_CTE_NOADJ), [barcode, branch]); stock = Number(r?.remaining || 0); }
+      else if (e?.code === "42703") { const [r] = await q<{ remaining: number }>(sel(STOCK_CTE_LEGACY), [barcode, branch]); stock = Number(r?.remaining || 0); }
+      else throw e;
+    } catch { stock = 0; }
+  }
+  let skuCount = 0;
+  try { const [c] = await q<{ n: number }>(`select count(*)::int n from sku_units where barcode = $1 and branch = upper($2) and status = 'in_stock'`, [barcode, branch]); skuCount = Number(c?.n || 0); }
+  catch (e: any) { if (e?.code !== "42P01") throw e; }
+  return { stock, skuCount };
+}
+
 /** Daily units sold per barcode over the last `days` (for the stock-movement heatmap).
  *  Counts approved sales + pending sale submissions (both leave the shelf), scoped to a
  *  branch (null = all). `cutoff` is computed in Bangkok time by the caller. */

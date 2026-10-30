@@ -22,7 +22,7 @@ function relaxUpcEanChecksum() {
   }
 }
 
-export type ScanResult = { ok: boolean; label: string; sub?: string; title?: string };
+export type ScanResult = { ok: boolean; label: string; sub?: string; title?: string; warn?: boolean };
 
 // Camera barcode scanner (iOS Safari + Android Chrome, rear camera).
 // - single mode: fires onDetected once, then closes.

@@ -35,6 +35,16 @@ export async function checkSku(sku: string, branch: string, barcode?: string): P
   }
 }
 
+/** Stock vs enrolled-SKU counts for one product at a branch — drives the "ผูก SKU ให้ตรงยอด" panel. */
+export async function getSkuBindInfo(barcode: string, branch: string): Promise<{ stock: number; skuCount: number }> {
+  await requireAnyPermission(["my_sales", "requisitions"]);
+  const bc = String(barcode || "").trim();
+  if (!bc || !branch) return { stock: 0, skuCount: 0 };
+  const { skuBindInfo } = await import("@/lib/queries");
+  try { return await skuBindInfo(bc, normalizeBranch(branch)); }
+  catch (e) { console.error("[getSkuBindInfo]", e); return { stock: 0, skuCount: 0 }; }
+}
+
 export type SkuAdd = { ok: true; scent: string | null; size: string | null; already?: boolean } | { ok: false; error: string; soldOnShelf?: boolean };
 /** Manually register an existing SKU sticker into stock at a branch (for stock that didn't arrive
  *  with a SKU from the warehouse). Picks the product by barcode, records the unit as in_stock.
