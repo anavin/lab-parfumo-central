@@ -21,7 +21,7 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
   // only what's actually in stock (received via requisition / adjusted in), by name —
   // hide the 0/phantom rows (items sold but never received into this branch)
   const stocked = useMemo(
-    () => rows.filter((r) => (Number(r.remaining) || 0) > 0)
+    () => rows.filter((r) => (Number(r.remaining) || 0) > 0 && !/try\s*me/i.test(r.scent || ""))   // ซ่อนเทสเตอร์ (ไม่ใช่ของขาย)
       .sort((a, b) =>
         (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)         // ถุงกระดาษไว้ท้ายสุด
         || (a.scent || "").localeCompare(b.scent || "", "th")       // แล้วเรียงตามกลิ่น
@@ -55,7 +55,7 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
             {list.length === 0 ? (
               <div className="py-5 text-center text-sm text-muted">{stocked.length ? "ไม่พบสินค้าที่ค้นหา" : "ยังไม่มีสต๊อกในสาขานี้ (ยังไม่ได้รับของเข้า)"}</div>
             ) : (
-              <div className="max-h-[60vh] overflow-auto -mx-1 px-1">
+              <div className="-mx-1 px-1">   {/* ขยายเต็ม เห็นทุกกลิ่น (เลื่อนหน้าแทนเลื่อนในกล่อง) */}
                 {list.map((r) => {
                   const q = Number(r.remaining) || 0;
                   const tone = q <= 0 ? "text-danger" : q <= 3 ? "text-warn-dark" : "text-ink";

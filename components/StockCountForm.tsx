@@ -141,7 +141,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
       {/* เลือกวิธีนับ: ตามจำนวน (เดิม) หรือ สแกน SKU รายชิ้น (รู้ว่าขวดไหนหาย) */}
       <div className="inline-flex gap-1 p-1 rounded-xl border border-line bg-surface">
         <button onClick={() => setMode("qty")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "qty" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>นับตามจำนวน</button>
-        <button onClick={() => setMode("sku")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>สแกน SKU</button>
+        <button onClick={() => setMode("sku")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เช็ค SKU บนชั้น</button>
         <button onClick={() => setMode("capture")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "capture" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เก็บข้อมูลใหม่</button>
       </div>
 
