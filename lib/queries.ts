@@ -474,6 +474,18 @@ export async function shelfCaptureDate(branch: string | null): Promise<string | 
   catch (e: any) { if (e?.code === "42P01") return null; throw e; }
 }
 
+/** How many SKUs were cut TODAY (Bangkok) by a guess/manual cut (sold, no bill link) — restorable
+ *  via undoGuessedSkuCuts. Yesterday's and older cuts are finalized and excluded. */
+export async function guessedSkuCutsToday(branch: string): Promise<number> {
+  try {
+    const [r] = await q<{ n: number }>(
+      `select count(*)::int n from sku_units
+       where status='sold' and sold_submission_id is null and branch = upper($1) and sold_at is not null
+         and (sold_at at time zone 'Asia/Bangkok')::date = (now() at time zone 'Asia/Bangkok')::date`, [branch]);
+    return Number(r?.n || 0);
+  } catch (e: any) { if (e?.code === "42P01" || e?.code === "42703") return 0; throw e; }
+}
+
 export type ShelfReviewRow = { barcode: string; scent: string | null; size: string | null; captured: number; skus: string[] };
 /** Captured shelf data aggregated per product (barcode) for the "สต็อกหน้าร้าน" review page:
  *  how many bottles were counted + the list of their SKUs. Rows with no barcode are skipped

@@ -2,7 +2,7 @@ import { Store } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
-import { shelfCaptureReview, stockLive, skuUnits, salesAfterDate, shelfCaptureDate } from "@/lib/queries";
+import { shelfCaptureReview, stockLive, skuUnits, salesAfterDate, shelfCaptureDate, guessedSkuCutsToday } from "@/lib/queries";
 import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
 import { BranchTabs } from "@/components/BranchTabs";
 import { ShelfStockReview, type ShelfRow } from "@/components/ShelfStockReview";
@@ -43,8 +43,8 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   // SKU ที่ค้าง in_stock เกินยอดคงเหลือจริง (ผีเก่า + ขายวันนี้ไม่ได้ตัด) — ตัวเลขรวมไว้โชว์ปุ่มซิงก์
   let phantomTotal = 0;
   for (const [bc, n] of skuInByBc) phantomTotal += Math.max(0, n - (remByBc.get(bc) ?? 0));
-  // SKU ที่ถูก "ตัดแบบเดา" (sold แต่ไม่ผูกบิล = FIFO/ตัดเอง) → คืนได้ เพื่อไปใส่ SKU จริงรายบิล
-  const guessedCut = skus.filter((u) => u.status === "sold" && !u.sold_receipt_no).length;
+  // SKU ที่ถูก "ตัดแบบเดา วันนี้" (sold ไม่ผูกบิล + sold_at วันนี้) → คืนได้ เพื่อไปใส่ SKU จริงรายบิล
+  const guessedCut = branch ? await guessedSkuCutsToday(branch) : 0;
 
   // สินค้าที่ระบบมีสต๊อก แต่ไม่ได้ถูกนับ (อาจขายหมด/ไม่อยู่บนชั้น) — ต้องรีวิวก่อนตั้งเป็น 0
   const capSet = new Set(caps.map((c) => c.barcode));

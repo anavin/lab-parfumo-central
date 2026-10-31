@@ -39,7 +39,7 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   // คืน SKU ที่ตัดแบบเดา (ไม่ผูกบิล) → กลับ in_stock เพื่อไปใส่ SKU จริงรายบิล
   const undoCuts = async () => {
     if (!branch || syncBusy) return;
-    if (!confirm(`คืน SKU ที่ตัดแบบเดา ${num(guessedCut)} ตัว กลับเป็น in_stock?\n\n(เฉพาะที่ตัดแบบเดา/ตัดเอง ไม่ผูกบิล — ที่ขายจริงผ่านการสแกน/ใส่รายบิล จะไม่ถูกแตะ)\nหลังคืน: SKU จะเกินยอดตามจริง → ไปใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย`)) return;
+    if (!confirm(`คืน SKU ที่ตัดแบบเดา "วันนี้" ${num(guessedCut)} ตัว กลับเป็น in_stock?\n\n(เฉพาะที่ตัดวันนี้ ไม่ผูกบิล — ของเก่าเมื่อวาน/ก่อนหน้า finalize แล้ว ไม่ถูกแตะ · ที่ขายจริงผ่านการสแกน/ใส่รายบิล ก็ไม่ถูกแตะ)\nหลังคืน: SKU จะเกินยอดตามจริง → ไปใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย`)) return;
     setSyncBusy(true); setSyncMsg(null);
     const r = await undoGuessedSkuCuts(branch); setSyncBusy(false);
     if (r.ok) { setSyncMsg(`✓ คืน SKU ${num(r.restored || 0)} ตัวกลับ in_stock แล้ว — ไปใส่ SKU จริงรายบิลได้เลย`); router.refresh(); }
@@ -139,8 +139,8 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
         <div className="rounded-xl border border-line bg-surface p-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-ink">คืน SKU ที่ตัดแบบเดา</div>
-              <div className="text-[12px] text-muted">มี SKU ถูกตัดแบบเดา/ตัดเอง (ไม่ผูกบิล) <b>{num(guessedCut)}</b> ตัว → คืนกลับ in_stock เพื่อไปใส่ SKU จริงรายบิล (serial ตรงตัว)</div>
+              <div className="text-sm font-semibold text-ink">คืน SKU ที่ตัดแบบเดา (วันนี้)</div>
+              <div className="text-[12px] text-muted">วันนี้มี SKU ถูกตัดแบบเดา/ตัดเอง (ไม่ผูกบิล) <b>{num(guessedCut)}</b> ตัว → คืนกลับ in_stock เพื่อไปใส่ SKU จริงรายบิล (serial ตรงตัว) · ของเก่าเมื่อวานไม่ถูกแตะ</div>
             </div>
             <button onClick={undoCuts} disabled={syncBusy || !branch}
               className="inline-flex items-center gap-1.5 rounded-lg border border-line text-sm font-medium px-4 py-2.5 text-ink hover:bg-canvas disabled:opacity-50">

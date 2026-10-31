@@ -155,10 +155,14 @@ export async function undoGuessedSkuCuts(branch: string): Promise<{ ok: boolean;
   const b = normalizeBranch(branch);
   if (!b) return { ok: false, error: "ไม่ได้ระบุสาขา" };
   try {
+    // เฉพาะที่ "ตัดวันนี้" (เวลาไทย) — ของเก่า (เมื่อวาน/ก่อนหน้า) finalize แล้ว อย่าแตะ
     const upd = await q<{ sku: string }>(
       `update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null
-       where status='sold' and sold_submission_id is null and branch=upper($1) returning sku`, [b]);
-    await logAudit("update", "stock", null, `คืน SKU ที่ตัดแบบเดา ${branchName(b)}: ${upd.length} ตัว กลับ in_stock`);
+       where status='sold' and sold_submission_id is null and branch=upper($1)
+         and sold_at is not null
+         and (sold_at at time zone 'Asia/Bangkok')::date = (now() at time zone 'Asia/Bangkok')::date
+       returning sku`, [b]);
+    await logAudit("update", "stock", null, `คืน SKU ที่ตัดแบบเดา (วันนี้) ${branchName(b)}: ${upd.length} ตัว กลับ in_stock`);
     revalidatePath("/shelf"); revalidatePath("/stock"); revalidatePath("/my/stock"); revalidatePath("/review");
     return { ok: true, restored: upd.length };
   } catch (e: any) {
