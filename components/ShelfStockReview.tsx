@@ -6,21 +6,24 @@ import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
 
-export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; skus: string[] };
+export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[] };
+
+const thDate = (ymd: string | null) => { if (!ymd) return ""; const [y, m, d] = ymd.split("-"); return `${d}/${m}/${+y + 543}`; };
 
 // หน้า "สต็อกหน้าร้าน": เช็คข้อมูลที่เก็บ (นับได้ต่อสินค้า + SKU) เทียบกับระบบปัจจุบัน
 // แล้วกดปุ่มเดียว "อัปเดตเข้าระบบทั้งหมด" ให้ทั้งระบบใช้ข้อมูลชุดเดียวกัน (ลง SKU + ปรับยอด)
-export function ShelfStockReview({ rows, branch, canApply }: { rows: ShelfRow[]; branch: string | null; canApply: boolean }) {
+export function ShelfStockReview({ rows, branch, canApply, captureDate }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null }) {
   const router = useRouter();
   const [qText, setQText] = useState("");
   const [open, setOpen] = useState<string | null>(null);   // expanded barcode
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [asOf, setAsOf] = useState(true);   // คิดยอด ณ วันที่นับ (กันบวกยอดขายวันนี้กลับ)
 
   const stats = useMemo(() => {
-    let bottles = 0, match = 0, diff = 0;
-    for (const r of rows) { bottles += r.captured; if (r.captured === r.remaining) match++; else diff++; }
-    return { bottles, products: rows.length, match, diff };
+    let bottles = 0, match = 0, diff = 0, soldToday = 0;
+    for (const r of rows) { bottles += r.captured; soldToday += r.soldToday; if (r.captured === r.remaining) match++; else diff++; }
+    return { bottles, products: rows.length, match, diff, soldToday };
   }, [rows]);
 
   const shown = useMemo(() => {
@@ -31,9 +34,10 @@ export function ShelfStockReview({ rows, branch, canApply }: { rows: ShelfRow[];
 
   const apply = async () => {
     if (!branch || busy) return;
-    if (!confirm(`อัปเดตข้อมูลที่เก็บ (${num(stats.bottles)} ขวด · ${num(stats.products)} สินค้า) เข้าระบบทั้งหมด?\n\n• ลงทะเบียน SKU ทุกตัวเป็นสต็อกจริง\n• ปรับยอดคงเหลือให้ = จำนวนที่นับ\n\nแนะนำทำตอนร้านไม่ขาย · ย้อนกลับได้ที่หน้าตรวจนับสต๊อก`)) return;
+    const asOfLine = asOf && captureDate ? `• ปรับยอด = จำนวนที่นับ หักยอดขายหลัง ${thDate(captureDate)} แล้ว (ยอดขายวันนี้ไม่ถูกบวกกลับ)` : `• ปรับยอดคงเหลือให้ = จำนวนที่นับ`;
+    if (!confirm(`อัปเดตข้อมูลที่เก็บ (${num(stats.bottles)} ขวด · ${num(stats.products)} สินค้า) เข้าระบบทั้งหมด?\n\n• ลงทะเบียน SKU ทุกตัวเป็นสต็อกจริง\n${asOfLine}\n\nย้อนกลับได้ที่หน้าตรวจนับสต๊อก`)) return;
     setBusy(true); setResult(null);
-    const r = await applyCapturesToSystem(branch); setBusy(false);
+    const r = await applyCapturesToSystem(branch, asOf && captureDate ? captureDate : undefined); setBusy(false);
     if (r.ok) { setResult(`✓ อัปเดตเข้าระบบแล้ว — SKU ใหม่ ${num(r.added || 0)} · มีอยู่แล้ว ${num(r.already || 0)} · ติดธง ${num(r.flagged || 0)} · ปรับยอด ${num(r.products || 0)} สินค้า (ใบนับ #${r.countId})`); router.refresh(); }
     else setResult(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
   };
@@ -47,11 +51,12 @@ export function ShelfStockReview({ rows, branch, canApply }: { rows: ShelfRow[];
   return (
     <div className="space-y-4">
       {/* summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <div className="rounded-xl border border-line bg-surface p-3"><div className="text-xs text-muted">ขวดที่นับ</div><div className="text-2xl font-bold tabular-nums text-ink mt-0.5">{num(stats.bottles)}</div></div>
         <div className="rounded-xl border border-line bg-surface p-3"><div className="text-xs text-muted">สินค้า</div><div className="text-2xl font-bold tabular-nums text-ink mt-0.5">{num(stats.products)}</div></div>
         <div className="rounded-xl border border-line bg-surface p-3"><div className="text-xs text-success">ตรงกับระบบ</div><div className="text-2xl font-bold tabular-nums text-success mt-0.5">{num(stats.match)}</div></div>
         <div className="rounded-xl border border-line bg-surface p-3"><div className="text-xs text-warn">ยอดต่าง</div><div className="text-2xl font-bold tabular-nums text-warn mt-0.5">{num(stats.diff)}</div></div>
+        <div className="rounded-xl border border-amber-300 bg-amber-50/60 p-3"><div className="text-xs text-amber-700">ขายวันนี้</div><div className="text-2xl font-bold tabular-nums text-amber-700 mt-0.5">{num(stats.soldToday)}</div></div>
       </div>
 
       {/* apply bar */}
@@ -67,8 +72,14 @@ export function ShelfStockReview({ rows, branch, canApply }: { rows: ShelfRow[];
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />} อัปเดตเข้าระบบ
             </button>
           </div>
+          {captureDate && (
+            <label className="mt-2 flex items-center gap-2 text-[12px] text-ink cursor-pointer select-none">
+              <input type="checkbox" checked={asOf} onChange={(e) => setAsOf(e.target.checked)} className="accent-brand w-4 h-4" />
+              คิดยอด <b>ณ วันที่นับ ({thDate(captureDate)})</b> — หักยอดขายหลังวันนับออก เพื่อไม่ให้ยอดขายวันนี้ถูกบวกกลับ {stats.soldToday > 0 && <span className="text-amber-700">(ขายหลังวันนับ {num(stats.soldToday)} ชิ้น)</span>}
+            </label>
+          )}
           {result && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{result}</div>}
-          <p className="mt-2 text-[11px] text-muted">แนะนำทำตอนร้านไม่ขาย (เช้าก่อนเปิด) ยอดจะแม่นสุด · ปรับเฉพาะสินค้าที่นับ · ย้อนกลับได้ที่หน้า ตรวจนับสต๊อก</p>
+          <p className="mt-2 text-[11px] text-muted">ปรับเฉพาะสินค้าที่นับ · ย้อนกลับได้ที่หน้า ตรวจนับสต๊อก · {asOf && captureDate ? "โหมดนี้ปลอดภัยแม้ทำระหว่างวัน" : "ถ้าไม่ติ๊ก ควรทำตอนร้านไม่ขาย"}</p>
         </div>
       )}
 
@@ -95,11 +106,12 @@ export function ShelfStockReview({ rows, branch, canApply }: { rows: ShelfRow[];
               const isOpen = open === r.barcode;
               return (
                 <Fragment key={r.barcode}>
-                  <tr className="border-t border-line-soft hover:bg-canvas/40 cursor-pointer" onClick={() => setOpen(isOpen ? null : r.barcode)}>
-                    <td className="px-3 py-2 text-ink">
-                      <div className="flex items-center gap-1.5">
+                  <tr className={"border-t border-line-soft cursor-pointer " + (r.soldToday > 0 ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-canvas/40")} onClick={() => setOpen(isOpen ? null : r.barcode)}>
+                    <td className={"px-3 py-2 text-ink " + (r.soldToday > 0 ? "border-l-2 border-amber-400" : "")}>
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <ChevronDown className={"w-3.5 h-3.5 text-muted transition-transform " + (isOpen ? "rotate-180" : "")} />
                         <span className="font-medium">{r.scent}</span> <span className="text-muted">{r.size}</span>
+                        {r.soldToday > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-100 rounded-full px-1.5 py-0.5">🔸 ขายวันนี้ {num(r.soldToday)}</span>}
                       </div>
                       <div className="font-mono text-[10px] text-muted-soft ml-5">{r.barcode}</div>
                     </td>
@@ -128,7 +140,7 @@ export function ShelfStockReview({ rows, branch, canApply }: { rows: ShelfRow[];
 
       <p className="text-[11px] text-muted leading-relaxed">
         <b className="text-ink">นับได้</b> = จำนวนที่เก็บหน้าชั้น · <b className="text-ink">ยอดระบบ</b> = คงเหลือในระบบตอนนี้ ·
-        <span className="text-warn-dark"> ต่าง</span> = ส่วนต่างที่จะปรับเมื่อกดอัปเดต · แตะแถวเพื่อดู SKU ทั้งหมด
+        <span className="text-warn-dark"> ต่าง</span> = ส่วนต่างที่จะปรับเมื่อกดอัปเดต · <span className="text-amber-700">🔸 แถวเหลือง</span> = มีขายวันนี้ (เฝ้าดู SKU ให้ตรง) · แตะแถวเพื่อดู SKU ทั้งหมด
       </p>
     </div>
   );

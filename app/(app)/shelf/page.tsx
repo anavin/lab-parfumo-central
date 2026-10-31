@@ -2,10 +2,11 @@ import { Store } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
-import { shelfCaptureReview, stockLive, skuUnits } from "@/lib/queries";
+import { shelfCaptureReview, stockLive, skuUnits, salesAfterDate, shelfCaptureDate } from "@/lib/queries";
 import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
 import { BranchTabs } from "@/components/BranchTabs";
 import { ShelfStockReview, type ShelfRow } from "@/components/ShelfStockReview";
+import { SkuCutPanel } from "@/components/SkuCutPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +16,19 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const branch = sp.branch === "all" ? null : (isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH);
 
+  const captureDate = await shelfCaptureDate(branch);   // e.g. "2026-10-30" (วันที่นับ)
+  // sold AFTER the capture date = today's (post-count) sales — to mark & to subtract in "ยอด ณ วันที่นับ"
+  const soldAfter = branch && captureDate ? await salesAfterDate(branch, captureDate) : new Map<string, number>();
   const [caps, live, skus] = await Promise.all([
     shelfCaptureReview(branch), stockLive(branch), skuUnits(branch),
   ]);
   const remByBc = new Map(live.map((r) => [r.barcode, Math.round(Number(r.remaining) || 0)]));
   const skuInByBc = new Map<string, number>();
-  for (const u of skus) if (u.status === "in_stock" && u.barcode) skuInByBc.set(u.barcode, (skuInByBc.get(u.barcode) || 0) + 1);
+  const inStockSkus: { sku: string; scent: string | null; size: string | null; barcode: string | null }[] = [];
+  for (const u of skus) if (u.status === "in_stock") {
+    if (u.barcode) skuInByBc.set(u.barcode, (skuInByBc.get(u.barcode) || 0) + 1);
+    inStockSkus.push({ sku: u.sku, scent: u.scent, size: u.size, barcode: u.barcode });
+  }
 
   const rows: ShelfRow[] = caps.map((c) => ({
     barcode: c.barcode,
@@ -29,6 +37,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
     captured: c.captured,
     remaining: remByBc.get(c.barcode) ?? 0,
     skuInStock: skuInByBc.get(c.barcode) ?? 0,
+    soldToday: Math.round(Number(soldAfter.get(c.barcode) || 0)),
     skus: Array.isArray(c.skus) ? c.skus.filter(Boolean) : [],
   }));
 
@@ -37,7 +46,10 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
       <PageHeader icon={Store} title="สต็อกหน้าร้าน"
         subtitle={`เช็คข้อมูลที่เก็บ${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} แล้วอัปเข้าระบบให้ใช้ข้อมูลชุดเดียวกัน`} />
       <div className="mb-4"><BranchTabs withAll defaultValue={DEFAULT_BRANCH} /></div>
-      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} />
+      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} />
+      {branch && inStockSkus.length > 0 && (
+        <div className="mt-4"><SkuCutPanel skus={inStockSkus} branch={branch} /></div>
+      )}
     </div>
   );
 }

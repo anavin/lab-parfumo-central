@@ -136,6 +136,32 @@ export async function clearSkuFlag(sku: string): Promise<{ ok: boolean; error?: 
   }
 }
 
+/** Mark one or more in_stock SKUs as sold — SERIAL ONLY (does NOT post a stock adjustment), for
+ *  catching up serials of sales that were billed WITHOUT scanning a SKU. The sale bill already cut
+ *  the aggregate stock, so touching it here would double-count. Normalized match, branch-scoped. */
+export async function markSkusSold(skus: string[], branch: string): Promise<{ ok: boolean; sold?: number; missing?: string[]; error?: string }> {
+  await requireAnyPermission(["my_sales", "requisitions", "stock"]);
+  const list = [...new Set((skus || []).map((s) => String(s || "").trim()).filter(Boolean))];
+  if (!list.length) return { ok: false, error: "ไม่มี SKU" };
+  const b = normalizeBranch(branch);
+  const keys = list.map((s) => s.toUpperCase().replace(/\s+/g, ""));
+  try {
+    const upd = await q<{ sku: string }>(
+      `update sku_units set status='sold', sold_at=now(), sold_branch=upper($2)
+       where status='in_stock' and branch=upper($2)
+         and upper(regexp_replace(sku, '\\s', '', 'g')) = any($1::text[]) returning sku`,
+      [keys, b]);
+    revalidatePath("/shelf"); revalidatePath("/stock");
+    const soldKeys = new Set(upd.map((r) => r.sku.toUpperCase().replace(/\s+/g, "")));
+    const missing = list.filter((s, i) => !soldKeys.has(keys[i]));
+    return { ok: true, sold: upd.length, missing };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
+    console.error("[markSkusSold]", e);
+    return { ok: false, error: "ตัด SKU ไม่สำเร็จ" };
+  }
+}
+
 /** Delete one SKU unit (manager-only). For a wrongly-added / lost / damaged unit. */
 export async function deleteSkuUnit(sku: string): Promise<{ ok: boolean; error?: string }> {
   await requirePermission("requisitions");

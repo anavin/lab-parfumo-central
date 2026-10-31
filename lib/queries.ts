@@ -449,6 +449,31 @@ export async function shelfCaptures(branch: string | null = null): Promise<Shelf
   catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
+/** Units sold (approved sales + pending sale submissions) AFTER a given date, per barcode at a branch.
+ *  Used to compute "ยอด ณ วันที่นับ": captured − soldAfterCount = what should be on the shelf now. */
+export async function salesAfterDate(branch: string, dateYMD: string): Promise<Map<string, number>> {
+  const b = normalizeBranch(branch);
+  const sql = `
+    select barcode, sum(q)::float q from (
+      select barcode, qty q from sales
+        where coalesce(barcode,'') <> '' and ${SOLD_BRANCH} = upper($1) and sale_date > $2
+      union all
+      select barcode, qty q from submissions
+        where coalesce(barcode,'') <> '' and kind = 'sale' and status = 'pending' and deleted_at is null
+          and ${SOLD_BRANCH} = upper($1) and entry_date > $2
+    ) t group by barcode`;
+  try { const rows = await q<{ barcode: string; q: number }>(sql, [b, dateYMD]); return new Map(rows.map((r) => [r.barcode, Number(r.q) || 0])); }
+  catch (e: any) { if (e?.code === "42P01") return new Map(); throw e; }
+}
+
+/** Latest capture date (Bangkok, YYYY-MM-DD) for a branch — prefills the "ยอด ณ วันที่นับ" toggle. */
+export async function shelfCaptureDate(branch: string | null): Promise<string | null> {
+  const sql = `select to_char(max(captured_at) at time zone 'Asia/Bangkok', 'YYYY-MM-DD') d
+    from shelf_capture where ($1::text is null or branch = upper($1))`;
+  try { const [r] = await q<{ d: string | null }>(sql, [branch]); return r?.d ?? null; }
+  catch (e: any) { if (e?.code === "42P01") return null; throw e; }
+}
+
 export type ShelfReviewRow = { barcode: string; scent: string | null; size: string | null; captured: number; skus: string[] };
 /** Captured shelf data aggregated per product (barcode) for the "สต็อกหน้าร้าน" review page:
  *  how many bottles were counted + the list of their SKUs. Rows with no barcode are skipped
