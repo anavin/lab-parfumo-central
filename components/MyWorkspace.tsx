@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus, ChevronDown, AlertTriangle, Loader2 } from "lucide-react";
 // The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
 // don't run on the SUNMI WebView) and cached, so barcode scans resolve instantly
 // instead of hitting the network per scan (slow on LTE).
@@ -21,7 +21,7 @@ async function lookupBarcode(code: string): Promise<any | null> {
   const bare = code.replace(/^0+/, "");
   return map.get(code) ?? map.get(bare) ?? map.get("0" + code) ?? map.get("00" + code) ?? null;
 }
-import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment, addMyBillItems } from "@/lib/actions/submissions";
+import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment, addMyBillItems, addSkuToSale } from "@/lib/actions/submissions";
 import { checkSku } from "@/lib/actions/sku";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -106,8 +106,8 @@ const blankBill = (date: string, withItem: boolean, branch: string = DEFAULT_BRA
 // ---- single-item edit type (for editing an existing bill line) ----
 type SaleState = { id: number; sale_date: string; sale_time: string; source: string; receipt_no: string; item: string; barcode: string; size: string; qty: any; unit_price: any; discount: any; payment_channel: string; nation: string; tenders: Tender[] };
 
-export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null, defaultPay = "Cash", promo = null, skuBarcodes = [] }:
-  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null; defaultPay?: string; promo?: Promo; skuBarcodes?: string[] }) {
+export function MyWorkspace({ date, today, fullName, rows, attachments = {}, payments = {}, branch: branchProp = DEFAULT_BRANCH, stockMap = null, defaultPay = "Cash", promo = null, skuBarcodes = [], soldSkus = {} }:
+  { date: string; today: string; fullName: string; rows: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; branch?: string; stockMap?: Record<string, number> | null; defaultPay?: string; promo?: Promo; skuBarcodes?: string[]; soldSkus?: Record<number, string[]> }) {
   const router = useRouter();
   const viewingPast = date !== today;   // browsing an older day; new sales still go to today
   // Which shop the salesperson is working at today (Central World / Seacon …).
@@ -319,7 +319,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
         <div className="space-y-3">
           {bills.map((b, i) => <BillGroupCard key={b.key} index={billRank.get(b.key) ?? (bills.length - i)} rows={b.rows} pending={pending}
             onEdit={editRow} onDelete={setDel} photos={attachments[b.rows[0].receipt_no || ""] || []}
-            onAddPhotos={addPhotos} onDeletePhoto={delPhoto} />)}
+            onAddPhotos={addPhotos} onDeletePhoto={delPhoto} soldSkus={soldSkus} skuBarcodes={skuBarcodes} />)}
         </div>
       )}
 
@@ -1031,10 +1031,12 @@ function AddToBill({ refId, disabled }: { refId: string; disabled?: boolean }) {
 }
 
 // one bill = the item lines a customer bought together
-function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], onAddPhotos, onDeletePhoto }: {
+function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], onAddPhotos, onDeletePhoto, soldSkus = {}, skuBarcodes = [] }: {
   index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; pending: boolean;
   photos?: BillAttachment[]; onAddPhotos?: (ref: string, imgs: string[]) => void; onDeletePhoto?: (id: number) => void;
+  soldSkus?: Record<number, string[]>; skuBarcodes?: string[];
 }) {
+  const skuBcSet = new Set(skuBarcodes);
   const first = rows[0];
   const total = rows.reduce((s, r) => s + (r.total ?? 0), 0);
   const status = rows.every((r) => r.status === "approved") ? "approved" : rows.some((r) => r.status === "rejected") ? "rejected" : "pending";
@@ -1062,8 +1064,12 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       </div>
       <div className="px-3.5 py-2.5">
       <ul className="space-y-1">
-        {rows.map((r, i) => (
-          <li key={r.id} className="flex items-center gap-2 text-sm">
+        {rows.map((r, i) => {
+          const covered = soldSkus[r.id]?.length ?? 0;
+          const needSku = r.status !== "rejected" && !!r.barcode && skuBcSet.has(r.barcode) && covered < (r.qty ?? 0);
+          return (
+          <li key={r.id} className="text-sm">
+            <div className="flex items-center gap-2">
             <span className="w-4 h-4 shrink-0 rounded-full bg-canvas text-muted text-[10px] font-semibold tabular-nums flex items-center justify-center">{i + 1}</span>
             <span className="text-muted text-xs w-7 shrink-0 text-right">{num(r.qty ?? 0)}×</span>
             {r.status === "pending" ? (
@@ -1079,8 +1085,17 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
             {r.status !== "approved" && (
               <button onClick={() => onDelete(r)} disabled={pending} className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger disabled:opacity-50 shrink-0" aria-label="ลบ"><Trash2 className="w-4 h-4" /></button>
             )}
+            </div>
+            {covered > 0 && (
+              <div className="flex flex-wrap items-center gap-1 mt-0.5 ml-6">
+                <span className="text-[10px] text-success">SKU:</span>
+                {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
+              </div>
+            )}
+            {needSku && <AddSkuMy id={r.id} need={(r.qty ?? 0) - covered} />}
           </li>
-        ))}
+          );
+        })}
       </ul>
       {status === "pending" && ref && <AddToBill refId={ref} disabled={pending} />}
       {(photos.length > 0 || canEditPhotos) && (
@@ -1262,6 +1277,36 @@ function SaleForm({ state, setState, onSave, pending, fullName }: { state: SaleS
         </div>
       </div>
       {scanning && <BarcodeScanner knownCodes={knownCodes} onDetected={onScanned} onClose={() => setScanning(false)} />}
+    </div>
+  );
+}
+
+// บิลที่ขายสินค้ามี SKU แต่ยังไม่ระบุ serial → Flag + ให้พนักงานสแกน/พิมพ์ SKU ที่ขายไปผูกกับบิล (ภายหลัง)
+function AddSkuMy({ id, need }: { id: number; need: number }) {
+  const router = useRouter();
+  const [sku, setSku] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const add = async (code?: string) => {
+    const v = (code ?? sku).trim();
+    if (!v) return;
+    setBusy(true); setMsg(null);
+    const r = await addSkuToSale(id, v);
+    setBusy(false);
+    if (r.ok) { setSku(""); setMsg(`✓ ${r.sku}`); router.refresh(); } else setMsg(`✗ ${r.error ?? ""}`);
+  };
+  return (
+    <div className="mt-1 ml-6 space-y-1">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-warn bg-warn-soft rounded px-1.5 py-0.5"><AlertTriangle className="w-3 h-3" /> ยังไม่ใส่ SKU{need > 1 ? ` (ขาด ${num(need)})` : ""}</span>
+        <button type="button" onClick={() => setScanning(true)} className="h-7 px-2 rounded bg-brand text-white text-[11px] font-medium inline-flex items-center gap-1 active:scale-95"><ScanLine className="w-3 h-3" /> สแกน</button>
+        <input value={sku} onChange={(e) => { setSku(e.target.value); setMsg(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          inputMode="text" placeholder="หรือพิมพ์ SKU" className="h-7 flex-1 min-w-[6rem] border border-line rounded px-2 text-[12px] font-mono bg-surface focus:outline-none focus:border-brand" />
+        <button type="button" onClick={() => add()} disabled={busy || !sku.trim()} className="h-7 px-2.5 rounded bg-brand-dark text-white text-[11px] font-medium disabled:opacity-40 inline-flex items-center">{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : "ใส่"}</button>
+      </div>
+      {msg && <div className={"text-[11px] " + (msg.startsWith("✓") ? "text-success" : "text-danger")}>{msg}</div>}
+      {scanning && <BarcodeScanner continuous knownCodes={null} onDetected={(c) => { add(c); }} onClose={() => setScanning(false)} />}
     </div>
   );
 }

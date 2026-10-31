@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { Store } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-user";
 import { isBranch, DEFAULT_BRANCH, isStockGated } from "@/lib/branches";
-import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts, stockLive, topPaymentChannels, getActivePromotionForSale, skuBarcodesInStock } from "@/lib/queries";
+import { myDayKpis, mySubmissions, myTrend, attachmentsForRefs, paymentsForRefs, pendingReceipts, stockLive, topPaymentChannels, getActivePromotionForSale, skuBarcodesInStock, soldSkusForSubmissions } from "@/lib/queries";
 import { ReceivingPanel } from "@/components/ReceivingPanel";
 import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht, num } from "@/lib/format";
@@ -74,6 +74,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     : null;
   // products with serialized SKU stock at this branch → their sale lines require a SKU scan
   const skuBarcodes = await skuBarcodesInStock(branch);
+  const soldSkus = await soldSkusForSubmissions(rows.map((r) => r.id));   // SKU ที่ผูกกับแต่ละบิล (ไว้ Flag บิลที่ยังไม่ใส่)
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -84,7 +85,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       <ReceivingPanel pending={receipts} />
 
       {/* data entry first */}
-      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} stockMap={stockMap} defaultPay={defaultPay} promo={promo} skuBarcodes={skuBarcodes} />
+      <MyWorkspace date={date} today={today} fullName={user.full_name} rows={rows} attachments={attachments} payments={payments} branch={branch} stockMap={stockMap} defaultPay={defaultPay} promo={promo} skuBarcodes={skuBarcodes} soldSkus={soldSkus} />
 
       {/* daily summary — below the entry */}
       <h2 className="text-sm font-semibold text-ink mb-3 mt-2">สรุปรายวัน</h2>
