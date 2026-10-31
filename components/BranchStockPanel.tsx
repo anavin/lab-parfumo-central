@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Boxes, ChevronDown, Search } from "lucide-react";
+import { Boxes, ChevronDown, Search, Barcode } from "lucide-react";
 import { num } from "@/lib/format";
 
 type Row = { barcode: string; scent: string; size: string; remaining: number };
@@ -14,9 +14,10 @@ const isBag = (scent?: string) => /ถุง/.test(String(scent || ""));
 
 /** Read-only branch stock for the salesperson on /my — what's left at the branch
  *  they're working at today. Sorted by scent (Thai collation), then size small→large. */
-export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { rows: Row[]; branchName: string; defaultOpen?: boolean }) {
+export function BranchStockPanel({ rows, branchName, skusByBc = {}, defaultOpen = false }: { rows: Row[]; branchName: string; skusByBc?: Record<string, string[]>; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [term, setTerm] = useState("");
+  const [openSku, setOpenSku] = useState<string | null>(null);   // barcode+size row ที่กางดู SKU อยู่
 
   // only what's actually in stock (received via requisition / adjusted in), by name —
   // hide the 0/phantom rows (items sold but never received into this branch)
@@ -29,8 +30,9 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
     [rows]);
   const list = useMemo(() => {
     const t = term.trim().toLowerCase();
-    return stocked.filter((r) => !t || r.scent?.toLowerCase().includes(t) || r.barcode?.toLowerCase().includes(t));
-  }, [stocked, term]);
+    return stocked.filter((r) => !t || r.scent?.toLowerCase().includes(t) || r.barcode?.toLowerCase().includes(t)
+      || (skusByBc[r.barcode] || []).some((s) => s.toLowerCase().includes(t)));
+  }, [stocked, term, skusByBc]);
   const totalUnits = useMemo(() => stocked.reduce((s, r) => s + (Number(r.remaining) || 0), 0), [stocked]);
 
   return (
@@ -59,10 +61,24 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
                 {list.map((r) => {
                   const q = Number(r.remaining) || 0;
                   const tone = q <= 0 ? "text-danger" : q <= 3 ? "text-warn-dark" : "text-ink";
+                  const skuList = skusByBc[r.barcode] || [];
+                  const rid = r.barcode + r.size;
+                  const exp = openSku === rid;
                   return (
-                    <div key={r.barcode + r.size} className="flex items-center gap-2 py-1.5 border-b border-line-soft last:border-0 text-sm">
-                      <span className="flex-1 min-w-0 truncate text-ink">{r.scent} <span className="text-muted text-xs">{r.size}</span></span>
-                      <span className={`tabular-nums font-semibold shrink-0 ${tone}`}>{num(q)}</span>
+                    <div key={rid} className="border-b border-line-soft last:border-0">
+                      <button onClick={() => skuList.length && setOpenSku(exp ? null : rid)} className="w-full flex items-center gap-2 py-1.5 text-sm text-left">
+                        <span className="flex-1 min-w-0 truncate text-ink">{r.scent} <span className="text-muted text-xs">{r.size}</span></span>
+                        {skuList.length > 0 && <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-medium text-brand-dark bg-brand-soft rounded px-1.5 py-0.5"><Barcode className="w-3 h-3" />{num(skuList.length)}</span>}
+                        <span className={`tabular-nums font-semibold shrink-0 w-7 text-right ${tone}`}>{num(q)}</span>
+                        {skuList.length > 0
+                          ? <ChevronDown className={"w-3.5 h-3.5 text-muted shrink-0 transition-transform " + (exp ? "rotate-180" : "")} />
+                          : <span className="w-3.5 shrink-0" />}
+                      </button>
+                      {exp && skuList.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pb-2 pl-1">
+                          {skuList.map((s) => <span key={s} className="font-mono text-[11px] bg-canvas border border-line rounded px-1.5 py-0.5 text-ink">{s}</span>)}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
