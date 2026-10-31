@@ -25,7 +25,7 @@ export function StockTabs({ matrix, movement, tester = null, packaging = null, s
         {/* กลุ่ม 1: ดูสินค้า/สต๊อก */}
         <Btn id="stock" icon={Package} label="คงเหลือ" />
         <Btn id="move" icon={Activity} label="การเคลื่อนไหว" />
-        {tester && <Btn id="tester" icon={FlaskConical} label="เทสเตอร์" />}
+        {tester && <Btn id="tester" icon={FlaskConical} label="เทสเตอร์ & ถุง" />}
         {packaging && <Btn id="packaging" icon={ShoppingBag} label="ถุง/บรรจุภัณฑ์" />}
         {/* กลุ่ม 2: SKU & ตรวจสอบ (ผู้จัดการ) */}
         {(sku || reconcile || loss) && <span aria-hidden className="mx-1 self-stretch w-px bg-line hidden sm:block" />}
