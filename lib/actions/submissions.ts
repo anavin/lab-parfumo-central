@@ -137,7 +137,6 @@ export async function addSkuToSale(submissionId: number, skuInput: string): Prom
         await q(`update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null
           where sku in (select sku from sku_units
             where status='sold' and sold_submission_id is null and branch=upper($1) and barcode=$2 and sku <> $3
-              and sold_at is not null and (sold_at at time zone 'Asia/Bangkok')::date = (now() at time zone 'Asia/Bangkok')::date
             order by received_at desc nulls last limit 1)`, [branch, wantBc, upd[0].sku]);
       } catch { /* non-fatal: การตัดตัวจริงสำเร็จแล้ว */ }
     }

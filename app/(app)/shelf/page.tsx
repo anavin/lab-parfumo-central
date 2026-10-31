@@ -40,9 +40,19 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
     soldToday: Math.round(Number(soldAfter.get(c.barcode) || 0)),
     skus: Array.isArray(c.skus) ? c.skus.filter(Boolean) : [],
   }));
-  // SKU ที่ค้าง in_stock เกินยอดคงเหลือจริง (ผีเก่า + ขายวันนี้ไม่ได้ตัด) — ตัวเลขรวมไว้โชว์ปุ่มซิงก์
-  let phantomTotal = 0;
-  for (const [bc, n] of skuInByBc) phantomTotal += Math.max(0, n - (remByBc.get(bc) ?? 0));
+  // ซิงก์ 2 ทาง: ส่วนเกิน (in_stock > คงเหลือ) ตัด · ส่วนขาด (in_stock < คงเหลือ) คืนจากที่เดาตัด
+  // ข้าม 4ml (ไม่มี SKU)
+  const is4ml = (s: string | null) => /^\s*4\s*ml/i.test(String(s || ""));
+  const bc4ml = new Set(live.filter((r) => is4ml(r.size)).map((r) => r.barcode));
+  const guessedByBc = new Map<string, number>();
+  for (const u of skus) if (u.status === "sold" && !u.sold_receipt_no && u.barcode) guessedByBc.set(u.barcode, (guessedByBc.get(u.barcode) || 0) + 1);
+  let phantomTotal = 0, restoreTotal = 0;
+  for (const bc of new Set([...remByBc.keys(), ...skuInByBc.keys()])) {
+    if (!bc || bc4ml.has(bc)) continue;
+    const r = remByBc.get(bc) ?? 0, ins = skuInByBc.get(bc) ?? 0;
+    if (ins > r) phantomTotal += ins - r;
+    else if (ins < r) restoreTotal += Math.min(r - ins, guessedByBc.get(bc) ?? 0);
+  }
   // SKU ที่ถูก "ตัดแบบเดา วันนี้" (sold ไม่ผูกบิล + sold_at วันนี้) → คืนได้ เพื่อไปใส่ SKU จริงรายบิล
   const guessedCut = branch ? await guessedSkuCutsToday(branch) : 0;
 
@@ -59,7 +69,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
       <PageHeader icon={Store} title="สต็อกหน้าร้าน"
         subtitle={`เช็คข้อมูลที่เก็บ${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} แล้วอัปเข้าระบบให้ใช้ข้อมูลชุดเดียวกัน`} />
       <div className="mb-4"><BranchTabs withAll defaultValue={DEFAULT_BRANCH} /></div>
-      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} phantomTotal={phantomTotal} guessedCut={guessedCut} />
+      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} phantomTotal={phantomTotal} restoreTotal={restoreTotal} guessedCut={guessedCut} />
       {branch && inStockSkus.length > 0 && (
         <div className="mt-4"><SkuCutPanel skus={inStockSkus} branch={branch} /></div>
       )}

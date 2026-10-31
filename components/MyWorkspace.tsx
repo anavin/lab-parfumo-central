@@ -362,7 +362,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 }) {
   // products that have serialized SKU stock → their lines REQUIRE scanning a SKU per unit
   const skuSet = useMemo(() => new Set(skuBarcodes), [skuBarcodes]);
-  const needsSku = (it: BillItem) => !!it.barcode && skuSet.has(it.barcode);
+  const needsSku = (it: BillItem) => !!it.barcode && skuSet.has(it.barcode) && !/^\s*4\s*ml/i.test(String(it.size || ""));   // 4ml = ของแจก ไม่มี SKU
   const [scanning, setScanning] = useState(!!autoScan && !laserMode);
   // per-item quantity cap at a stock-gated branch: available stock minus what other
   // lines in THIS bill already use for the same barcode (covers scan + search + splits).
@@ -1066,7 +1066,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       <ul className="space-y-1">
         {rows.map((r, i) => {
           const covered = soldSkus[r.id]?.length ?? 0;
-          const needSku = r.status !== "rejected" && !!r.barcode && skuBcSet.has(r.barcode) && covered < (r.qty ?? 0);
+          const needSku = r.status !== "rejected" && !!r.barcode && skuBcSet.has(r.barcode) && !/^\s*4\s*ml/i.test(String(r.size || "")) && covered < (r.qty ?? 0);
           return (
           <li key={r.id} className="text-sm">
             <div className="flex items-center gap-2">

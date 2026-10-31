@@ -108,11 +108,13 @@ export async function enrollCapturedSkus(branch: string): Promise<{ ok: boolean;
   }
 }
 
-/** Sync sku_units to the ACTUAL remaining stock per product: for each barcode, if there are more
- *  in_stock SKUs than the system's remaining qty, mark the excess (oldest first) as sold. This clears
- *  BOTH the old phantom backlog AND today's sales that didn't scan a SKU — anything where serial count
- *  > real stock. Serial-only (aggregate stock already correct, so no double-count). Manager/ops only. */
-export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolean; cleared?: number; kept?: number; error?: string }> {
+const IS_4ML = (s: string | null) => /^\s*4\s*ml/i.test(String(s || ""));   // 4ml = ของแจก ไม่มี SKU
+
+/** Sync sku_units to the ACTUAL remaining stock per product (2-way): per barcode
+ *   - in_stock SKU > remaining → ตัดส่วนเกิน (เก่าสุดก่อน) เป็น sold
+ *   - in_stock SKU < remaining → คืนตัวที่ "เดาตัด" (sold ไม่ผูกบิล) ของสินค้านั้นกลับ in_stock
+ *  → จำนวน SKU = ยอดคงเหลือทุกตัว. serial-only (ยอดคงเหลือถูกอยู่แล้ว). ข้าม 4ml (ไม่มี SKU). Manager/ops. */
+export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolean; cleared?: number; restored?: number; kept?: number; error?: string }> {
   await requireAnyPermission(["requisitions", "stock"]);
   const b = normalizeBranch(branch);
   if (!b) return { ok: false, error: "ไม่ได้ระบุสาขา" };
@@ -120,25 +122,26 @@ export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolea
     const { stockLive } = await import("@/lib/queries");
     const live = await stockLive(b);
     const rem = new Map<string, number>();
-    for (const r of live) rem.set(r.barcode, Math.round(Number(r.remaining) || 0));
-    // newest first → keep the newest `remaining` per product, sell the OLDER excess (FIFO: oldest sold)
-    const units = await q<{ sku: string; barcode: string | null }>(
-      `select sku, barcode from sku_units where status='in_stock' and branch=upper($1)
-       order by received_at desc nulls last, sku`, [b]);
-    const seen = new Map<string, number>();
-    const toSell: string[] = [];
-    for (const u of units) {
-      const bc = u.barcode || "";
-      const keep = bc ? (rem.get(bc) ?? 0) : 0;   // no barcode → keep 0 (can't match stock)
-      const n = (seen.get(bc) || 0) + 1; seen.set(bc, n);
-      if (n > keep) toSell.push(u.sku);   // beyond the remaining qty → excess → sold
+    for (const r of live) if (r.barcode && !IS_4ML(r.size)) rem.set(r.barcode, Math.round(Number(r.remaining) || 0));
+    // in_stock newest-first (keep newest, sell older excess); guessed-cuts oldest-first (restore pool)
+    const inStock = await q<{ sku: string; barcode: string | null }>(
+      `select sku, barcode from sku_units where status='in_stock' and branch=upper($1) order by received_at desc nulls last, sku`, [b]);
+    const guessed = await q<{ sku: string; barcode: string | null }>(
+      `select sku, barcode from sku_units where status='sold' and sold_submission_id is null and branch=upper($1) order by received_at asc nulls last, sku`, [b]);
+    const grp = (rows: { sku: string; barcode: string | null }[]) => { const m = new Map<string, string[]>(); for (const r of rows) { const k = r.barcode || ""; if (!k) continue; (m.get(k) ?? m.set(k, []).get(k)!).push(r.sku); } return m; };
+    const inByBc = grp(inStock), guByBc = grp(guessed);
+    const toSell: string[] = [], toRestore: string[] = [];
+    for (const [bc, target] of rem) {
+      const cur = inByBc.get(bc)?.length ?? 0;
+      if (cur > target) toSell.push(...(inByBc.get(bc) || []).slice(target));                    // ตัดส่วนเกิน (ตัวเก่า)
+      else if (cur < target) toRestore.push(...(guByBc.get(bc) || []).slice(0, target - cur));   // คืนส่วนขาดจากที่เดาตัด
     }
-    if (!toSell.length) { const [k] = await q<{ n: number }>(`select count(*)::int n from sku_units where status='in_stock' and branch=upper($1)`, [b]); return { ok: true, cleared: 0, kept: k?.n || 0 }; }
-    await q(`update sku_units set status='sold', sold_at=now(), sold_branch=upper($2) where sku = any($1::text[]) and status='in_stock'`, [toSell, b]);
+    if (toSell.length) await q(`update sku_units set status='sold', sold_at=now(), sold_branch=upper($2) where sku = any($1::text[]) and status='in_stock'`, [toSell, b]);
+    if (toRestore.length) await q(`update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null where sku = any($1::text[]) and status='sold' and sold_submission_id is null`, [toRestore, b]);
     const [kept] = await q<{ n: number }>(`select count(*)::int n from sku_units where status='in_stock' and branch=upper($1)`, [b]);
-    await logAudit("update", "stock", null, `ซิงก์ SKU ให้ตรงสต๊อก ${branchName(b)}: ตัด ${toSell.length} · เหลือ ${kept?.n || 0}`);
+    await logAudit("update", "stock", null, `ซิงก์ SKU ให้ตรงสต๊อก ${branchName(b)}: ตัด ${toSell.length} · คืน ${toRestore.length} · เหลือ ${kept?.n || 0}`);
     revalidatePath("/shelf"); revalidatePath("/stock"); revalidatePath("/my/stock");
-    return { ok: true, cleared: toSell.length, kept: kept?.n || 0 };
+    return { ok: true, cleared: toSell.length, restored: toRestore.length, kept: kept?.n || 0 };
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง" };
     console.error("[reconcileSkusToStock]", e);
