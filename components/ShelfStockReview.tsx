@@ -1,11 +1,11 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Scissors } from "lucide-react";
+import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Scissors, Undo2 } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
-import { reconcileSkusToStock } from "@/lib/actions/shelf-capture";
+import { reconcileSkusToStock, undoGuessedSkuCuts } from "@/lib/actions/shelf-capture";
 
 export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[] };
 export type MissingRow = { barcode: string; scent: string; size: string; remaining: number };
@@ -14,7 +14,7 @@ const thDate = (ymd: string | null) => { if (!ymd) return ""; const [y, m, d] = 
 
 // หน้า "สต็อกหน้าร้าน": เช็คข้อมูลที่เก็บ (นับได้ต่อสินค้า + SKU) เทียบกับระบบปัจจุบัน
 // แล้วกดปุ่มเดียว "อัปเดตเข้าระบบทั้งหมด" ให้ทั้งระบบใช้ข้อมูลชุดเดียวกัน (ลง SKU + ปรับยอด)
-export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [], phantomTotal = 0 }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[]; phantomTotal?: number }) {
+export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [], phantomTotal = 0, guessedCut = 0 }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[]; phantomTotal?: number; guessedCut?: number }) {
   const router = useRouter();
   const [qText, setQText] = useState("");
   const [open, setOpen] = useState<string | null>(null);   // expanded barcode
@@ -30,10 +30,19 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   // ตัด SKU ส่วนเกิน (in_stock เกินยอดคงเหลือจริง) = ขายไปแล้วยังไม่ตัด (ผีเก่า + ขายวันนี้)
   const syncSkus = async () => {
     if (!branch || syncBusy) return;
-    if (!confirm(`ตัด SKU ส่วนเกิน ${num(phantomTotal)} ตัว ที่เกินยอดคงเหลือจริง (= ขายไปแล้วยังไม่ตัด SKU)?\n\nทำให้จำนวน SKU = ยอดคงเหลือทุกสินค้า · ตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ`)) return;
+    if (!confirm(`ตัด SKU ส่วนเกิน ${num(phantomTotal)} ตัว ที่เกินยอดคงเหลือจริง (= ขายไปแล้วยังไม่ตัด SKU)?\n\nทำให้จำนวน SKU = ยอดคงเหลือทุกสินค้า · ตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ\n\n⚠ นี่คือการ "เดา" (ตัดตัวเก่าสุด) ไม่รู้ serial จริง — ถ้าอยากตรงตัวจริง ให้ใส่ SKU รายบิลที่ /review หรือหน้าขายแทน`)) return;
     setSyncBusy(true); setSyncMsg(null);
     const r = await reconcileSkusToStock(branch); setSyncBusy(false);
     if (r.ok) { setSyncMsg(`✓ ตัด SKU ส่วนเกิน ${num(r.cleared || 0)} ตัว · เหลือ in_stock ${num(r.kept || 0)}`); router.refresh(); }
+    else setSyncMsg(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
+  };
+  // คืน SKU ที่ตัดแบบเดา (ไม่ผูกบิล) → กลับ in_stock เพื่อไปใส่ SKU จริงรายบิล
+  const undoCuts = async () => {
+    if (!branch || syncBusy) return;
+    if (!confirm(`คืน SKU ที่ตัดแบบเดา ${num(guessedCut)} ตัว กลับเป็น in_stock?\n\n(เฉพาะที่ตัดแบบเดา/ตัดเอง ไม่ผูกบิล — ที่ขายจริงผ่านการสแกน/ใส่รายบิล จะไม่ถูกแตะ)\nหลังคืน: SKU จะเกินยอดตามจริง → ไปใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย`)) return;
+    setSyncBusy(true); setSyncMsg(null);
+    const r = await undoGuessedSkuCuts(branch); setSyncBusy(false);
+    if (r.ok) { setSyncMsg(`✓ คืน SKU ${num(r.restored || 0)} ตัวกลับ in_stock แล้ว — ไปใส่ SKU จริงรายบิลได้เลย`); router.refresh(); }
     else setSyncMsg(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
   };
 
@@ -121,7 +130,24 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
             </button>
           </div>
           {syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{syncMsg}</div>}
-          <p className="mt-2 text-[11px] text-amber-700/80">ตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ (บิลตัดยอดไปแล้ว) · ตัดตัวเก่าสุดก่อน</p>
+          <p className="mt-2 text-[11px] text-amber-700/80">ตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ (บิลตัดยอดไปแล้ว) · ตัดตัวเก่าสุดก่อน · <b>แม่นกว่า:</b> ใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย</p>
+        </div>
+      )}
+
+      {/* undo guessed cuts → restore for exact per-bill SKU entry */}
+      {canApply && guessedCut > 0 && (
+        <div className="rounded-xl border border-line bg-surface p-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-ink">คืน SKU ที่ตัดแบบเดา</div>
+              <div className="text-[12px] text-muted">มี SKU ถูกตัดแบบเดา/ตัดเอง (ไม่ผูกบิล) <b>{num(guessedCut)}</b> ตัว → คืนกลับ in_stock เพื่อไปใส่ SKU จริงรายบิล (serial ตรงตัว)</div>
+            </div>
+            <button onClick={undoCuts} disabled={syncBusy || !branch}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line text-sm font-medium px-4 py-2.5 text-ink hover:bg-canvas disabled:opacity-50">
+              {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />} คืน SKU ({num(guessedCut)})
+            </button>
+          </div>
+          {phantomTotal === 0 && syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-canvas border border-line text-ink">{syncMsg}</div>}
         </div>
       )}
 

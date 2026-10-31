@@ -146,6 +146,28 @@ export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolea
   }
 }
 
+/** Undo serial cuts that were NOT tied to a real bill — i.e. the FIFO "ตัด SKU ส่วนเกิน" guesses and
+ *  manual "ตัด SKU ที่ขายออก" (both leave sold_submission_id null). Restores them to in_stock so SKU
+ *  counts go back above the real stock, letting staff attach the EXACT SKU per bill instead of guesses.
+ *  Keeps real bill-linked sales (scanned at checkout / added on /review) sold. Manager/ops only. */
+export async function undoGuessedSkuCuts(branch: string): Promise<{ ok: boolean; restored?: number; error?: string }> {
+  await requireAnyPermission(["requisitions", "stock"]);
+  const b = normalizeBranch(branch);
+  if (!b) return { ok: false, error: "ไม่ได้ระบุสาขา" };
+  try {
+    const upd = await q<{ sku: string }>(
+      `update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null
+       where status='sold' and sold_submission_id is null and branch=upper($1) returning sku`, [b]);
+    await logAudit("update", "stock", null, `คืน SKU ที่ตัดแบบเดา ${branchName(b)}: ${upd.length} ตัว กลับ in_stock`);
+    revalidatePath("/shelf"); revalidatePath("/stock"); revalidatePath("/my/stock"); revalidatePath("/review");
+    return { ok: true, restored: upd.length };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง" };
+    console.error("[undoGuessedSkuCuts]", e);
+    return { ok: false, error: "คืนไม่สำเร็จ" };
+  }
+}
+
 /** Clear the whole capture round for a branch (start fresh). Manager-only so staff can't wipe
  *  a round by accident. Returns how many rows were removed. Does NOT touch sku_units. */
 export async function clearShelfCaptures(branch: string): Promise<{ ok: boolean; cleared?: number; error?: string }> {
