@@ -24,11 +24,13 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   ]);
   const remByBc = new Map(live.map((r) => [r.barcode, Math.round(Number(r.remaining) || 0)]));
   const skuInByBc = new Map<string, number>();
+  const liveSkusByBc = new Map<string, string[]>();
   const inStockSkus: { sku: string; scent: string | null; size: string | null; barcode: string | null }[] = [];
   for (const u of skus) if (u.status === "in_stock") {
-    if (u.barcode) skuInByBc.set(u.barcode, (skuInByBc.get(u.barcode) || 0) + 1);
+    if (u.barcode) { skuInByBc.set(u.barcode, (skuInByBc.get(u.barcode) || 0) + 1); (liveSkusByBc.get(u.barcode) ?? liveSkusByBc.set(u.barcode, []).get(u.barcode)!).push(u.sku); }
     inStockSkus.push({ sku: u.sku, scent: u.scent, size: u.size, barcode: u.barcode });
   }
+  for (const arr of liveSkusByBc.values()) arr.sort();
 
   const rows: ShelfRow[] = caps.map((c) => ({
     barcode: c.barcode,
@@ -39,6 +41,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
     skuInStock: skuInByBc.get(c.barcode) ?? 0,
     soldToday: Math.round(Number(soldAfter.get(c.barcode) || 0)),
     skus: Array.isArray(c.skus) ? c.skus.filter(Boolean) : [],
+    liveSkus: liveSkusByBc.get(c.barcode) ?? [],
   }));
   // ซิงก์ 2 ทาง: ส่วนเกิน (in_stock > คงเหลือ) ตัด · ส่วนขาด (in_stock < คงเหลือ) คืนจากที่เดาตัด
   // ข้าม 4ml (ไม่มี SKU)

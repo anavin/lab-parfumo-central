@@ -7,7 +7,7 @@ import { branchName } from "@/lib/branches";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
 import { reconcileSkusToStock, undoGuessedSkuCuts } from "@/lib/actions/shelf-capture";
 
-export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[] };
+export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[]; liveSkus: string[] };
 export type MissingRow = { barcode: string; scent: string; size: string; remaining: number };
 
 const thDate = (ymd: string | null) => { if (!ymd) return ""; const [y, m, d] = ymd.split("-"); return `${d}/${m}/${+y + 543}`; };
@@ -55,7 +55,7 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   const shown = useMemo(() => {
     const t = qText.trim().toLowerCase();
     if (!t) return rows;
-    return rows.filter((r) => r.scent.toLowerCase().includes(t) || r.barcode.includes(t) || r.skus.some((s) => s.toLowerCase().includes(t)));
+    return rows.filter((r) => r.scent.toLowerCase().includes(t) || r.barcode.includes(t) || r.skus.some((s) => s.toLowerCase().includes(t)) || r.liveSkus.some((s) => s.toLowerCase().includes(t)));
   }, [rows, qText]);
 
   const apply = async () => {
@@ -204,14 +204,15 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
                     <td className="px-3 py-2 text-right tabular-nums font-semibold text-ink">{num(r.captured)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted">{num(r.remaining)}</td>
                     <td className={"px-3 py-2 text-right tabular-nums font-medium " + (d === 0 ? "text-success" : "text-warn-dark")}>{d === 0 ? "✓" : (d > 0 ? `+${num(d)}` : num(d))}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted">{num(r.skus.length)}</td>
+                    <td className={"px-3 py-2 text-right tabular-nums " + (r.skuInStock > r.remaining ? "text-warn-dark font-semibold" : "text-muted")}>{num(r.skuInStock)}</td>
                   </tr>
                   {isOpen && (
                     <tr className="border-t border-line-soft bg-canvas/30">
                       <td colSpan={5} className="px-3 py-2">
-                        <div className="text-[11px] text-muted mb-1 flex items-center gap-1"><Barcode className="w-3.5 h-3.5" /> SKU ที่เก็บ ({num(r.skus.length)}):</div>
+                        <div className="text-[11px] text-muted mb-1 flex items-center gap-1"><Barcode className="w-3.5 h-3.5" /> SKU ที่เหลือจริง ({num(r.liveSkus.length)}):</div>
                         <div className="flex flex-wrap gap-1">
-                          {r.skus.map((s) => <span key={s} className="font-mono text-[11px] bg-surface border border-line rounded px-1.5 py-0.5 text-ink">{s}</span>)}
+                          {r.liveSkus.map((s) => <span key={s} className="font-mono text-[11px] bg-surface border border-line rounded px-1.5 py-0.5 text-ink">{s}</span>)}
+                          {r.liveSkus.length === 0 && <span className="text-[11px] text-muted">— ไม่มี SKU ในระบบ</span>}
                         </div>
                       </td>
                     </tr>
