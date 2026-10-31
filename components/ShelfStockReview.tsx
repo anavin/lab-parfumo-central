@@ -1,10 +1,11 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronDown, UploadCloud, Loader2, Barcode } from "lucide-react";
+import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Scissors } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
+import { reconcileSkusToStock } from "@/lib/actions/shelf-capture";
 
 export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[] };
 export type MissingRow = { barcode: string; scent: string; size: string; remaining: number };
@@ -13,7 +14,7 @@ const thDate = (ymd: string | null) => { if (!ymd) return ""; const [y, m, d] = 
 
 // หน้า "สต็อกหน้าร้าน": เช็คข้อมูลที่เก็บ (นับได้ต่อสินค้า + SKU) เทียบกับระบบปัจจุบัน
 // แล้วกดปุ่มเดียว "อัปเดตเข้าระบบทั้งหมด" ให้ทั้งระบบใช้ข้อมูลชุดเดียวกัน (ลง SKU + ปรับยอด)
-export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [] }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[] }) {
+export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [], phantomTotal = 0 }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[]; phantomTotal?: number }) {
   const router = useRouter();
   const [qText, setQText] = useState("");
   const [open, setOpen] = useState<string | null>(null);   // expanded barcode
@@ -22,7 +23,19 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   const [result, setResult] = useState<string | null>(null);
   const [asOf, setAsOf] = useState(true);   // คิดยอด ณ วันที่นับ (กันบวกยอดขายวันนี้กลับ)
   const [zeroMissing, setZeroMissing] = useState(false);   // ตั้งสินค้าที่ไม่ได้นับเป็น 0
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const missingTotal = useMemo(() => missing.reduce((s, m) => s + m.remaining, 0), [missing]);
+
+  // ตัด SKU ส่วนเกิน (in_stock เกินยอดคงเหลือจริง) = ขายไปแล้วยังไม่ตัด (ผีเก่า + ขายวันนี้)
+  const syncSkus = async () => {
+    if (!branch || syncBusy) return;
+    if (!confirm(`ตัด SKU ส่วนเกิน ${num(phantomTotal)} ตัว ที่เกินยอดคงเหลือจริง (= ขายไปแล้วยังไม่ตัด SKU)?\n\nทำให้จำนวน SKU = ยอดคงเหลือทุกสินค้า · ตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ`)) return;
+    setSyncBusy(true); setSyncMsg(null);
+    const r = await reconcileSkusToStock(branch); setSyncBusy(false);
+    if (r.ok) { setSyncMsg(`✓ ตัด SKU ส่วนเกิน ${num(r.cleared || 0)} ตัว · เหลือ in_stock ${num(r.kept || 0)}`); router.refresh(); }
+    else setSyncMsg(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
+  };
 
   const stats = useMemo(() => {
     let bottles = 0, match = 0, diff = 0, soldToday = 0;
@@ -91,6 +104,24 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
           )}
           {result && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{result}</div>}
           <p className="mt-2 text-[11px] text-muted">ปรับเฉพาะสินค้าที่นับ · ย้อนกลับได้ที่หน้า ตรวจนับสต๊อก · {asOf && captureDate ? "โหมดนี้ปลอดภัยแม้ทำระหว่างวัน" : "ถ้าไม่ติ๊ก ควรทำตอนร้านไม่ขาย"}</p>
+        </div>
+      )}
+
+      {/* ซิงก์ SKU ให้ตรงยอด — ตัด SKU ส่วนเกิน (ขายแล้วยังไม่ตัด: ผีเก่า + ขายวันนี้) */}
+      {canApply && phantomTotal > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-amber-800">ซิงก์ SKU ให้ตรงยอด</div>
+              <div className="text-[12px] text-amber-700">มี SKU ค้าง <b>{num(phantomTotal)}</b> ตัว ที่เกินยอดคงเหลือจริง (ขายไปแล้วยังไม่ตัด SKU) → ตัดออกให้ SKU = ยอดคงเหลือทุกสินค้า</div>
+            </div>
+            <button onClick={syncSkus} disabled={syncBusy || !branch}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold px-4 py-2.5 hover:bg-amber-700 disabled:opacity-50">
+              {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />} ตัด SKU ส่วนเกิน ({num(phantomTotal)})
+            </button>
+          </div>
+          {syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{syncMsg}</div>}
+          <p className="mt-2 text-[11px] text-amber-700/80">ตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ (บิลตัดยอดไปแล้ว) · ตัดตัวเก่าสุดก่อน</p>
         </div>
       )}
 

@@ -40,6 +40,10 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
     soldToday: Math.round(Number(soldAfter.get(c.barcode) || 0)),
     skus: Array.isArray(c.skus) ? c.skus.filter(Boolean) : [],
   }));
+  // SKU ที่ค้าง in_stock เกินยอดคงเหลือจริง (ผีเก่า + ขายวันนี้ไม่ได้ตัด) — ตัวเลขรวมไว้โชว์ปุ่มซิงก์
+  let phantomTotal = 0;
+  for (const [bc, n] of skuInByBc) phantomTotal += Math.max(0, n - (remByBc.get(bc) ?? 0));
+
   // สินค้าที่ระบบมีสต๊อก แต่ไม่ได้ถูกนับ (อาจขายหมด/ไม่อยู่บนชั้น) — ต้องรีวิวก่อนตั้งเป็น 0
   const capSet = new Set(caps.map((c) => c.barcode));
   const missing = live
@@ -53,7 +57,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
       <PageHeader icon={Store} title="สต็อกหน้าร้าน"
         subtitle={`เช็คข้อมูลที่เก็บ${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} แล้วอัปเข้าระบบให้ใช้ข้อมูลชุดเดียวกัน`} />
       <div className="mb-4"><BranchTabs withAll defaultValue={DEFAULT_BRANCH} /></div>
-      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} />
+      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} phantomTotal={phantomTotal} />
       {branch && inStockSkus.length > 0 && (
         <div className="mt-4"><SkuCutPanel skus={inStockSkus} branch={branch} /></div>
       )}

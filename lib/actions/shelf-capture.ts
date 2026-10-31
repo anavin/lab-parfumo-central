@@ -108,6 +108,44 @@ export async function enrollCapturedSkus(branch: string): Promise<{ ok: boolean;
   }
 }
 
+/** Sync sku_units to the ACTUAL remaining stock per product: for each barcode, if there are more
+ *  in_stock SKUs than the system's remaining qty, mark the excess (oldest first) as sold. This clears
+ *  BOTH the old phantom backlog AND today's sales that didn't scan a SKU — anything where serial count
+ *  > real stock. Serial-only (aggregate stock already correct, so no double-count). Manager/ops only. */
+export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolean; cleared?: number; kept?: number; error?: string }> {
+  await requireAnyPermission(["requisitions", "stock"]);
+  const b = normalizeBranch(branch);
+  if (!b) return { ok: false, error: "ไม่ได้ระบุสาขา" };
+  try {
+    const { stockLive } = await import("@/lib/queries");
+    const live = await stockLive(b);
+    const rem = new Map<string, number>();
+    for (const r of live) rem.set(r.barcode, Math.round(Number(r.remaining) || 0));
+    // newest first → keep the newest `remaining` per product, sell the OLDER excess (FIFO: oldest sold)
+    const units = await q<{ sku: string; barcode: string | null }>(
+      `select sku, barcode from sku_units where status='in_stock' and branch=upper($1)
+       order by received_at desc nulls last, sku`, [b]);
+    const seen = new Map<string, number>();
+    const toSell: string[] = [];
+    for (const u of units) {
+      const bc = u.barcode || "";
+      const keep = bc ? (rem.get(bc) ?? 0) : 0;   // no barcode → keep 0 (can't match stock)
+      const n = (seen.get(bc) || 0) + 1; seen.set(bc, n);
+      if (n > keep) toSell.push(u.sku);   // beyond the remaining qty → excess → sold
+    }
+    if (!toSell.length) { const [k] = await q<{ n: number }>(`select count(*)::int n from sku_units where status='in_stock' and branch=upper($1)`, [b]); return { ok: true, cleared: 0, kept: k?.n || 0 }; }
+    await q(`update sku_units set status='sold', sold_at=now(), sold_branch=upper($2) where sku = any($1::text[]) and status='in_stock'`, [toSell, b]);
+    const [kept] = await q<{ n: number }>(`select count(*)::int n from sku_units where status='in_stock' and branch=upper($1)`, [b]);
+    await logAudit("update", "stock", null, `ซิงก์ SKU ให้ตรงสต๊อก ${branchName(b)}: ตัด ${toSell.length} · เหลือ ${kept?.n || 0}`);
+    revalidatePath("/shelf"); revalidatePath("/stock"); revalidatePath("/my/stock");
+    return { ok: true, cleared: toSell.length, kept: kept?.n || 0 };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง" };
+    console.error("[reconcileSkusToStock]", e);
+    return { ok: false, error: "ซิงก์ไม่สำเร็จ" };
+  }
+}
+
 /** Clear the whole capture round for a branch (start fresh). Manager-only so staff can't wipe
  *  a round by accident. Returns how many rows were removed. Does NOT touch sku_units. */
 export async function clearShelfCaptures(branch: string): Promise<{ ok: boolean; cleared?: number; error?: string }> {
