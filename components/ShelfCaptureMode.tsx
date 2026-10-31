@@ -127,8 +127,6 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
 
   const del = async (id: number) => { if (!confirm("ลบรายการนี้?")) return; setBusy(true); const r = await deleteShelfCapture(id); setBusy(false); if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ"); };
   const [editId, setEditId] = useState<number | null>(null);
-  const [armClear, setArmClear] = useState(false);   // two-step confirm for wiping the round
-  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const exportCsv = () => {
     const rows: (string | number | null)[][] = [["กลิ่น", "ขนาด", "SKU", "บาร์โค้ด", "เวลาเก็บ"]];
@@ -138,8 +136,8 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
   };
   const doClear = async () => {
     if (!branch) return;
-    if (!armClear) { setArmClear(true); if (armTimer.current) clearTimeout(armTimer.current); armTimer.current = setTimeout(() => setArmClear(false), 4000); return; }
-    setArmClear(false); setBusy(true);
+    if (!confirm(`เริ่มรอบใหม่ — ล้างข้อมูลที่เก็บทั้งหมด ${num(captures.length)} ขวด?\n\nข้อมูลที่ยังไม่ได้อัปเข้าระบบจะหายถาวร`)) return;
+    setBusy(true);
     const r = await clearShelfCaptures(branch); setBusy(false);
     if (r.ok) { selectProduct(null); router.refresh(); } else alert(r.error ?? "ล้างไม่สำเร็จ");
   };
@@ -234,17 +232,11 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
         </>
       )}
 
-      {/* round actions: export + start-new-round (clear) */}
+      {/* round action: export (clear moved to bottom to avoid mis-taps) */}
       {captures.length > 0 && (
         <div className="flex items-center gap-2">
           <button onClick={exportCsv} className="inline-flex items-center gap-1.5 text-sm text-ink border border-line rounded-lg px-3 py-1.5 hover:bg-canvas">
             <Download className="w-4 h-4" /> Export CSV
-          </button>
-          <button onClick={doClear} disabled={busy}
-            className={"ml-auto inline-flex items-center gap-1.5 text-sm rounded-lg px-3 py-1.5 border transition " +
-              (armClear ? "bg-danger text-white border-danger" : "text-danger border-danger/40 hover:bg-danger-soft")}>
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            {armClear ? `ยืนยันล้าง ${num(captures.length)} ขวด?` : "เริ่มรอบใหม่ (ล้างข้อมูล)"}
           </button>
         </div>
       )}
@@ -272,6 +264,17 @@ export function ShelfCaptureMode({ captures, branch }: { captures: ShelfCaptureR
               {editId === c.id && <CaptureRowEditor row={c} onDone={() => setEditId(null)} />}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* start-new-round (clear) — placed far from the scan area to avoid mis-taps */}
+      {captures.length > 0 && (
+        <div className="pt-8 mt-2 border-t border-line-soft flex justify-end">
+          <button onClick={doClear} disabled={busy}
+            className="inline-flex items-center gap-1.5 text-sm rounded-lg px-3 py-1.5 border text-danger border-danger/40 hover:bg-danger-soft disabled:opacity-40">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            เริ่มรอบใหม่ (ล้างข้อมูล)
+          </button>
         </div>
       )}
 
