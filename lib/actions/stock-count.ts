@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser, requirePermission, requireAnyPermission } from "@/lib/auth/require-user";
 import { resolveBranch, branchName } from "@/lib/branches";
 import { logAudit } from "@/lib/audit";
-import { stockRawForBarcodes } from "@/lib/queries";
+import { stockRawForBarcodes, stockLive } from "@/lib/queries";
 
 export type CountLineInput = { barcode: string; scent: string; size: string; expected: number; counted: number; verified?: boolean };
 export type CountLine = CountLineInput & { id: number; verified: boolean };
@@ -47,6 +47,34 @@ export async function submitStockCount(branch: string, lines: CountLineInput[], 
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (รัน SQL 0024)" };
     console.error("[submitStockCount]", e);
     return { ok: false, error: "ส่งผลนับไม่สำเร็จ" };
+  }
+}
+
+/** Build a pending stock count straight from the shelf-capture data: counted = number of captured
+ *  bottles per product, expected = current system remaining. Goes through the normal approve flow
+ *  (/stock/counts) so a manager reviews the variance before any stock_adjustments post — nothing
+ *  touches live stock until approval, and it stays reversible. Only captured products are included,
+ *  so products that weren't counted keep their current stock untouched. */
+export async function createCountFromCaptures(branch: string): Promise<{ ok: boolean; id?: number; products?: number; error?: string }> {
+  await requireAnyPermission(["requisitions", "stock"]);
+  const b = resolveBranch(branch);
+  try {
+    const caps = await q<{ barcode: string; scent: string | null; size: string | null; cnt: number }>(
+      `select barcode, max(scent) scent, max(size) size, count(*)::int cnt
+       from shelf_capture where branch = upper($1) and coalesce(barcode,'') <> '' group by barcode`, [b]);
+    if (!caps.length) return { ok: false, error: "ยังไม่มีข้อมูลที่เก็บ (ที่มีบาร์โค้ด)" };
+    const live = await stockLive(b);
+    const rem = new Map(live.map((r) => [r.barcode, Math.round(Number(r.remaining) || 0)]));
+    const lines: CountLineInput[] = caps.map((c) => ({
+      barcode: c.barcode, scent: c.scent || "", size: c.size || "",
+      expected: rem.get(c.barcode) ?? 0, counted: c.cnt, verified: true,
+    }));
+    const r = await submitStockCount(b, lines, "ปรับยอดจากการเก็บ SKU หน้าชั้น");
+    return r.ok ? { ok: true, id: r.id, products: caps.length } : r;
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง" };
+    console.error("[createCountFromCaptures]", e);
+    return { ok: false, error: "สร้างใบนับไม่สำเร็จ" };
   }
 }
 

@@ -2,7 +2,8 @@
 import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { requireAnyPermission } from "@/lib/auth/require-user";
-import { normalizeBranch } from "@/lib/branches";
+import { normalizeBranch, branchName } from "@/lib/branches";
+import { logAudit } from "@/lib/audit";
 
 const NORM = (col: string) => `upper(regexp_replace(${col}, '\\s', '', 'g'))`;
 
@@ -68,6 +69,42 @@ export async function updateShelfCapture(input: { id: number; sku?: string; barc
     if (e?.code === "42P01") return { ok: false, error: "ไม่มีตาราง" };
     console.error("[updateShelfCapture]", e);
     return { ok: false, error: "แก้ไขไม่สำเร็จ" };
+  }
+}
+
+/** Bulk-enroll every captured SKU of a branch into sku_units as in_stock (one row per normalized SKU
+ *  not already present). Non-destructive: does NOT change aggregate stock (sku_units ≠ STOCK_CTE),
+ *  and a SKU the system has as 'sold' but that was found on the shelf is flagged (anomaly), not revived.
+ *  Idempotent — safe to run again. Manager/ops only. */
+export async function enrollCapturedSkus(branch: string): Promise<{ ok: boolean; added?: number; flagged?: number; already?: number; error?: string }> {
+  const me = await requireAnyPermission(["requisitions", "stock"]);
+  const b = normalizeBranch(branch);
+  if (!b) return { ok: false, error: "ไม่ได้ระบุสาขา" };
+  try {
+    const [tot] = await q<{ n: number }>(`select count(distinct ${NORM("sku")})::int n from shelf_capture where branch = upper($1) and coalesce(sku,'') <> ''`, [b]);
+    const ins = await q<{ sku: string }>(
+      `insert into sku_units (sku, barcode, scent, size, branch, received_by, status, received_at)
+       select distinct on (${NORM("sc.sku")}) sc.sku, sc.barcode, sc.scent, sc.size, upper($1), $2, 'in_stock', now()
+       from shelf_capture sc
+       where sc.branch = upper($1) and coalesce(sc.sku,'') <> ''
+         and not exists (select 1 from sku_units u where ${NORM("u.sku")} = ${NORM("sc.sku")})
+       order by ${NORM("sc.sku")}, sc.id
+       on conflict (sku) do nothing
+       returning sku`, [b, me.id]);
+    const flag = await q<{ sku: string }>(
+      `update sku_units set shelf_flag_at = now(), shelf_flag_by = $2
+       where status = 'sold' and shelf_flag_at is null
+         and exists (select 1 from shelf_capture sc where sc.branch = upper($1) and ${NORM("sc.sku")} = ${NORM("sku_units.sku")})
+       returning sku`, [b, me.id]);
+    const added = ins.length, flagged = flag.length;
+    const already = Math.max(0, (tot?.n || 0) - added - flagged);
+    await logAudit("create", "stock", null, `ลงทะเบียน SKU จากที่เก็บ ${branchName(b)}: ใหม่ ${added} · ซ้ำ ${already} · ติดธง ${flagged}`);
+    revalidatePath("/stock");
+    return { ok: true, added, flagged, already };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง (sku_units/shelf_capture)" };
+    console.error("[enrollCapturedSkus]", e);
+    return { ok: false, error: "ลงทะเบียนไม่สำเร็จ" };
   }
 }
 
