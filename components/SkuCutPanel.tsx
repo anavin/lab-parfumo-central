@@ -31,7 +31,7 @@ export function SkuCutPanel({ skus, branch }: { skus: U[]; branch: string | null
     if (cut.has(norm(code))) { setMsg({ ok: false, warn: true, text: `ตัดไปแล้ว: ${code}` }); return false; }
     setBusy(true);
     const r = await markSkusSold([code], branch); setBusy(false);
-    if (r.ok && (r.sold || 0) > 0) { setCut((p) => new Set(p).add(norm(code))); setManual(""); setMsg({ ok: true, text: `ตัดออก: ${code}` }); router.refresh(); return true; }
+    if (r.ok && (r.sold || 0) > 0) { setCut((p) => new Set(p).add(norm(code))); setManual(""); setMsg({ ok: true, text: `ตัดออก: ${code} — ตัดผิดคืนได้ที่แท็บ SKU` }); router.refresh(); return true; }
     setMsg({ ok: false, warn: true, text: `ตัดไม่ได้: ${code} — ไม่อยู่ในสต็อก (ขายแล้ว/ไม่พบ/คนละสาขา)` }); return false;
   };
 
@@ -54,7 +54,7 @@ export function SkuCutPanel({ skus, branch }: { skus: U[]; branch: string | null
 
       {open && (
         <div className="px-4 pb-4 space-y-2">
-          <p className="text-[11px] text-muted">ไว้ตัด SKU ของบิลที่ขาย<b className="text-ink">โดยไม่ได้สแกน SKU</b> — บิลตัดยอดไปแล้ว ตรงนี้แค่ทำให้ serial ตรง (ไม่ลดยอดซ้ำ)</p>
+          <p className="text-[11px] text-muted">ไว้ตัด SKU ของบิลที่ขาย<b className="text-ink">โดยไม่ได้สแกน SKU</b> — บิลตัดยอดไปแล้ว ตรงนี้แค่ทำให้ serial ตรง (ไม่ลดยอดซ้ำ) · <b className="text-ink">ตัดผิด?</b> คืนได้ที่แท็บ SKU → ปุ่ม “คืนสต๊อก”</p>
 
           <div className="flex gap-1.5">
             <button onClick={() => setScanning(true)} disabled={!branch}

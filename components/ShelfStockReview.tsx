@@ -24,7 +24,8 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   const [asOf, setAsOf] = useState(true);   // คิดยอด ณ วันที่นับ (กันบวกยอดขายวันนี้กลับ)
   const [zeroMissing, setZeroMissing] = useState(false);   // ตั้งสินค้าที่ไม่ได้นับเป็น 0
   const [syncBusy, setSyncBusy] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);   // ข้อความของ "วิธี A" (ซิงก์)
+  const [undoMsg, setUndoMsg] = useState<string | null>(null);   // ข้อความของ "วิธี B" (คืน) — แยกกันไม่ให้โผล่ผิดการ์ด
   const missingTotal = useMemo(() => missing.reduce((s, m) => s + m.remaining, 0), [missing]);
 
   // ตัด SKU ส่วนเกิน (in_stock เกินยอดคงเหลือจริง) = ขายไปแล้วยังไม่ตัด (ผีเก่า + ขายวันนี้)
@@ -40,10 +41,10 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   const undoCuts = async () => {
     if (!branch || syncBusy) return;
     if (!confirm(`คืน SKU ที่ตัดแบบเดา "วันนี้" ${num(guessedCut)} ตัว กลับเป็น in_stock?\n\n(เฉพาะที่ตัดวันนี้ ไม่ผูกบิล — ของเก่าเมื่อวาน/ก่อนหน้า finalize แล้ว ไม่ถูกแตะ · ที่ขายจริงผ่านการสแกน/ใส่รายบิล ก็ไม่ถูกแตะ)\nหลังคืน: SKU จะเกินยอดตามจริง → ไปใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย`)) return;
-    setSyncBusy(true); setSyncMsg(null);
+    setSyncBusy(true); setUndoMsg(null);
     const r = await undoGuessedSkuCuts(branch); setSyncBusy(false);
-    if (r.ok) { setSyncMsg(`✓ คืน SKU ${num(r.restored || 0)} ตัวกลับ in_stock แล้ว — ไปใส่ SKU จริงรายบิลได้เลย`); router.refresh(); }
-    else setSyncMsg(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
+    if (r.ok) { setUndoMsg(`✓ คืน SKU ${num(r.restored || 0)} ตัวกลับ in_stock แล้ว — ไปใส่ SKU จริงรายบิลได้เลย`); router.refresh(); }
+    else setUndoMsg(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
   };
 
   const stats = useMemo(() => {
@@ -91,7 +92,7 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
         <div className="rounded-xl border border-brand/40 bg-brand-soft/20 p-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-ink">อัปเดตเข้าระบบทั้งหมด</div>
+              <div className="text-sm font-semibold text-ink">1 · อัปเดตเข้าระบบทั้งหมด</div>
               <div className="text-[12px] text-muted">ลง SKU ทุกตัว + ปรับยอดคงเหลือให้ = ที่นับ → ทั้งระบบใช้ข้อมูลชุดนี้ (ย้อนได้)</div>
             </div>
             <button onClick={apply} disabled={busy || !branch}
@@ -116,38 +117,49 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
         </div>
       )}
 
-      {/* ซิงก์ SKU ให้ตรงยอด — ตัด SKU ส่วนเกิน (ขายแล้วยังไม่ตัด: ผีเก่า + ขายวันนี้) */}
-      {canApply && (phantomTotal > 0 || restoreTotal > 0) && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-amber-800">ซิงก์ SKU ให้ตรงยอด</div>
-              <div className="text-[12px] text-amber-700">SKU ยังไม่ตรงยอด: {phantomTotal > 0 && <>เกิน <b>{num(phantomTotal)}</b> (ตัดออก)</>}{phantomTotal > 0 && restoreTotal > 0 && " · "}{restoreTotal > 0 && <>ขาด <b>{num(restoreTotal)}</b> (คืนจากที่เดาตัด)</>} → ทำให้ SKU = ยอดคงเหลือทุกสินค้า</div>
-            </div>
-            <button onClick={syncSkus} disabled={syncBusy || !branch}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold px-4 py-2.5 hover:bg-amber-700 disabled:opacity-50">
-              {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />} ซิงก์ SKU ให้ตรงยอด
-            </button>
+      {/* STEP 2: จัดการ SKU ให้ตรงยอด — โชว์เฉพาะเมื่อ SKU ยังไม่ตรง · เลือกวิธีใดวิธีหนึ่ง */}
+      {canApply && (phantomTotal > 0 || restoreTotal > 0 || guessedCut > 0) && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/40 p-3 space-y-2.5">
+          <div>
+            <div className="text-sm font-semibold text-amber-800">2 · จัดการ SKU ให้ตรงยอด</div>
+            <div className="text-[12px] text-amber-700">ทำ “อัปเดตเข้าระบบ” (ข้อ 1) ก่อน แล้วเลือก <b>วิธีใดวิธีหนึ่ง</b> ให้ SKU ตรงกับยอดคงเหลือ — ไม่ต้องทำทั้งคู่</div>
           </div>
-          {syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{syncMsg}</div>}
-          <p className="mt-2 text-[11px] text-amber-700/80">ตัด/คืน serial เท่านั้น ไม่กระทบยอดคงเหลือ · ขายจริงที่ผูกบิลไม่ถูกแตะ · <b>แม่นกว่า:</b> ใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย</p>
-        </div>
-      )}
 
-      {/* undo guessed cuts → restore for exact per-bill SKU entry */}
-      {canApply && guessedCut > 0 && (
-        <div className="rounded-xl border border-line bg-surface p-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-ink">คืน SKU ที่ตัดแบบเดา (วันนี้)</div>
-              <div className="text-[12px] text-muted">วันนี้มี SKU ถูกตัดแบบเดา/ตัดเอง (ไม่ผูกบิล) <b>{num(guessedCut)}</b> ตัว → คืนกลับ in_stock เพื่อไปใส่ SKU จริงรายบิล (serial ตรงตัว) · ของเก่าเมื่อวานไม่ถูกแตะ</div>
+          {/* วิธี A — ซิงก์อัตโนมัติ */}
+          {(phantomTotal > 0 || restoreTotal > 0) && (
+            <div className="rounded-lg border border-amber-200 bg-surface p-2.5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-ink">วิธี A — ซิงก์อัตโนมัติให้ตรงยอด <span className="font-normal text-muted">(เร็ว · ระบบเดา serial ให้)</span></div>
+                  <div className="text-[12px] text-muted">{phantomTotal > 0 && <>เกิน <b>{num(phantomTotal)}</b> → ตัดออก</>}{phantomTotal > 0 && restoreTotal > 0 && " · "}{restoreTotal > 0 && <>ขาด <b>{num(restoreTotal)}</b> → คืนจากที่เดาตัดวันนี้</>} → ให้ SKU = ยอดคงเหลือทุกสินค้า</div>
+                </div>
+                <button onClick={syncSkus} disabled={syncBusy || !branch}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold px-4 py-2.5 hover:bg-amber-700 disabled:opacity-50">
+                  {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />} ซิงก์ให้ตรงยอด
+                </button>
+              </div>
+              {syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-canvas border border-line text-ink">{syncMsg}</div>}
             </div>
-            <button onClick={undoCuts} disabled={syncBusy || !branch}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line text-sm font-medium px-4 py-2.5 text-ink hover:bg-canvas disabled:opacity-50">
-              {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />} คืน SKU ({num(guessedCut)})
-            </button>
-          </div>
-          {phantomTotal === 0 && syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-canvas border border-line text-ink">{syncMsg}</div>}
+          )}
+
+          {/* วิธี B — คืนที่เดาตัด เพื่อใส่ SKU จริงรายบิล */}
+          {guessedCut > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-surface p-2.5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-ink">วิธี B — คืน SKU ที่ตัดแบบเดา (วันนี้) เพื่อใส่เอง <span className="font-normal text-muted">(แม่นสุด · serial ตรงตัว)</span></div>
+                  <div className="text-[12px] text-muted">วันนี้มี SKU ตัดแบบเดา/ตัดเอง (ไม่ผูกบิล) <b>{num(guessedCut)}</b> ตัว → คืนกลับ in_stock แล้วไปใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย · ของเก่าเมื่อวานไม่ถูกแตะ</div>
+                </div>
+                <button onClick={undoCuts} disabled={syncBusy || !branch}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500 text-sm font-medium px-4 py-2.5 text-amber-800 bg-surface hover:bg-amber-50 disabled:opacity-50">
+                  {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />} คืน SKU ({num(guessedCut)})
+                </button>
+              </div>
+              {undoMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-canvas border border-line text-ink">{undoMsg}</div>}
+            </div>
+          )}
+
+          <p className="text-[11px] text-amber-700/80">ทั้งสองวิธีแตะ serial เท่านั้น ไม่กระทบยอดคงเหลือ และไม่แตะบิลที่ขายจริง · วิธี B แม่นกว่าเพราะใส่ SKU จริงทีละบิล</p>
         </div>
       )}
 
