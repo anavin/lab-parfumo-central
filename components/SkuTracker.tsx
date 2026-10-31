@@ -28,10 +28,23 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
     if (r.ok) router.refresh(); else alert(r.error ?? "ลบไม่สำเร็จ");
   };
   const unflag = async (sku: string) => {
+    if (!confirm(`ล้างธง "${sku}"?\n(ยืนยันว่าตรวจแล้ว — SKU นี้ขายไปแล้วจริง ไม่ได้อยู่บนชั้น)`)) return;
     setBusySku(sku);
     const r = await clearSkuFlag(sku);
     setBusySku(null);
     if (r.ok) router.refresh(); else alert(r.error ?? "ล้างธงไม่สำเร็จ");
+  };
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const clearAllFlags = async () => {
+    const skus = rows.filter((r) => r.shelf_flag_at).map((r) => r.sku);
+    if (!skus.length) return;
+    if (!confirm(`ล้างธงทั้งหมด ${num(skus.length)} รายการ?\n(ยืนยันว่าตรวจแล้วทุกตัว — ขายไปจริง ไม่ได้อยู่บนชั้น)`)) return;
+    setBulkBusy(true);
+    const res = await Promise.all(skus.map((s) => clearSkuFlag(s).catch(() => ({ ok: false }))));
+    setBulkBusy(false);
+    const failed = res.filter((r) => !r.ok).length;
+    if (failed) alert(`ล้างธงไม่สำเร็จ ${num(failed)} รายการ ลองใหม่อีกครั้ง`);
+    router.refresh();
   };
   const returnToStock = async (sku: string) => {
     if (!confirm(`คืน SKU "${sku}" กลับเข้าสต๊อก (เปลี่ยนจากขายแล้ว → คงเหลือ)?`)) return;
@@ -98,10 +111,16 @@ export function SkuTracker({ rows, branch }: { rows: SkuUnitRow[]; branch: strin
       </div>
 
       {counts.flagged > 0 && (
-        <button onClick={() => setFilter("flagged")} className="w-full text-left flex items-center gap-2 mb-3 rounded-xl border border-warn/40 bg-warn-soft/50 px-3 py-2.5 hover:bg-warn-soft">
-          <AlertTriangle className="w-5 h-5 text-warn shrink-0" />
-          <span className="text-sm text-warn"><b>พบ {num(counts.flagged)} รายการ: ขายแล้วแต่เจอบนชั้น</b> — พนักงานสแกนตอนเก็บ SKU · แตะเพื่อดู แล้วเลือกคืนสต๊อก/ล้างธง</span>
-        </button>
+        <div className="flex items-stretch gap-2 mb-3">
+          <button onClick={() => setFilter("flagged")} className="flex-1 min-w-0 text-left flex items-center gap-2 rounded-xl border border-warn/40 bg-warn-soft/50 px-3 py-2.5 hover:bg-warn-soft">
+            <AlertTriangle className="w-5 h-5 text-warn shrink-0" />
+            <span className="text-sm text-warn"><b>พบ {num(counts.flagged)} รายการ: ขายแล้วแต่เจอบนชั้น</b> — พนักงานสแกนตอนเก็บ SKU · แตะเพื่อดู แล้วเลือกคืนสต๊อก/ล้างธง</span>
+          </button>
+          <button onClick={clearAllFlags} disabled={bulkBusy} title="ยืนยันว่าตรวจแล้วทุกตัว — ล้างธงพร้อมกัน"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-warn/50 bg-surface px-3 text-sm font-medium text-warn-dark hover:bg-warn-soft disabled:opacity-50">
+            {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} ล้างธงทั้งหมด ({num(counts.flagged)})
+          </button>
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2 mb-3">

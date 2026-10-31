@@ -21,13 +21,16 @@ export function StockTabs({ matrix, movement, tester = null, packaging = null, s
   );
   return (
     <div>
-      <div className="flex flex-wrap gap-1 p-1 mb-3 rounded-xl border border-line bg-surface">
+      <div className="flex flex-wrap items-center gap-1 p-1 mb-3 rounded-xl border border-line bg-surface">
+        {/* กลุ่ม 1: ดูสินค้า/สต๊อก */}
         <Btn id="stock" icon={Package} label="คงเหลือ" />
         <Btn id="move" icon={Activity} label="การเคลื่อนไหว" />
         {tester && <Btn id="tester" icon={FlaskConical} label="เทสเตอร์" />}
         {packaging && <Btn id="packaging" icon={ShoppingBag} label="ถุง/บรรจุภัณฑ์" />}
-        {sku && <Btn id="sku" icon={Barcode} label="SKU" />}
-        {reconcile && <Btn id="reconcile" icon={Scale} label="เทียบ SKU" />}
+        {/* กลุ่ม 2: SKU & ตรวจสอบ (ผู้จัดการ) */}
+        {(sku || reconcile || loss) && <span aria-hidden className="mx-1 self-stretch w-px bg-line hidden sm:block" />}
+        {sku && <Btn id="sku" icon={Barcode} label="ทะเบียน SKU" />}
+        {reconcile && <Btn id="reconcile" icon={Scale} label="ตรวจส่วนต่าง SKU" />}
         {loss && <Btn id="loss" icon={ShieldAlert} label="ป้องกันของหาย" dot={lossAlert} />}
       </div>
       <div hidden={tab !== "stock"}>{matrix}</div>
