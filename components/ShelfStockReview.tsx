@@ -7,18 +7,22 @@ import { branchName } from "@/lib/branches";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
 
 export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[] };
+export type MissingRow = { barcode: string; scent: string; size: string; remaining: number };
 
 const thDate = (ymd: string | null) => { if (!ymd) return ""; const [y, m, d] = ymd.split("-"); return `${d}/${m}/${+y + 543}`; };
 
 // หน้า "สต็อกหน้าร้าน": เช็คข้อมูลที่เก็บ (นับได้ต่อสินค้า + SKU) เทียบกับระบบปัจจุบัน
 // แล้วกดปุ่มเดียว "อัปเดตเข้าระบบทั้งหมด" ให้ทั้งระบบใช้ข้อมูลชุดเดียวกัน (ลง SKU + ปรับยอด)
-export function ShelfStockReview({ rows, branch, canApply, captureDate }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null }) {
+export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [] }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[] }) {
   const router = useRouter();
   const [qText, setQText] = useState("");
   const [open, setOpen] = useState<string | null>(null);   // expanded barcode
+  const [showMissing, setShowMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [asOf, setAsOf] = useState(true);   // คิดยอด ณ วันที่นับ (กันบวกยอดขายวันนี้กลับ)
+  const [zeroMissing, setZeroMissing] = useState(false);   // ตั้งสินค้าที่ไม่ได้นับเป็น 0
+  const missingTotal = useMemo(() => missing.reduce((s, m) => s + m.remaining, 0), [missing]);
 
   const stats = useMemo(() => {
     let bottles = 0, match = 0, diff = 0, soldToday = 0;
@@ -35,9 +39,10 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate }: { rows
   const apply = async () => {
     if (!branch || busy) return;
     const asOfLine = asOf && captureDate ? `• ปรับยอด = จำนวนที่นับ หักยอดขายหลัง ${thDate(captureDate)} แล้ว (ยอดขายวันนี้ไม่ถูกบวกกลับ)` : `• ปรับยอดคงเหลือให้ = จำนวนที่นับ`;
-    if (!confirm(`อัปเดตข้อมูลที่เก็บ (${num(stats.bottles)} ขวด · ${num(stats.products)} สินค้า) เข้าระบบทั้งหมด?\n\n• ลงทะเบียน SKU ทุกตัวเป็นสต็อกจริง\n${asOfLine}\n\nย้อนกลับได้ที่หน้าตรวจนับสต๊อก`)) return;
+    const zeroLine = zeroMissing && missing.length ? `\n• ตั้งสินค้าที่ไม่ได้นับ ${num(missing.length)} รายการ (รวม ${num(missingTotal)} ชิ้น) เป็น 0` : "";
+    if (!confirm(`อัปเดตข้อมูลที่เก็บ (${num(stats.bottles)} ขวด · ${num(stats.products)} สินค้า) เข้าระบบทั้งหมด?\n\n• ลงทะเบียน SKU ทุกตัวเป็นสต็อกจริง\n${asOfLine}${zeroLine}\n\nย้อนกลับได้ที่หน้าตรวจนับสต๊อก`)) return;
     setBusy(true); setResult(null);
-    const r = await applyCapturesToSystem(branch, asOf && captureDate ? captureDate : undefined); setBusy(false);
+    const r = await applyCapturesToSystem(branch, asOf && captureDate ? captureDate : undefined, zeroMissing); setBusy(false);
     if (r.ok) { setResult(`✓ อัปเดตเข้าระบบแล้ว — SKU ใหม่ ${num(r.added || 0)} · มีอยู่แล้ว ${num(r.already || 0)} · ติดธง ${num(r.flagged || 0)} · ปรับยอด ${num(r.products || 0)} สินค้า (ใบนับ #${r.countId})`); router.refresh(); }
     else setResult(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
   };
@@ -78,8 +83,32 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate }: { rows
               คิดยอด <b>ณ วันที่นับ ({thDate(captureDate)})</b> — หักยอดขายหลังวันนับออก เพื่อไม่ให้ยอดขายวันนี้ถูกบวกกลับ {stats.soldToday > 0 && <span className="text-amber-700">(ขายหลังวันนับ {num(stats.soldToday)} ชิ้น)</span>}
             </label>
           )}
+          {missing.length > 0 && (
+            <label className="mt-1.5 flex items-start gap-2 text-[12px] text-ink cursor-pointer select-none">
+              <input type="checkbox" checked={zeroMissing} onChange={(e) => setZeroMissing(e.target.checked)} className="accent-brand w-4 h-4 mt-0.5" />
+              <span>ตั้ง<b>สินค้าที่ไม่ได้นับเป็น 0</b> ({num(missing.length)} รายการ · {num(missingTotal)} ชิ้น) — ติ๊กเมื่อนับครบทั้งร้าน (ของที่ไม่อยู่บนชั้น = หมด) · <button type="button" onClick={(e) => { e.preventDefault(); setShowMissing((v) => !v); }} className="text-brand-dark underline">ดูรายการ</button></span>
+            </label>
+          )}
           {result && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{result}</div>}
           <p className="mt-2 text-[11px] text-muted">ปรับเฉพาะสินค้าที่นับ · ย้อนกลับได้ที่หน้า ตรวจนับสต๊อก · {asOf && captureDate ? "โหมดนี้ปลอดภัยแม้ทำระหว่างวัน" : "ถ้าไม่ติ๊ก ควรทำตอนร้านไม่ขาย"}</p>
+        </div>
+      )}
+
+      {/* uncaptured-but-in-system review */}
+      {missing.length > 0 && showMissing && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/40 overflow-hidden">
+          <div className="px-3 py-2 text-[12px] font-semibold text-amber-800 border-b border-amber-200">
+            สินค้าที่ไม่ได้นับ แต่ระบบยังมีสต๊อก — {num(missing.length)} รายการ · {num(missingTotal)} ชิ้น
+            <span className="font-normal text-amber-700"> (ถ้าติ๊ก “ตั้งเป็น 0” ตัวพวกนี้จะถูกตั้งเป็น 0)</span>
+          </div>
+          <div className="max-h-72 overflow-auto divide-y divide-amber-200/60">
+            {missing.map((m) => (
+              <div key={m.barcode} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+                <span className="flex-1 min-w-0 truncate text-ink">{m.scent} <span className="text-muted">{m.size}</span> <span className="font-mono text-[10px] text-muted-soft">{m.barcode}</span></span>
+                <span className="tabular-nums text-amber-800 font-medium shrink-0">ระบบมี {num(m.remaining)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

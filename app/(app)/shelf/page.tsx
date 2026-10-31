@@ -40,13 +40,19 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
     soldToday: Math.round(Number(soldAfter.get(c.barcode) || 0)),
     skus: Array.isArray(c.skus) ? c.skus.filter(Boolean) : [],
   }));
+  // สินค้าที่ระบบมีสต๊อก แต่ไม่ได้ถูกนับ (อาจขายหมด/ไม่อยู่บนชั้น) — ต้องรีวิวก่อนตั้งเป็น 0
+  const capSet = new Set(caps.map((c) => c.barcode));
+  const missing = live
+    .map((r) => ({ barcode: r.barcode, scent: r.scent || r.barcode, size: r.size || "", remaining: Math.round(Number(r.remaining) || 0) }))
+    .filter((r) => r.remaining > 0 && !capSet.has(r.barcode))
+    .sort((a, b) => b.remaining - a.remaining);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader icon={Store} title="สต็อกหน้าร้าน"
         subtitle={`เช็คข้อมูลที่เก็บ${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} แล้วอัปเข้าระบบให้ใช้ข้อมูลชุดเดียวกัน`} />
       <div className="mb-4"><BranchTabs withAll defaultValue={DEFAULT_BRANCH} /></div>
-      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} />
+      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} />
       {branch && inStockSkus.length > 0 && (
         <div className="mt-4"><SkuCutPanel skus={inStockSkus} branch={branch} /></div>
       )}

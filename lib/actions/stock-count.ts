@@ -56,7 +56,7 @@ export async function submitStockCount(branch: string, lines: CountLineInput[], 
  *  (/stock/counts) so a manager reviews the variance before any stock_adjustments post — nothing
  *  touches live stock until approval, and it stays reversible. Only captured products are included,
  *  so products that weren't counted keep their current stock untouched. */
-export async function createCountFromCaptures(branch: string, asOfDate?: string): Promise<{ ok: boolean; id?: number; products?: number; error?: string }> {
+export async function createCountFromCaptures(branch: string, asOfDate?: string, zeroUncaptured = false): Promise<{ ok: boolean; id?: number; products?: number; error?: string }> {
   await requireAnyPermission(["requisitions", "stock"]);
   const b = resolveBranch(branch);
   try {
@@ -72,9 +72,17 @@ export async function createCountFromCaptures(branch: string, asOfDate?: string)
       const counted = after ? Math.max(0, c.cnt - Math.round(after.get(c.barcode) || 0)) : c.cnt;
       return { barcode: c.barcode, scent: c.scent || "", size: c.size || "", expected: rem.get(c.barcode) ?? 0, counted, verified: true };
     });
-    const note = asOfDate ? `ปรับยอดจากการเก็บ SKU (ยอด ณ ${asOfDate})` : "ปรับยอดจากการเก็บ SKU หน้าชั้น";
+    // optionally set products that have system stock but were NOT counted → 0 (ไม่อยู่บนชั้น = หมด)
+    if (zeroUncaptured) {
+      const capSet = new Set(caps.map((c) => c.barcode));
+      for (const r of live) {
+        const rr = Math.round(Number(r.remaining) || 0);
+        if (rr > 0 && !capSet.has(r.barcode)) lines.push({ barcode: r.barcode, scent: r.scent || "", size: r.size || "", expected: rr, counted: 0, verified: true });
+      }
+    }
+    const note = `ปรับยอดจากการเก็บ SKU${asOfDate ? ` (ยอด ณ ${asOfDate})` : ""}${zeroUncaptured ? " +ตัดที่ไม่ได้นับ=0" : ""}`;
     const r = await submitStockCount(b, lines, note);
-    return r.ok ? { ok: true, id: r.id, products: caps.length } : r;
+    return r.ok ? { ok: true, id: r.id, products: lines.length } : r;
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง" };
     console.error("[createCountFromCaptures]", e);
@@ -86,11 +94,11 @@ export async function createCountFromCaptures(branch: string, asOfDate?: string)
  *  captured shelf data as the single source of truth — (1) enroll every captured SKU as in_stock,
  *  (2) build a stock count from the captured quantities AND approve it, so remaining = counted.
  *  Admin/manager only (writes stock). Auditable + reversible (the count can be reversed). */
-export async function applyCapturesToSystem(branch: string, asOfDate?: string): Promise<{ ok: boolean; error?: string; added?: number; flagged?: number; already?: number; countId?: number; products?: number }> {
+export async function applyCapturesToSystem(branch: string, asOfDate?: string, zeroUncaptured = false): Promise<{ ok: boolean; error?: string; added?: number; flagged?: number; already?: number; countId?: number; products?: number }> {
   await requirePermission("requisitions");
   try {
     const en = await enrollCapturedSkus(branch);               // serials (non-destructive)
-    const cr = await createCountFromCaptures(branch, asOfDate); // build the count from captured qty (optionally ณ วันที่นับ)
+    const cr = await createCountFromCaptures(branch, asOfDate, zeroUncaptured); // build the count (optionally ณ วันที่นับ + ตัดที่ไม่ได้นับ=0)
     if (!cr.ok) return { ok: false, error: cr.error, added: en.added, flagged: en.flagged, already: en.already };
     const ap = await approveStockCount(cr.id!, "อัปจากสต็อกหน้าร้าน (ข้อมูลที่เก็บ)");  // post adjustments → remaining = counted
     if (!ap.ok) return { ok: false, error: `ลง SKU แล้ว แต่ปรับยอดไม่สำเร็จ: ${ap.error} (ใบนับ #${cr.id} รออนุมัติที่ /stock/counts)`, added: en.added, flagged: en.flagged, already: en.already, countId: cr.id };
