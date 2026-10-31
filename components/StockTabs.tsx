@@ -1,15 +1,15 @@
 "use client";
 import { useState } from "react";
-import { Package, Activity, ShieldAlert, FlaskConical, Barcode, Scale } from "lucide-react";
+import { Package, Activity, ShieldAlert, FlaskConical, Barcode, Scale, ShoppingBag } from "lucide-react";
 
-type TabId = "stock" | "move" | "tester" | "sku" | "reconcile" | "loss";
+type TabId = "stock" | "move" | "tester" | "packaging" | "sku" | "reconcile" | "loss";
 
-// สลับแท็บบนหน้า /stock — คงเหลือ · การเคลื่อนไหว · เทสเตอร์ · SKU · เทียบ SKU · ป้องกันของหาย
+// สลับแท็บบนหน้า /stock — คงเหลือ · การเคลื่อนไหว · เทสเตอร์ · ถุง/บรรจุภัณฑ์ · SKU · เทียบ SKU · ป้องกันของหาย
 // ("เทียบข้อมูลใหม่" ยุบไปที่หน้า "สต็อกหน้าร้าน" /shelf แล้ว)
 // ทุกแท็บ mount ค้างไว้ (ใช้ hidden) เพื่อไม่ให้ state (การแก้จำนวน/ตัวกรอง) รีเซ็ตตอนสลับ
 // loss/sku/reconcile = null → ไม่มีสิทธิ์ (ผู้จัดการ/แอดมิน/ปฏิบัติการเท่านั้น) → ซ่อนแท็บนั้น
-export function StockTabs({ matrix, movement, tester = null, sku = null, reconcile = null, loss = null, lossAlert = false }:
-  { matrix: React.ReactNode; movement: React.ReactNode; tester?: React.ReactNode; sku?: React.ReactNode; reconcile?: React.ReactNode; loss?: React.ReactNode; lossAlert?: boolean }) {
+export function StockTabs({ matrix, movement, tester = null, packaging = null, sku = null, reconcile = null, loss = null, lossAlert = false }:
+  { matrix: React.ReactNode; movement: React.ReactNode; tester?: React.ReactNode; packaging?: React.ReactNode; sku?: React.ReactNode; reconcile?: React.ReactNode; loss?: React.ReactNode; lossAlert?: boolean }) {
   const [tab, setTab] = useState<TabId>("stock");
   const Btn = ({ id, icon: Icon, label, dot }: { id: TabId; icon: any; label: string; dot?: boolean }) => (
     <button onClick={() => setTab(id)}
@@ -25,6 +25,7 @@ export function StockTabs({ matrix, movement, tester = null, sku = null, reconci
         <Btn id="stock" icon={Package} label="คงเหลือ" />
         <Btn id="move" icon={Activity} label="การเคลื่อนไหว" />
         {tester && <Btn id="tester" icon={FlaskConical} label="เทสเตอร์" />}
+        {packaging && <Btn id="packaging" icon={ShoppingBag} label="ถุง/บรรจุภัณฑ์" />}
         {sku && <Btn id="sku" icon={Barcode} label="SKU" />}
         {reconcile && <Btn id="reconcile" icon={Scale} label="เทียบ SKU" />}
         {loss && <Btn id="loss" icon={ShieldAlert} label="ป้องกันของหาย" dot={lossAlert} />}
@@ -32,6 +33,7 @@ export function StockTabs({ matrix, movement, tester = null, sku = null, reconci
       <div hidden={tab !== "stock"}>{matrix}</div>
       <div hidden={tab !== "move"}>{movement}</div>
       {tester && <div hidden={tab !== "tester"}>{tester}</div>}
+      {packaging && <div hidden={tab !== "packaging"}>{packaging}</div>}
       {sku && <div hidden={tab !== "sku"}>{sku}</div>}
       {reconcile && <div hidden={tab !== "reconcile"}>{reconcile}</div>}
       {loss && <div hidden={tab !== "loss"}>{loss}</div>}

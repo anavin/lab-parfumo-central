@@ -42,6 +42,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const { rows, reorder, negatives, valuation } = bundle;
   // เทสเตอร์ (ของโชว์) + ถุงกระดาษ (บรรจุภัณฑ์) ไม่ใช่สต๊อกสินค้า → ซ่อนออกจาก "คงเหลือ"
   const matrixRows = rows.filter((r) => !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""));
+  const bagRows = rows.filter((r) => /ถุง/.test(r.scent || ""));   // แท็บ "ถุง/บรรจุภัณฑ์" แยกต่างหาก
   // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
   const soldByBarcode = new Map<string, Map<string, number>>();
   for (const m of moves) {
@@ -167,6 +168,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           matrix={<StockMatrix rows={matrixRows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} />}
           movement={<><StockTrend data={trend} canManage={canRequisition} /><StockMovement dates={moveDates} rows={movRows} /></>}
           tester={<TesterStock rows={testers} branch={branch} />}
+          packaging={bagRows.length ? <StockMatrix rows={bagRows} branch={branch} canEdit={canRequisition} inactiveScents={inactiveScents} /> : null}
           /* SKU tracking เป็นข้อมูลติดตามเชิงจัดการ → เฉพาะผู้จัดการ/แอดมิน/ปฏิบัติการ (requisitions) */
           sku={canRequisition ? <SkuTracker rows={skus} branch={branch} /> : null}
           reconcile={canRequisition ? <SkuReconcile stock={rows} skus={skus} branch={branch} /> : null}
