@@ -137,7 +137,7 @@ export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolea
       else if (cur < target) toRestore.push(...(guByBc.get(bc) || []).slice(0, target - cur));   // คืนส่วนขาดจากที่เดาตัด
     }
     if (toSell.length) await q(`update sku_units set status='sold', sold_at=now(), sold_branch=upper($2) where sku = any($1::text[]) and status='in_stock'`, [toSell, b]);
-    if (toRestore.length) await q(`update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null where sku = any($1::text[]) and status='sold' and sold_submission_id is null`, [toRestore, b]);
+    if (toRestore.length) await q(`update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null where sku = any($1::text[]) and status='sold' and sold_submission_id is null`, [toRestore]);
     const [kept] = await q<{ n: number }>(`select count(*)::int n from sku_units where status='in_stock' and branch=upper($1)`, [b]);
     await logAudit("update", "stock", null, `ซิงก์ SKU ให้ตรงสต๊อก ${branchName(b)}: ตัด ${toSell.length} · คืน ${toRestore.length} · เหลือ ${kept?.n || 0}`);
     revalidatePath("/shelf"); revalidatePath("/stock"); revalidatePath("/my/stock");
