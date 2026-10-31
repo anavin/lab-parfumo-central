@@ -118,7 +118,7 @@ export function RequisitionsTable({ rows }: { rows: Row[] }) {
       </div>
 
       <div className="card overflow-hidden">
-        <DataTable columns={columns} rows={filtered} rowKey={(r) => r.id} cellPad="px-4 py-3" headPad="px-4 py-3" maxHeight="66vh"
+        <DataTable columns={columns} rows={filtered} rowKey={(r) => r.id} cellPad="px-4 py-3" headPad="px-4 py-3" maxHeight="none"
           empty={search || bucket !== "all" || branch !== "all" ? "ไม่พบใบเบิกที่ตรงกับตัวกรอง" : "ยังไม่มีใบเบิก"} />
       </div>
     </div>
