@@ -4,6 +4,7 @@ import { requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
 import { shelfCaptureReview, stockLive, skuUnits, salesAfterDate, shelfCaptureDate, guessedSkuCutsToday } from "@/lib/queries";
 import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
+import { isGiveawaySize, isNonStock } from "@/lib/product-class";
 import { BranchTabs } from "@/components/BranchTabs";
 import { ShelfStockReview, type ShelfRow } from "@/components/ShelfStockReview";
 import { SkuCutPanel } from "@/components/SkuCutPanel";
@@ -45,10 +46,14 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   }));
   // ซิงก์ 2 ทาง: ส่วนเกิน (in_stock > คงเหลือ) ตัด · ส่วนขาด (in_stock < คงเหลือ) คืนจากที่เดาตัด
   // ข้าม 4ml (ไม่มี SKU)
-  const is4ml = (s: string | null) => /^\s*4\s*ml/i.test(String(s || ""));
-  const bc4ml = new Set(live.filter((r) => is4ml(r.size)).map((r) => r.barcode));
+  const bc4ml = new Set(live.filter((r) => isGiveawaySize(r.size)).map((r) => r.barcode));
+  // นับเฉพาะที่ "เดาตัดวันนี้" (เวลาไทย) — ให้ตรงกับที่ reconcile จะคืนได้จริง (today-only)
+  const bkkToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  const isGuessedToday = (u: { status: string; sold_receipt_no: string | null; sold_at: string | null }) =>
+    u.status === "sold" && !u.sold_receipt_no && !!u.sold_at
+    && new Date(u.sold_at).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }) === bkkToday;
   const guessedByBc = new Map<string, number>();
-  for (const u of skus) if (u.status === "sold" && !u.sold_receipt_no && u.barcode) guessedByBc.set(u.barcode, (guessedByBc.get(u.barcode) || 0) + 1);
+  for (const u of skus) if (isGuessedToday(u) && u.barcode) guessedByBc.set(u.barcode, (guessedByBc.get(u.barcode) || 0) + 1);
   let phantomTotal = 0, restoreTotal = 0;
   for (const bc of new Set([...remByBc.keys(), ...skuInByBc.keys()])) {
     if (!bc || bc4ml.has(bc)) continue;
@@ -64,7 +69,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   const missing = live
     .map((r) => ({ barcode: r.barcode, scent: r.scent || r.barcode, size: r.size || "", remaining: Math.round(Number(r.remaining) || 0) }))
     // ไม่รวมเทสเตอร์ (TRY ME) + ถุง/บรรจุภัณฑ์ — ไม่ได้นับบนชั้น ไม่ควรถูกตั้ง 0
-    .filter((r) => r.remaining > 0 && !capSet.has(r.barcode) && !/try\s*me/i.test(r.scent) && !/ถุง/.test(r.scent))
+    .filter((r) => r.remaining > 0 && !capSet.has(r.barcode) && !isNonStock(r.scent))
     .sort((a, b) => b.remaining - a.remaining);
 
   return (

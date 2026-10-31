@@ -23,6 +23,7 @@ async function lookupBarcode(code: string): Promise<any | null> {
 }
 import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment, addMyBillItems, addSkuToSale } from "@/lib/actions/submissions";
 import { checkSku } from "@/lib/actions/sku";
+import { isGiveawaySize } from "@/lib/product-class";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { KShopQr } from "@/components/KShopQr";
@@ -362,7 +363,7 @@ function BillForm({ state, setState, onSubmit, onCancel, pending, fullName, auto
 }) {
   // products that have serialized SKU stock → their lines REQUIRE scanning a SKU per unit
   const skuSet = useMemo(() => new Set(skuBarcodes), [skuBarcodes]);
-  const needsSku = (it: BillItem) => !!it.barcode && skuSet.has(it.barcode) && !/^\s*4\s*ml/i.test(String(it.size || ""));   // 4ml = ของแจก ไม่มี SKU
+  const needsSku = (it: BillItem) => !!it.barcode && skuSet.has(it.barcode) && !isGiveawaySize(it.size);   // 4ml = ของแจก ไม่มี SKU
   const [scanning, setScanning] = useState(!!autoScan && !laserMode);
   // per-item quantity cap at a stock-gated branch: available stock minus what other
   // lines in THIS bill already use for the same barcode (covers scan + search + splits).
@@ -828,7 +829,7 @@ function ItemCard({ it, index, onChange, onRemove, showPayment, paymentDefault =
   };
   const q = Number(it.qty) || 0, up = Number(it.unit_price) || 0;
   const hasPromo = it.list_price != null && it.list_price > up;   // promo line under ราคา → equal spacer on the others
-  const is4ml = /^4\s*ml/i.test(String(it.size || "").trim());   // giveaway-eligible size
+  const is4ml = isGiveawaySize(it.size);   // giveaway-eligible size
   // clamp per-item discount to the line subtotal so the card never shows a
   // misleading negative total (mirrors the authoritative BillForm math).
   // ของแถม (gift) → full discount → line is free (฿0).
@@ -1066,7 +1067,7 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
       <ul className="space-y-1">
         {rows.map((r, i) => {
           const covered = soldSkus[r.id]?.length ?? 0;
-          const needSku = r.status !== "rejected" && !!r.barcode && skuBcSet.has(r.barcode) && !/^\s*4\s*ml/i.test(String(r.size || "")) && covered < (r.qty ?? 0);
+          const needSku = r.status !== "rejected" && !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && covered < (r.qty ?? 0);
           return (
           <li key={r.id} className="text-sm">
             <div className="flex items-center gap-2">

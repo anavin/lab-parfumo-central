@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Scale, Check, Search } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
+import { isGiveawaySize, isNonStock } from "@/lib/product-class";
 import type { SkuUnitRow } from "@/lib/queries";
 
 type StockRow = { barcode: string; scent: string; size: string; remaining: number };
@@ -17,8 +18,7 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
 
   const rows = useMemo<Row[]>(() => {
     // 4ml (ของแจก ไม่มี SKU) · เทสเตอร์ (TRY ME) · ถุง/บรรจุภัณฑ์ = ไม่ใช่สินค้าที่ติดตาม SKU → ไม่นับเป็นความต่าง
-    const skip = (scent?: string | null, size?: string | null) =>
-      /^\s*4\s*ml/i.test(String(size || "")) || /try\s*me/i.test(String(scent || "")) || /ถุง/.test(String(scent || ""));
+    const skip = (scent?: string | null, size?: string | null) => isGiveawaySize(size) || isNonStock(scent);
     const coll = new Map<string, number>();
     for (const u of skus) if (u.status === "in_stock" && u.barcode && !skip(u.scent, u.size)) coll.set(u.barcode, (coll.get(u.barcode) || 0) + 1);
     const sys = new Map<string, { scent: string; size: string; remaining: number }>();

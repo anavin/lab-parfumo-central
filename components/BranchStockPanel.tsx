@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { Boxes, ChevronDown, Search, Barcode, AlertTriangle } from "lucide-react";
 import { num } from "@/lib/format";
+import { isPackaging, isNonStock } from "@/lib/product-class";
 
 type Row = { barcode: string; scent: string; size: string; remaining: number };
 
@@ -10,7 +11,7 @@ const inp = "border border-line rounded-lg px-2 py-1.5 text-sm bg-surface text-i
 // ดึงจำนวน ml จากข้อความขนาด ("10 ml." → 10) เพื่อเรียงขนาดเล็ก→ใหญ่
 const mlOf = (s?: string) => { const m = String(s || "").match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
 // ถุงกระดาษ = ของบรรจุภัณฑ์ ไม่ใช่น้ำหอม → ดันไปท้ายลิสต์เสมอ
-const isBag = (scent?: string) => /ถุง/.test(String(scent || ""));
+const isBag = isPackaging;
 
 /** Read-only branch stock for the salesperson on /my — what's left at the branch
  *  they're working at today. Sorted by scent (Thai collation), then size small→large. */
@@ -23,7 +24,7 @@ export function BranchStockPanel({ rows, branchName, skusByBc = {}, defaultOpen 
   // ซ่อนเทสเตอร์ + ถุง (ไม่ใช่สต๊อกสินค้า)
   const stocked = useMemo(
     () => rows.filter((r) => ((Number(r.remaining) || 0) > 0 || (skusByBc[r.barcode] || []).length > 0)
-        && !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""))
+        && !isNonStock(r.scent))
       .sort((a, b) =>
         (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)         // ถุงกระดาษไว้ท้ายสุด
         || (a.scent || "").localeCompare(b.scent || "", "th")       // แล้วเรียงตามกลิ่น

@@ -3,6 +3,7 @@ import { q } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { requireAnyPermission } from "@/lib/auth/require-user";
 import { normalizeBranch, branchName } from "@/lib/branches";
+import { isGiveawaySize } from "@/lib/product-class";
 import { logAudit } from "@/lib/audit";
 
 const NORM = (col: string) => `upper(regexp_replace(${col}, '\\s', '', 'g'))`;
@@ -108,7 +109,7 @@ export async function enrollCapturedSkus(branch: string): Promise<{ ok: boolean;
   }
 }
 
-const IS_4ML = (s: string | null) => /^\s*4\s*ml/i.test(String(s || ""));   // 4ml = ของแจก ไม่มี SKU
+const IS_4ML = isGiveawaySize;   // 4ml = ของแจก ไม่มี SKU
 
 /** Sync sku_units to the ACTUAL remaining stock per product (2-way): per barcode
  *   - in_stock SKU > remaining → ตัดส่วนเกิน (เก่าสุดก่อน) เป็น sold
@@ -126,8 +127,13 @@ export async function reconcileSkusToStock(branch: string): Promise<{ ok: boolea
     // in_stock newest-first (keep newest, sell older excess); guessed-cuts oldest-first (restore pool)
     const inStock = await q<{ sku: string; barcode: string | null }>(
       `select sku, barcode from sku_units where status='in_stock' and branch=upper($1) order by received_at desc nulls last, sku`, [b]);
+    // คืนได้เฉพาะที่ "เดาตัดวันนี้" (เวลาไทย) — ของเก่า/ที่ write-off ไปแล้ว finalize แล้ว อย่าปลุกกลับ
+    // (ให้ตรงกับ undoGuessedSkuCuts ที่เป็น today-only เหมือนกัน)
     const guessed = await q<{ sku: string; barcode: string | null }>(
-      `select sku, barcode from sku_units where status='sold' and sold_submission_id is null and branch=upper($1) order by received_at asc nulls last, sku`, [b]);
+      `select sku, barcode from sku_units where status='sold' and sold_submission_id is null and branch=upper($1)
+         and sold_at is not null
+         and (sold_at at time zone 'Asia/Bangkok')::date = (now() at time zone 'Asia/Bangkok')::date
+       order by received_at asc nulls last, sku`, [b]);
     const grp = (rows: { sku: string; barcode: string | null }[]) => { const m = new Map<string, string[]>(); for (const r of rows) { const k = r.barcode || ""; if (!k) continue; (m.get(k) ?? m.set(k, []).get(k)!).push(r.sku); } return m; };
     const inByBc = grp(inStock), guByBc = grp(guessed);
     const toSell: string[] = [], toRestore: string[] = [];

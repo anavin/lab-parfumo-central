@@ -12,6 +12,7 @@ import { SplitTenders } from "@/components/SplitTenders";
 import { Select } from "@/components/ui/Select";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 import { branchOptions } from "@/lib/branches";
+import { isGiveawaySize } from "@/lib/product-class";
 import { NATION_OPTIONS, natLabel } from "@/lib/nation";
 
 const SOURCE_OPTIONS = branchOptions();
@@ -357,7 +358,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
                               </div>
                             )}
-                            {isSale && !!r.barcode && skuBcSet.has(r.barcode) && !/^\s*4\s*ml/i.test(String(r.size || "")) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0) && (
+                            {isSale && !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0) && (
                               <AddSkuLine id={r.id} need={(r.qty ?? 0) - (soldSkus[r.id]?.length ?? 0)} onDone={refresh} />
                             )}
                             {editId === r.id && (

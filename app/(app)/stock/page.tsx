@@ -18,6 +18,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { BranchTabs } from "@/components/BranchTabs";
 import { isBranch, branchName, DEFAULT_BRANCH } from "@/lib/branches";
+import { isPackaging, isNonStock } from "@/lib/product-class";
 import { Package, AlertTriangle, PackagePlus, ChevronDown } from "lucide-react";
 import Link from "next/link";
 
@@ -41,8 +42,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   // one STOCK_CTE pass → derive คงเหลือ / ควรเติม / ติดลบ / มูลค่า (was 4 separate CTE queries)
   const { rows, reorder, negatives, valuation } = bundle;
   // เทสเตอร์ (ของโชว์) + ถุงกระดาษ (บรรจุภัณฑ์) ไม่ใช่สต๊อกสินค้า → ซ่อนออกจาก "คงเหลือ"
-  const matrixRows = rows.filter((r) => !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""));
-  const bagRows = rows.filter((r) => /ถุง/.test(r.scent || ""));   // แท็บ "ถุง/บรรจุภัณฑ์" แยกต่างหาก
+  const matrixRows = rows.filter((r) => !isNonStock(r.scent));
+  const bagRows = rows.filter((r) => isPackaging(r.scent));   // แท็บ "ถุง/บรรจุภัณฑ์" แยกต่างหาก
   // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
   const soldByBarcode = new Map<string, Map<string, number>>();
   for (const m of moves) {
@@ -60,7 +61,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
     if (bc) for (const [d, q] of bc) mv.sold[d] = (mv.sold[d] || 0) + q;
   }
   const mlOf = (z?: string) => { const mm = String(z || "").match(/(\d+(?:\.\d+)?)/); return mm ? parseFloat(mm[1]) : 0; };
-  const isBag = (n?: string) => /ถุง/.test(String(n || ""));
+  const isBag = (n?: string) => isPackaging(n);
   const movRows = [...movMap.values()].sort((a, b) =>
     (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)
     || a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
@@ -82,7 +83,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const keys = new Set<string>([...varAgg.keys(), ...[...movMap.values()].filter((m) => m.remaining > 0).map((m) => `${m.scent}|${m.size}`)]);
   for (const key of keys) {
     const [scent, size] = key.split("|");
-    if (/try\s*me/i.test(scent) || /ถุง/.test(scent)) continue;   // เทสเตอร์/ถุง = ไม่ใช่สต๊อกสินค้า → ไม่นับเป็นของขาด
+    if (isNonStock(scent)) continue;   // เทสเตอร์/ถุง = ไม่ใช่สต๊อกสินค้า → ไม่นับเป็นของขาด
     const remaining = movMap.get(key)?.remaining ?? 0;
     const a = varAgg.get(key);
     if (a) {

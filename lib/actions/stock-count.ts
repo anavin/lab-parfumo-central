@@ -3,6 +3,7 @@ import { q, tx } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { requireUser, requirePermission, requireAnyPermission } from "@/lib/auth/require-user";
 import { resolveBranch, branchName } from "@/lib/branches";
+import { isNonStock } from "@/lib/product-class";
 import { logAudit } from "@/lib/audit";
 import { stockRawForBarcodes, stockLive, salesAfterDate } from "@/lib/queries";
 import { enrollCapturedSkus } from "@/lib/actions/shelf-capture";
@@ -76,7 +77,7 @@ export async function createCountFromCaptures(branch: string, asOfDate?: string,
     // ยกเว้น เทสเตอร์ (TRY ME) + ถุง/บรรจุภัณฑ์ — ไม่ได้นับบนชั้นน้ำหอม จึงไม่ควรโดนตั้ง 0
     if (zeroUncaptured) {
       const capSet = new Set(caps.map((c) => c.barcode));
-      const skipZero = (s: string) => /try\s*me/i.test(s) || /ถุง/.test(s);
+      const skipZero = (s: string) => isNonStock(s);
       for (const r of live) {
         const rr = Math.round(Number(r.remaining) || 0);
         if (rr > 0 && !capSet.has(r.barcode) && !skipZero(r.scent || "")) lines.push({ barcode: r.barcode, scent: r.scent || "", size: r.size || "", expected: rr, counted: 0, verified: true });

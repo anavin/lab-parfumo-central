@@ -21,7 +21,8 @@ const ICON: Record<PermKey, any> = {
   stock: Package, products: FlaskConical, cash: Wallet, review: ClipboardCheck,
   users: Users, audit: ScrollText, trash: Trash2, my_sales: Store,
 };
-const MENU: { title: string; items: { key: PermKey; href: string; label: string; icon?: any }[] }[] = [
+// key = สิทธิ์หลัก (ใช้เลือกไอคอน/จัดกลุ่ม) · needs = ต้องมี "ครบทุกตัว" ถึงจะโชว์ (สำหรับหน้าที่ layout+page gate ซ้อนกัน)
+const MENU: { title: string; items: { key: PermKey; href: string; label: string; icon?: any; needs?: PermKey[] }[] }[] = [
   { title: "ภาพรวม", items: [
     { key: "dashboard", href: "/", label: "แดชบอร์ด" },
     { key: "review", href: "/review", label: "ตรวจสอบยอดขาย" },
@@ -34,8 +35,8 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
   { title: "คลัง & การเงิน", items: [
     { key: "stock", href: "/stock", label: "สต๊อกคงเหลือ" },
     { key: "stock", href: "/shelf", label: "สต็อกหน้าร้าน", icon: Store },
-    { key: "requisitions", href: "/stock/import", label: "นำเข้าสต๊อก CTW", icon: FileUp },
-    { key: "requisitions", href: "/stock/counts", label: "ตรวจนับสต๊อก", icon: ListChecks },
+    { key: "requisitions", href: "/stock/import", label: "นำเข้าสต๊อก CTW", icon: FileUp, needs: ["stock", "requisitions"] },
+    { key: "requisitions", href: "/stock/counts", label: "ตรวจนับสต๊อก", icon: ListChecks, needs: ["stock", "requisitions"] },
     { key: "products", href: "/products", label: "สินค้า" },
     { key: "products", href: "/promotions", label: "โปรโมชัน", icon: Tag },
     { key: "products", href: "/products/barcodes", label: "พิมพ์บาร์โค้ด", icon: Barcode },
@@ -58,7 +59,7 @@ function groupsFor(user: User, pending: number): Group[] {
   const allowed = new Set(effectivePermissions(user));
   return MENU.map((g) => ({
     title: g.title,
-    items: g.items.filter((it) => allowed.has(it.key)).map((it) => ({
+    items: g.items.filter((it) => it.needs ? it.needs.every((k) => allowed.has(k)) : allowed.has(it.key)).map((it) => ({
       href: it.href, label: it.label, icon: it.icon ?? ICON[it.key],
       badge: it.key === "review" ? pending : undefined,
     })),
