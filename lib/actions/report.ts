@@ -30,7 +30,7 @@ export async function getDailyBills(date: string, source: string) {
 
 /** Load a branch's shop drawer for a day (opening carries forward per branch). */
 export async function getMyCashFloat(date: string, branch: string = DEFAULT_BRANCH) {
-  await requireUser();
+  await requireAnyPermission(["my_sales", "cash", "review"]);   // คนที่เปิดหน้าลิ้นชัก/รายงานได้ (/my · /cash · /review)
   return getDailyCash(date, resolveBranch(branch));
 }
 

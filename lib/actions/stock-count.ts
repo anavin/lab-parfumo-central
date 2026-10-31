@@ -113,7 +113,7 @@ export async function applyCapturesToSystem(branch: string, asOfDate?: string, z
 
 /** Count sessions for the admin review list (optionally by status). */
 export async function listStockCounts(status: string | null = null): Promise<StockCount[]> {
-  await requireUser();
+  await requireAnyPermission(["requisitions", "stock"]);
   const where = status ? `where c.status = $1` : ``;
   const args = status ? [status] : [];
   const sql = (verifiedCol: string) => `
@@ -138,7 +138,7 @@ export async function listStockCounts(status: string | null = null): Promise<Sto
 }
 
 export async function getStockCountLines(id: number): Promise<CountLine[]> {
-  await requireUser();
+  await requireAnyPermission(["requisitions", "stock"]);
   const sql = (verifiedCol: string) => `select id, barcode, scent, size, expected::float expected, counted::float counted, ${verifiedCol} verified
     from stock_count_lines where count_id = $1 order by scent, size`;
   try {

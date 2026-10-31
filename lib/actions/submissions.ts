@@ -99,6 +99,16 @@ export async function resolveSkuPhoto(attachmentId: number, skuInput: string): P
          and (coalesce(barcode,'')='' or $5='' or barcode=$5) returning sku`,
       [sku, line.id, att.bill_ref, branch, wantBc]);
     if (!upd.length) return { ok: false, error: `SKU "${sku}" ตัดไม่ได้ (ไม่พบ/ขายแล้ว/คนละสินค้าหรือสาขา)` };
+    // สลับอัตโนมัติ (เหมือน addSkuToSale): ถ้าสินค้านี้เคยถูก "เดาตัด" (sold ไม่ผูกบิล) → คืน 1 ตัวกลับ in_stock
+    // ไม่งั้นจะกลายเป็นตัด 2 serial ต่อการขาย 1 ครั้ง (ตัวจริง + ตัวที่เดา) → ของจริงบนชั้นอ่านว่าขายแล้ว
+    if (wantBc) {
+      try {
+        await q(`update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null
+          where sku in (select sku from sku_units
+            where status='sold' and sold_submission_id is null and branch=upper($1) and barcode=$2 and sku <> $3
+            order by received_at desc nulls last limit 1)`, [branch, wantBc, upd[0].sku]);
+      } catch { /* non-fatal: การตัดตัวจริงสำเร็จแล้ว */ }
+    }
     try { await q(`update bill_attachments set note = $2 where id = $1`, [attachmentId, `skudone|${upd[0].sku}`]); } catch (e: any) { if (e?.code !== "42703") throw e; }
     await logAudit("update", "submission", line.id, `ตัด SKU ${upd[0].sku} จากรูป (บิล ${att.bill_ref})`);
     revalidatePath("/review"); revalidatePath("/stock");

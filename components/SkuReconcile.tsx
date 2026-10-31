@@ -16,10 +16,14 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
   const [qText, setQText] = useState("");
 
   const rows = useMemo<Row[]>(() => {
+    // 4ml (ของแจก ไม่มี SKU) · เทสเตอร์ (TRY ME) · ถุง/บรรจุภัณฑ์ = ไม่ใช่สินค้าที่ติดตาม SKU → ไม่นับเป็นความต่าง
+    const skip = (scent?: string | null, size?: string | null) =>
+      /^\s*4\s*ml/i.test(String(size || "")) || /try\s*me/i.test(String(scent || "")) || /ถุง/.test(String(scent || ""));
     const coll = new Map<string, number>();
-    for (const u of skus) if (u.status === "in_stock" && u.barcode) coll.set(u.barcode, (coll.get(u.barcode) || 0) + 1);
+    for (const u of skus) if (u.status === "in_stock" && u.barcode && !skip(u.scent, u.size)) coll.set(u.barcode, (coll.get(u.barcode) || 0) + 1);
     const sys = new Map<string, { scent: string; size: string; remaining: number }>();
     for (const r of stock) {
+      if (skip(r.scent, r.size)) continue;
       const prev = sys.get(r.barcode);
       sys.set(r.barcode, { scent: r.scent, size: r.size, remaining: (prev?.remaining || 0) + (Number(r.remaining) || 0) });
     }
