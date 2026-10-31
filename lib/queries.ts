@@ -449,6 +449,20 @@ export async function shelfCaptures(branch: string | null = null): Promise<Shelf
   catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
+export type ShelfReviewRow = { barcode: string; scent: string | null; size: string | null; captured: number; skus: string[] };
+/** Captured shelf data aggregated per product (barcode) for the "สต็อกหน้าร้าน" review page:
+ *  how many bottles were counted + the list of their SKUs. Rows with no barcode are skipped
+ *  (can't be matched to a product). Empty pre-0038. */
+export async function shelfCaptureReview(branch: string | null): Promise<ShelfReviewRow[]> {
+  const sql = `select barcode, max(scent) scent, max(size) size, count(*)::int captured,
+       array_agg(sku order by sku) skus
+     from shelf_capture
+     where ($1::text is null or branch = upper($1)) and coalesce(barcode,'') <> ''
+     group by barcode order by max(scent) nulls last, max(size)`;
+  try { return await q<ShelfReviewRow>(sql, [branch]); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 export type ReceivedSkuRow = { sku: string; barcode: string | null; scent: string | null; size: string | null; status: string; received_at: string };
 /** Serialized SKUs that actually entered stock under one requisition (po_id) — what to verify on
  *  receive. status reflects current state (in_stock / sold / returned / lost). Empty pre-0036. */

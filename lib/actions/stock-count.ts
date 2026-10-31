@@ -5,6 +5,7 @@ import { requireUser, requirePermission, requireAnyPermission } from "@/lib/auth
 import { resolveBranch, branchName } from "@/lib/branches";
 import { logAudit } from "@/lib/audit";
 import { stockRawForBarcodes, stockLive } from "@/lib/queries";
+import { enrollCapturedSkus } from "@/lib/actions/shelf-capture";
 
 export type CountLineInput = { barcode: string; scent: string; size: string; expected: number; counted: number; verified?: boolean };
 export type CountLine = CountLineInput & { id: number; verified: boolean };
@@ -75,6 +76,25 @@ export async function createCountFromCaptures(branch: string): Promise<{ ok: boo
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งตาราง" };
     console.error("[createCountFromCaptures]", e);
     return { ok: false, error: "สร้างใบนับไม่สำเร็จ" };
+  }
+}
+
+/** One-click "อัปข้อมูลเข้าระบบทั้งหมด" for the สต็อกหน้าร้าน page: make the whole system use the
+ *  captured shelf data as the single source of truth — (1) enroll every captured SKU as in_stock,
+ *  (2) build a stock count from the captured quantities AND approve it, so remaining = counted.
+ *  Admin/manager only (writes stock). Auditable + reversible (the count can be reversed). */
+export async function applyCapturesToSystem(branch: string): Promise<{ ok: boolean; error?: string; added?: number; flagged?: number; already?: number; countId?: number; products?: number }> {
+  await requirePermission("requisitions");
+  try {
+    const en = await enrollCapturedSkus(branch);               // serials (non-destructive)
+    const cr = await createCountFromCaptures(branch);          // build the count from captured qty
+    if (!cr.ok) return { ok: false, error: cr.error, added: en.added, flagged: en.flagged, already: en.already };
+    const ap = await approveStockCount(cr.id!, "อัปจากสต็อกหน้าร้าน (ข้อมูลที่เก็บ)");  // post adjustments → remaining = counted
+    if (!ap.ok) return { ok: false, error: `ลง SKU แล้ว แต่ปรับยอดไม่สำเร็จ: ${ap.error} (ใบนับ #${cr.id} รออนุมัติที่ /stock/counts)`, added: en.added, flagged: en.flagged, already: en.already, countId: cr.id };
+    return { ok: true, added: en.added, flagged: en.flagged, already: en.already, countId: cr.id, products: cr.products };
+  } catch (e: any) {
+    console.error("[applyCapturesToSystem]", e);
+    return { ok: false, error: "อัปข้อมูลไม่สำเร็จ" };
   }
 }
 
