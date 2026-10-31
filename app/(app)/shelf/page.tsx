@@ -44,7 +44,8 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   const capSet = new Set(caps.map((c) => c.barcode));
   const missing = live
     .map((r) => ({ barcode: r.barcode, scent: r.scent || r.barcode, size: r.size || "", remaining: Math.round(Number(r.remaining) || 0) }))
-    .filter((r) => r.remaining > 0 && !capSet.has(r.barcode))
+    // ไม่รวมเทสเตอร์ (TRY ME) + ถุง/บรรจุภัณฑ์ — ไม่ได้นับบนชั้น ไม่ควรถูกตั้ง 0
+    .filter((r) => r.remaining > 0 && !capSet.has(r.barcode) && !/try\s*me/i.test(r.scent) && !/ถุง/.test(r.scent))
     .sort((a, b) => b.remaining - a.remaining);
 
   return (
