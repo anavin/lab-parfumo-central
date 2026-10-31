@@ -130,6 +130,17 @@ export async function addSkuToSale(submissionId: number, skuInput: string): Prom
          and (coalesce(barcode,'')='' or $5='' or barcode=$5) returning sku`,
       [sku, line.id, line.receipt_no, branch, wantBc]);
     if (!upd.length) return { ok: false, error: `SKU "${sku}" ใส่ไม่ได้ (ไม่พบ/ขายแล้ว/คนละสินค้าหรือสาขา)` };
+    // สลับอัตโนมัติ: ถ้าสินค้านี้เคยถูก "เดาตัด" วันนี้ (sold ไม่ผูกบิล) → คืน 1 ตัวกลับ in_stock
+    // เพื่อไม่ให้จำนวนต่ำกว่ายอด (เท่ากับย้ายการตัดจาก "ตัวที่เดา" มาเป็น "ตัวจริงที่สแกน")
+    if (wantBc) {
+      try {
+        await q(`update sku_units set status='in_stock', sold_at=null, sold_branch=null, sold_receipt_no=null
+          where sku in (select sku from sku_units
+            where status='sold' and sold_submission_id is null and branch=upper($1) and barcode=$2 and sku <> $3
+              and sold_at is not null and (sold_at at time zone 'Asia/Bangkok')::date = (now() at time zone 'Asia/Bangkok')::date
+            order by received_at desc nulls last limit 1)`, [branch, wantBc, upd[0].sku]);
+      } catch { /* non-fatal: การตัดตัวจริงสำเร็จแล้ว */ }
+    }
     await logAudit("update", "submission", line.id, `ใส่ SKU ${upd[0].sku} ให้บิล ${line.receipt_no || line.id}`);
     revalidatePath("/review"); revalidatePath("/stock"); revalidatePath("/my/stock"); revalidatePath("/shelf");
     return { ok: true, sku: upd[0].sku };
