@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { monthLabel } from "@/lib/month";
 import { branchPrefix, resolveBranch } from "@/lib/branches";
 import { natLabel } from "@/lib/nation";
-import { requirePermission } from "@/lib/auth/require-user";
+import { requirePermission, requireAnyPermission } from "@/lib/auth/require-user";
 import { pushLine, siteBaseUrl } from "@/lib/line";
 import { offloadToStorage, deleteAttachment } from "@/lib/attachments";
 
@@ -107,6 +107,36 @@ export async function resolveSkuPhoto(attachmentId: number, skuInput: string): P
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
     console.error("[resolveSkuPhoto]", e);
     return { ok: false, error: "ตัด SKU ไม่สำเร็จ" };
+  }
+}
+
+/** Staff adds the actual SKU of a sold bottle to a sale line AFTER the fact (bill sold without scanning).
+ *  Links the exact serial to the bill (sold_submission_id) and marks it sold — accurate, no FIFO guess.
+ *  Serial-only (aggregate already cut by the sale). Validates branch + barcode so a wrong SKU is rejected. */
+export async function addSkuToSale(submissionId: number, skuInput: string): Promise<{ ok: boolean; sku?: string; error?: string }> {
+  await requireAnyPermission(["review", "my_sales", "requisitions"]);
+  const sku = String(skuInput || "").trim();
+  if (!sku) return { ok: false, error: "ไม่มีรหัส SKU" };
+  try {
+    const [line] = await q<{ id: number; receipt_no: string | null; source: string | null; barcode: string | null }>(
+      `select id, receipt_no, source, barcode from submissions where id = $1 and kind = 'sale'`, [submissionId]);
+    if (!line) return { ok: false, error: "ไม่พบบิล" };
+    const branch = resolveBranch(line.source);
+    const wantBc = (line.barcode || "").trim();
+    const upd = await q<{ sku: string }>(
+      `update sku_units set status='sold', sold_submission_id=$2, sold_receipt_no=$3, sold_branch=$4, sold_at=now()
+       where upper(regexp_replace(sku, '\\s', '', 'g')) = upper(regexp_replace($1, '\\s', '', 'g'))
+         and status='in_stock' and branch=upper($4)
+         and (coalesce(barcode,'')='' or $5='' or barcode=$5) returning sku`,
+      [sku, line.id, line.receipt_no, branch, wantBc]);
+    if (!upd.length) return { ok: false, error: `SKU "${sku}" ใส่ไม่ได้ (ไม่พบ/ขายแล้ว/คนละสินค้าหรือสาขา)` };
+    await logAudit("update", "submission", line.id, `ใส่ SKU ${upd[0].sku} ให้บิล ${line.receipt_no || line.id}`);
+    revalidatePath("/review"); revalidatePath("/stock"); revalidatePath("/my/stock"); revalidatePath("/shelf");
+    return { ok: true, sku: upd[0].sku };
+  } catch (e: any) {
+    if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
+    console.error("[addSkuToSale]", e);
+    return { ok: false, error: "ใส่ SKU ไม่สำเร็จ" };
   }
 }
 

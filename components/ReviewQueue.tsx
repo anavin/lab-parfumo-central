@@ -3,7 +3,7 @@ import { useState, useMemo, useTransition, useEffect, useContext, useRef } from 
 import { useRouter } from "next/navigation";
 import { ReviewDayContext } from "@/components/review-day-context";
 import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Plus, Receipt as ReceiptIcon, AlertTriangle, Undo2 } from "lucide-react";
-import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin, rejectMany, resolveSkuPhoto } from "@/lib/actions/submissions";
+import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin, rejectMany, resolveSkuPhoto, addSkuToSale } from "@/lib/actions/submissions";
 import { Barcode, Loader2 } from "lucide-react";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
@@ -114,8 +114,9 @@ function BillTime({ bill, onSaved }: { bill: Bill; onSaved: () => void }) {
   );
 }
 
-export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {}, closedDays = [], soldSkus = {} }:
-  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; closedDays?: string[]; soldSkus?: Record<number, string[]> }) {
+export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {}, closedDays = [], soldSkus = {}, skuBarcodes = [] }:
+  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; closedDays?: string[]; soldSkus?: Record<number, string[]>; skuBarcodes?: string[] }) {
+  const skuBcSet = useMemo(() => new Set(skuBarcodes), [skuBarcodes]);
   const router = useRouter();
   const closedSet = useMemo(() => new Set(closedDays), [closedDays]);
   // this bill sits on a cash day the admin already closed → editing/unapproving it won't
@@ -355,6 +356,9 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 <span className="text-[10px] text-success">SKU ที่ตัด:</span>
                                 {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
                               </div>
+                            )}
+                            {isSale && !!r.barcode && skuBcSet.has(r.barcode) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0) && (
+                              <AddSkuLine id={r.id} need={(r.qty ?? 0) - (soldSkus[r.id]?.length ?? 0)} onDone={refresh} />
                             )}
                             {editId === r.id && (
                               <RowEditor row={r} pending={pending} savedTenders={payments[bill.ref]}
@@ -702,6 +706,33 @@ function SkuPhotoRow({ att, onDone }: { att: BillAttachment; onDone: () => void 
           <img src={src} alt="SKU" className="max-w-full max-h-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
+    </div>
+  );
+}
+
+// บิลที่ขายสินค้ามี SKU แต่ยังไม่ระบุ serial → Flag + ให้พนักงานสแกน/พิมพ์ SKU ที่ขายไปผูกกับบิล (ภายหลัง)
+function AddSkuLine({ id, need, onDone }: { id: number; need: number; onDone: () => void }) {
+  const [sku, setSku] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const add = async () => {
+    if (!sku.trim()) return;
+    setBusy(true); setMsg(null);
+    const r = await addSkuToSale(id, sku.trim());
+    setBusy(false);
+    if (r.ok) { setSku(""); setMsg(`✓ ${r.sku}`); onDone(); } else setMsg(`✗ ${r.error ?? ""}`);
+  };
+  return (
+    <div className="mt-1 ml-6">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-warn bg-warn-soft rounded px-1.5 py-0.5"><AlertTriangle className="w-3 h-3" /> ยังไม่ใส่ SKU{need > 1 ? ` (ขาด ${num(need)})` : ""}</span>
+        <input value={sku} onChange={(e) => { setSku(e.target.value); setMsg(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+          placeholder="สแกน/พิมพ์ SKU ที่ขายไป แล้ว Enter" className="h-7 w-52 max-w-full border border-line rounded px-2 text-[12px] font-mono bg-surface focus:outline-none focus:border-brand" />
+        <button onClick={add} disabled={busy || !sku.trim()} className="h-7 px-2.5 rounded bg-brand text-white text-[12px] font-medium disabled:opacity-40 inline-flex items-center gap-1">
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : "ใส่"}
+        </button>
+        {msg && <span className={"text-[11px] " + (msg.startsWith("✓") ? "text-success" : "text-danger")}>{msg}</span>}
+      </div>
     </div>
   );
 }

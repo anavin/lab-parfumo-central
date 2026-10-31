@@ -1,6 +1,6 @@
 import { ClipboardCheck } from "lucide-react";
 import { requirePermission } from "@/lib/auth/require-user";
-import { pendingSubmissions, recentlyApprovedSubmissions, pendingCountsByBranch, attachmentsForRefs, paymentsForRefs, confirmedCashDays, soldSkusForSubmissions } from "@/lib/queries";
+import { pendingSubmissions, recentlyApprovedSubmissions, pendingCountsByBranch, attachmentsForRefs, paymentsForRefs, confirmedCashDays, soldSkusForSubmissions, skuBarcodesInStock } from "@/lib/queries";
 import { isBranch, DEFAULT_BRANCH, branchOptions, branchName } from "@/lib/branches";
 import { PageHeader } from "@/components/ui";
 import { ReviewQueue } from "@/components/ReviewQueue";
@@ -24,6 +24,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const payments = await paymentsForRefs(refs);
   const closedDays = await confirmedCashDays();   // (day|branch) already confirmed → warn before editing those bills
   const soldSkus = await soldSkusForSubmissions([...rows, ...approved].map((r) => r.id));   // SKU ที่ขายออกต่อบรรทัด
+  const skuBarcodes = await skuBarcodesInStock(branch);   // สินค้าที่มี SKU → บิลที่ขายสินค้าพวกนี้ควรระบุ SKU
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -44,7 +45,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       </div>
       <ReviewInsights revision={`${rows.length}|${approved.length}`} branch={branch}>
         <div className="no-print">
-          <ReviewQueue rows={rows} approved={approved} attachments={attachments} payments={payments} closedDays={closedDays} soldSkus={soldSkus} />
+          <ReviewQueue rows={rows} approved={approved} attachments={attachments} payments={payments} closedDays={closedDays} soldSkus={soldSkus} skuBarcodes={skuBarcodes} />
         </div>
       </ReviewInsights>
     </div>
