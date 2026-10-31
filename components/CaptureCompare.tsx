@@ -1,13 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitCompare, Check, Search, Download, Plus, Wrench, PackageX, Loader2, Boxes, ClipboardList } from "lucide-react";
+import Link from "next/link";
+import { GitCompare, Check, Search, Download, Plus, Wrench, PackageX, Loader2, Store } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
 import { downloadCsv } from "@/lib/csv";
 import { addSkuUnit, updateSkuUnit } from "@/lib/actions/sku";
-import { enrollCapturedSkus } from "@/lib/actions/shelf-capture";
-import { createCountFromCaptures } from "@/lib/actions/stock-count";
 import type { ShelfCaptureRow, SkuUnitRow } from "@/lib/queries";
 
 const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
@@ -24,27 +23,6 @@ export function CaptureCompare({ captures, skus, branch }: { captures: ShelfCapt
   const [qText, setQText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);   // sku currently being acted on
   const [err, setErr] = useState<string | null>(null);
-  const [toolBusy, setToolBusy] = useState<"enroll" | "count" | null>(null);
-  const [toolMsg, setToolMsg] = useState<string | null>(null);
-
-  // ① ลงทะเบียน serials ที่เก็บเข้า sku_units (ไม่กระทบยอดคงเหลือ)
-  const doEnroll = async () => {
-    if (!branch || toolBusy) return;
-    if (!confirm("ลงทะเบียน SKU ทั้งหมดที่เก็บเข้าระบบ (เป็น in_stock)?\nไม่กระทบยอดคงเหลือ · ตัวที่ขายแล้วแต่เจอบนชั้นจะติดธงให้ตรวจ")) return;
-    setToolBusy("enroll"); setToolMsg(null);
-    const r = await enrollCapturedSkus(branch); setToolBusy(null);
-    if (r.ok) { setToolMsg(`ลงทะเบียน SKU แล้ว: ใหม่ ${num(r.added || 0)} · มีอยู่แล้ว ${num(r.already || 0)} · ติดธง(ขายแล้วเจอบนชั้น) ${num(r.flagged || 0)}`); router.refresh(); }
-    else setToolMsg(`ไม่สำเร็จ: ${r.error ?? ""}`);
-  };
-  // ② สร้างใบนับ (pending) จากที่เก็บ → ไปอนุมัติที่ /stock/counts เพื่อปรับยอดคงเหลือ
-  const doCount = async () => {
-    if (!branch || toolBusy) return;
-    if (!confirm("สร้างใบปรับยอดจากจำนวนที่เก็บ?\nจะได้ 'ใบนับ' รอตรวจ — ไปกดอนุมัติที่หน้านับสต๊อกเพื่อปรับยอดจริง (แนะนำทำตอนร้านไม่ขาย)")) return;
-    setToolBusy("count"); setToolMsg(null);
-    const r = await createCountFromCaptures(branch); setToolBusy(null);
-    if (r.ok) { setToolMsg(`สร้างใบนับ #${r.id} แล้ว (${num(r.products || 0)} สินค้า) — ไปตรวจ/อนุมัติที่ หน้านับสต๊อก`); setTimeout(() => router.push("/stock/counts"), 1200); }
-    else setToolMsg(`ไม่สำเร็จ: ${r.error ?? ""}`);
-  };
 
   const { rows, stats } = useMemo(() => {
     const sysByKey = new Map<string, string | null>();   // normalized sku → system barcode (in_stock only)
@@ -126,26 +104,13 @@ export function CaptureCompare({ captures, skus, branch }: { captures: ShelfCapt
         </div>
       ) : (
         <>
-          {/* อัปเดตสต๊อกจากที่เก็บ — ① ลงทะเบียน serials (ไม่กระทบยอด) · ② สร้างใบนับไปอนุมัติ (ปรับยอด) */}
+          {/* อัปเดตเข้าระบบย้ายไปทำที่หน้า "สต็อกหน้าร้าน" (/shelf) ที่เดียว — ครบกว่า (คิด ณ วันที่นับ + ตั้งที่ไม่ได้นับ=0 + ปุ่มเดียว) */}
           {branch && (
-            <div className="mb-3 rounded-xl border border-brand/40 bg-brand-soft/20 p-3">
-              <div className="text-sm font-semibold text-ink mb-2">อัปเดตสต๊อกจากที่เก็บ ({num(captures.length)} ขวด)</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={doEnroll} disabled={!!toolBusy}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg px-3 py-2 bg-surface border border-brand/40 text-brand-dark hover:bg-brand-soft disabled:opacity-50">
-                  {toolBusy === "enroll" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Boxes className="w-4 h-4" />} ① ลงทะเบียน SKU เข้าระบบ
-                </button>
-                <button onClick={doCount} disabled={!!toolBusy}
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-3 py-2 bg-gold text-white hover:bg-gold-dark disabled:opacity-50">
-                  {toolBusy === "count" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardList className="w-4 h-4" />} ② สร้างใบปรับยอดให้ตรง
-                </button>
-              </div>
-              {toolMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-surface border border-line text-ink">{toolMsg}</div>}
-              <p className="mt-2 text-[11px] text-muted leading-relaxed">
-                <b className="text-ink">①</b> ลงทะเบียน serial เข้า sku_units (ไม่กระทบยอดคงเหลือ · ขายแล้วเจอบนชั้น = ติดธง) ·
-                <b className="text-ink"> ②</b> สร้าง “ใบนับ” รอตรวจ → ไปกด<b className="text-ink">อนุมัติที่หน้านับสต๊อก</b>เพื่อปรับยอดจริง (ปรับเฉพาะสินค้าที่นับ · แนะนำทำตอนร้านไม่ขาย · ย้อนกลับได้)
-              </p>
-            </div>
+            <Link href="/shelf" className="mb-3 flex items-center gap-2 rounded-xl border border-brand/40 bg-brand-soft/20 p-3 hover:bg-brand-soft/40 transition">
+              <Store className="w-4 h-4 text-brand shrink-0" />
+              <span className="text-sm text-ink">อยากปรับยอด/ลง SKU จากข้อมูลที่เก็บ? ทำที่หน้า <b>“สต็อกหน้าร้าน”</b> (ปุ่มเดียวจบ · คิด ณ วันที่นับ · ตั้งที่ไม่ได้นับ=0 · ย้อนได้)</span>
+              <span className="ml-auto text-sm text-brand-dark font-medium shrink-0">ไปที่ /shelf →</span>
+            </Link>
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">

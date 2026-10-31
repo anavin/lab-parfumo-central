@@ -4,11 +4,9 @@ import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
 import { ScanLine, Plus, Minus, Loader2, ClipboardCheck, Search, EyeOff, Eye } from "lucide-react";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
-import { num } from "@/lib/format";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
 import { submitStockCount } from "@/lib/actions/stock-count";
 import { SkuCountMode } from "@/components/SkuCountMode";
-import { SkuAddPanel } from "@/components/SkuAddPanel";
 import { ShelfCaptureMode } from "@/components/ShelfCaptureMode";
 import type { ShelfCaptureRow } from "@/lib/queries";
 
@@ -25,34 +23,7 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const draftKey = `lp_count_${branch}_${today}`;
   const staleSet = useMemo(() => new Set(staleKeys), [staleKeys]);
-  const [mode, setMode] = useState<"qty" | "sku" | "collect" | "capture">("qty");   // นับตามจำนวน / สแกน SKU / เก็บ SKU / เก็บข้อมูลใหม่
-  const [showCodes, setShowCodes] = useState(true);   // show every product's SKU codes by default
-  const [srcFilter, setSrcFilter] = useState<"all" | "store" | "warehouse">("all");   // แหล่งที่มา: เก็บหน้าร้าน vs จากคลัง
-  // สรุป SKU ในระบบ — จัดกลุ่ม "กลิ่น → ขนาด" + แยกที่มา (เก็บหน้าร้าน = ไม่มีใบเบิก / จากคลัง = มีใบเบิก/backfill)
-  const { scentGroups, totals } = useMemo(() => {
-    const mlOf = (z: string) => { const m = z.match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
-    const cleanSize = (z: string) => z.replace(/\s+/g, " ").trim().replace(/\s*\.\s*$/, "");   // "10 ml." → "10 ml"
-    type SizeRow = { key: string; size: string; store: number; warehouse: number; skus: { code: string; store: boolean }[] };
-    const byScent = new Map<string, Map<string, SizeRow>>();
-    let tStore = 0, tWh = 0;
-    for (const u of skuUnits) {
-      const store = !((u.po_number || "").trim());   // ไม่มีใบเบิก = เก็บหน้าร้าน
-      store ? tStore++ : tWh++;
-      const scent = u.scent || "-";
-      const bc = (u.barcode || "").trim();
-      const sizeKey = bc ? `bc:${bc}` : `sz:${cleanSize(u.size || "").toLowerCase()}`;
-      let sm = byScent.get(scent); if (!sm) { sm = new Map(); byScent.set(scent, sm); }
-      const r = sm.get(sizeKey) || { key: `${scent}|${sizeKey}`, size: cleanSize(u.size || ""), store: 0, warehouse: 0, skus: [] };
-      store ? r.store++ : r.warehouse++;
-      if (u.sku) r.skus.push({ code: u.sku, store });
-      sm.set(sizeKey, r);
-    }
-    const scentGroups = [...byScent.entries()].map(([scent, sm]) => {
-      const sizes = [...sm.values()].sort((a, b) => mlOf(a.size) - mlOf(b.size));
-      return { scent, store: sizes.reduce((s, x) => s + x.store, 0), warehouse: sizes.reduce((s, x) => s + x.warehouse, 0), total: sizes.reduce((s, x) => s + x.store + x.warehouse, 0), sizes };
-    }).sort((a, b) => a.scent.localeCompare(b.scent, "th"));
-    return { scentGroups, totals: { all: skuUnits.length, store: tStore, warehouse: tWh } };
-  }, [skuUnits]);
+  const [mode, setMode] = useState<"qty" | "sku" | "capture">("qty");   // นับตามจำนวน / สแกน SKU / เก็บข้อมูลใหม่
 
   const base = useMemo<Item[]>(() =>
     expected.map((e) => ({ barcode: e.barcode, scent: e.scent, size: e.size, expected: Math.round(e.remaining), counted: String(Math.round(e.remaining)), changed: (Number(e.sold) || 0) > 0, verified: false })).sort(byName), [expected]);
@@ -171,105 +142,11 @@ export function StockCountForm({ expected, branch, staleKeys = [], skuUnits = []
       <div className="inline-flex gap-1 p-1 rounded-xl border border-line bg-surface">
         <button onClick={() => setMode("qty")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "qty" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>นับตามจำนวน</button>
         <button onClick={() => setMode("sku")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "sku" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>สแกน SKU</button>
-        <button onClick={() => setMode("collect")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "collect" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เก็บ SKU</button>
         <button onClick={() => setMode("capture")} className={"px-3 py-2 text-sm font-medium rounded-lg transition " + (mode === "capture" ? "bg-brand text-white" : "text-muted hover:bg-canvas")}>เก็บข้อมูลใหม่</button>
       </div>
 
       {mode === "capture" ? (
         <ShelfCaptureMode captures={captures} branch={branch} />
-      ) : mode === "collect" ? (
-        <div>
-          <p className="text-xs text-muted mb-2">ยิงบาร์โค้ดสินค้า 1 ครั้งเพื่อเลือกกลิ่น แล้วยิงสติกเกอร์ SKU ที่ขวดทีละใบ (ลงทะเบียนของที่ยังไม่มี SKU ในระบบ)</p>
-          <SkuAddPanel branch={branch} defaultOpen />
-          {/* สรุป SKU ที่มีในระบบ (สาขานี้) — อัปเดตทุกครั้งที่เก็บ ให้เห็นว่าเก็บไปแล้วเท่าไหร่ */}
-          <div className="rounded-xl border border-line bg-surface p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-ink">SKU ในระบบ (สาขานี้)</div>
-              {scentGroups.length > 0 && (
-                <button onClick={() => setShowCodes((v) => !v)} className="text-xs text-brand-dark border border-line rounded-lg px-2 py-1 hover:bg-canvas">
-                  {showCodes ? "ซ่อนรหัส SKU" : "แสดงรหัส SKU"}
-                </button>
-              )}
-            </div>
-            {/* ยอดรวม แยกตามที่มา */}
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              <div className="rounded-lg bg-canvas p-2.5">
-                <div className="text-[11px] text-muted">รวมทั้งหมด</div>
-                <div className="text-xl font-bold tabular-nums text-ink">{num(totals.all)}</div>
-              </div>
-              <div className="rounded-lg bg-brand-soft/60 p-2.5">
-                <div className="text-[11px] text-brand-dark">เก็บหน้าร้าน</div>
-                <div className="text-xl font-bold tabular-nums text-brand-dark">{num(totals.store)}</div>
-              </div>
-              <div className="rounded-lg bg-canvas p-2.5">
-                <div className="text-[11px] text-muted">จากคลัง/เก่า</div>
-                <div className="text-xl font-bold tabular-nums text-ink">{num(totals.warehouse)}</div>
-              </div>
-            </div>
-            {/* ตัวกรองที่มา */}
-            {scentGroups.length > 0 && (() => {
-              const Pill = ({ id, label, n }: { id: "all" | "store" | "warehouse"; label: string; n: number }) => (
-                <button onClick={() => setSrcFilter(id)} className={"px-2.5 py-1 text-xs font-medium rounded-lg border transition " + (srcFilter === id ? "bg-brand text-white border-brand" : "text-muted border-line hover:bg-canvas")}>
-                  {label} <span className="tabular-nums">{num(n)}</span>
-                </button>
-              );
-              return <div className="flex flex-wrap gap-1.5 mb-2">
-                <Pill id="all" label="ทั้งหมด" n={totals.all} />
-                <Pill id="store" label="เก็บหน้าร้าน" n={totals.store} />
-                <Pill id="warehouse" label="จากคลัง/เก่า" n={totals.warehouse} />
-              </div>;
-            })()}
-            {scentGroups.length === 0 ? (
-              <div className="text-xs text-muted py-2">ยังไม่มี SKU — เริ่มเก็บด้านบน (ยิงบาร์โค้ดสินค้า แล้วยิงสติกเกอร์ SKU)</div>
-            ) : (
-              <div className="-mx-1">
-                {scentGroups.map((g) => {
-                  const gN = srcFilter === "store" ? g.store : srcFilter === "warehouse" ? g.warehouse : g.total;
-                  if (gN === 0) return null;
-                  return (
-                    <div key={g.scent} className="border-t border-line-soft first:border-t-0 py-2">
-                      {/* กลิ่น (หัวหลัก) */}
-                      <div className="flex items-center justify-between gap-2 px-1">
-                        <span className="text-[15px] font-semibold text-ink">{g.scent}</span>
-                        <span className="shrink-0 inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-brand-soft text-brand-dark text-xs font-bold tabular-nums">{num(gN)}</span>
-                      </div>
-                      {/* ขนาด (sub) */}
-                      <div className="mt-1.5 pl-3 border-l-2 border-line-soft ml-1 space-y-1.5">
-                        {g.sizes.map((s) => {
-                          const sN = srcFilter === "store" ? s.store : srcFilter === "warehouse" ? s.warehouse : (s.store + s.warehouse);
-                          if (sN === 0) return null;
-                          const chips = s.skus.filter((c) => srcFilter === "all" ? true : srcFilter === "store" ? c.store : !c.store);
-                          return (
-                            <div key={s.key}>
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="text-muted min-w-[4.5rem]">{s.size || "—"}</span>
-                                <span className="tabular-nums font-medium text-ink">{num(sN)} <span className="text-xs font-normal text-muted">ชิ้น</span></span>
-                              </div>
-                              {showCodes && (
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {chips.slice().sort((a, b) => a.code.localeCompare(b.code)).map((c) => (
-                                    <span key={c.code} title={c.store ? "เก็บหน้าร้าน" : "จากคลัง/เก่า"}
-                                      className={"font-mono text-[11px] rounded px-1.5 py-0.5 border " + (c.store ? "bg-brand-soft border-brand/40 text-brand-dark" : "bg-canvas border-line text-muted")}>{c.code}</span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {showCodes && scentGroups.length > 0 && (
-              <div className="flex items-center gap-3 mt-2 text-[11px] text-muted">
-                <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-brand-soft border border-brand/40" /> เก็บหน้าร้าน</span>
-                <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-canvas border border-line" /> จากคลัง/เก่า</span>
-              </div>
-            )}
-          </div>
-        </div>
       ) : mode === "sku" ? (
         <SkuCountMode units={skuUnits} />
       ) : (
