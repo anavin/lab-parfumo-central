@@ -40,8 +40,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   ]);
   // one STOCK_CTE pass → derive คงเหลือ / ควรเติม / ติดลบ / มูลค่า (was 4 separate CTE queries)
   const { rows, reorder, negatives, valuation } = bundle;
-  // เทสเตอร์มีแท็บแยกแล้ว → ซ่อนออกจาก "คงเหลือ" (เป็นของโชว์ ไม่ใช่สต๊อกขาย)
-  const matrixRows = rows.filter((r) => !/try\s*me/i.test(r.scent || ""));
+  // เทสเตอร์ (ของโชว์) + ถุงกระดาษ (บรรจุภัณฑ์) ไม่ใช่สต๊อกสินค้า → ซ่อนออกจาก "คงเหลือ"
+  const matrixRows = rows.filter((r) => !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""));
   // build movement rows keyed by scent+size (aggregate barcodes), merging daily sold + remaining
   const soldByBarcode = new Map<string, Map<string, number>>();
   for (const m of moves) {
@@ -81,6 +81,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const keys = new Set<string>([...varAgg.keys(), ...[...movMap.values()].filter((m) => m.remaining > 0).map((m) => `${m.scent}|${m.size}`)]);
   for (const key of keys) {
     const [scent, size] = key.split("|");
+    if (/try\s*me/i.test(scent) || /ถุง/.test(scent)) continue;   // เทสเตอร์/ถุง = ไม่ใช่สต๊อกสินค้า → ไม่นับเป็นของขาด
     const remaining = movMap.get(key)?.remaining ?? 0;
     const a = varAgg.get(key);
     if (a) {

@@ -21,7 +21,7 @@ export function BranchStockPanel({ rows, branchName, defaultOpen = false }: { ro
   // only what's actually in stock (received via requisition / adjusted in), by name —
   // hide the 0/phantom rows (items sold but never received into this branch)
   const stocked = useMemo(
-    () => rows.filter((r) => (Number(r.remaining) || 0) > 0 && !/try\s*me/i.test(r.scent || ""))   // ซ่อนเทสเตอร์ (ไม่ใช่ของขาย)
+    () => rows.filter((r) => (Number(r.remaining) || 0) > 0 && !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""))   // ซ่อนเทสเตอร์ + ถุง (ไม่ใช่สต๊อกสินค้า)
       .sort((a, b) =>
         (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)         // ถุงกระดาษไว้ท้ายสุด
         || (a.scent || "").localeCompare(b.scent || "", "th")       // แล้วเรียงตามกลิ่น
