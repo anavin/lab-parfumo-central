@@ -12,7 +12,7 @@ import { SplitTenders } from "@/components/SplitTenders";
 import { Select } from "@/components/ui/Select";
 import type { SubmissionRow, BillAttachment, BillTender } from "@/lib/queries";
 import { branchOptions } from "@/lib/branches";
-import { isGiveawaySize } from "@/lib/product-class";
+import { isGiveawaySize, isNonStock } from "@/lib/product-class";
 import { NATION_OPTIONS, natLabel } from "@/lib/nation";
 
 const SOURCE_OPTIONS = branchOptions();
@@ -53,11 +53,13 @@ function billAnomalies(bill: Bill): string[] {
     const qty = Number(r.qty) || 0, price = Number(r.unit_price) || 0, disc = Number(r.discount) || 0;
     const sub = qty * price;
     const name = r.item || "รายการ";
-    if (price === 0) out.push(`${name}: ราคา 0`);
-    else if (sub > 0 && disc >= sub) out.push(`${name}: ส่วนลดเต็มจำนวน`);
-    else if (sub > 0 && disc / sub > 0.5) out.push(`${name}: ส่วนลด >50%`);
-    if (!r.barcode) out.push(`${name}: ไม่มีบาร์โค้ด`);
-    if (qty > 50) out.push(`${name}: จำนวนสูงผิดปกติ (${qty})`);
+    // 4ml/ของแจก · เทสเตอร์ · ถุง = ราคา ฿0 และไม่มีบาร์โค้ดได้ตามปกติ → ไม่ต้องเตือน (กัน flag รก)
+    const giveaway = isGiveawaySize(r.size) || isNonStock(name);
+    if (!giveaway && price === 0) out.push(`${name}: ราคา ฿0 — ตั้งใจแจกไหม?`);
+    else if (sub > 0 && disc >= sub) out.push(`${name}: ลดเต็มจำนวน (ฟรี) — ตั้งใจไหม?`);
+    else if (sub > 0 && disc / sub > 0.5) out.push(`${name}: ลด >50% — ตรวจซ้ำ`);
+    if (!giveaway && !r.barcode) out.push(`${name}: ไม่มีบาร์โค้ด — ควรเลือกจากรายการสินค้า`);
+    if (qty > 50) out.push(`${name}: จำนวนสูงผิดปกติ (${qty}) — ตรวจซ้ำ`);
   }
   return [...new Set(out)];
 }
@@ -118,6 +120,10 @@ function BillTime({ bill, onSaved }: { bill: Bill; onSaved: () => void }) {
 export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {}, closedDays = [], soldSkus = {}, skuBarcodes = [] }:
   { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; closedDays?: string[]; soldSkus?: Record<number, string[]>; skuBarcodes?: string[] }) {
   const skuBcSet = useMemo(() => new Set(skuBarcodes), [skuBarcodes]);
+  // จำนวน SKU ที่ "ยังไม่ใส่" ของทั้งบิล (เฉพาะรายการสินค้ามี SKU ที่ไม่ใช่ 4ml) — ใช้เตือน/นับ/ติดธง
+  const skuShortOf = (b: Bill) => b.rows.reduce((n, r) =>
+    n + (r.kind === "sale" && !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size)
+      ? Math.max(0, (r.qty ?? 0) - (soldSkus[r.id]?.length ?? 0)) : 0), 0);
   const router = useRouter();
   const closedSet = useMemo(() => new Set(closedDays), [closedDays]);
   // this bill sits on a cash day the admin already closed → editing/unapproving it won't
@@ -193,11 +199,15 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   const shownBills = days.reduce((s, d) => s + d.bills.length, 0);
   const shownTotal = days.reduce((s, d) => s + d.bills.reduce((x, b) => x + b.rows.reduce((y, r) => y + (r.total ?? 0), 0), 0), 0);
 
-  const approveBill = (bill: Bill) => start(async () => {
-    setBusy(bill.key);
-    try { await approveMany(bill.rows.map((r) => r.id)); refresh(); }
-    catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } finally { setBusy(null); }
-  });
+  const approveBill = (bill: Bill) => {
+    const short = skuShortOf(bill);
+    if (short > 0 && !confirm(`บิลนี้ยังไม่ใส่ SKU อีก ${short} ชิ้น\nอนุมัติเลยไหม? (ใส่ SKU ทีหลังได้ที่บิลที่อนุมัติแล้ว)`)) return;
+    start(async () => {
+      setBusy(bill.key);
+      try { await approveMany(bill.rows.map((r) => r.id)); refresh(); }
+      catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } finally { setBusy(null); }
+    });
+  };
   const trashBill = (bill: Bill) => {
     if (!confirm("ลบบิลนี้?\nบิลจะถูกย้ายไปถังขยะ — กู้คืนได้ที่หน้า ‘ถังขยะ’")) return;
     start(async () => {
@@ -221,7 +231,9 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   };
   const approveDay = (day: Day) => {
     const ids = day.bills.flatMap((b) => b.rows.map((r) => r.id));
-    if (!confirm(`อนุมัติทั้งวัน ${fmtThaiDay(day.date)} · ${day.bills.length} บิล?`)) return;
+    const shortBills = day.bills.filter((b) => skuShortOf(b) > 0).length;
+    const warn = shortBills > 0 ? `\n\n⚠ มี ${shortBills} บิลที่ยังไม่ใส่ SKU — ใส่ทีหลังได้ที่บิลที่อนุมัติแล้ว` : "";
+    if (!confirm(`อนุมัติทั้งวัน ${fmtThaiDay(day.date)} · ${day.bills.length} บิล?${warn}`)) return;
     start(async () => { try { await approveMany(ids); refresh(); } catch (e: any) { alert(e?.message ?? "ไม่สำเร็จ"); } });
   };
   const unapproveBill = (bill: Bill) => {
@@ -278,7 +290,10 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
       <div className="space-y-6">
       {/* summary of what's shown */}
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-muted">แสดง <b className="text-ink">{shownBills}</b> บิล{who ? ` ของ ${who}` : "รอตรวจสอบ"}</span>
+        <span className="text-muted">แสดง <b className="text-ink">{shownBills}</b> บิล{who ? ` ของ ${who}` : "รอตรวจสอบ"}
+          {(() => { const n = days.reduce((s, d) => s + d.bills.filter((b) => skuShortOf(b) > 0).length, 0); return n > 0
+            ? <span className="ml-2 inline-flex items-center gap-1 text-[12px] font-medium text-warn bg-warn-soft rounded-full px-2 py-0.5"><AlertTriangle className="w-3 h-3" /> ยังไม่ใส่ SKU {num(n)} บิล</span> : null; })()}
+        </span>
         <span className="font-semibold text-ink tabular-nums">รวม {baht(shownTotal)}</span>
       </div>
       {days.map((day) => {
@@ -465,6 +480,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                     {first.nation && <span>· {natLabel(first.nation)}</span>}
                                     {isSale && <span>· {bill.rows.length} รายการ</span>}
                                     {first.reviewer && <span>· โดย {first.reviewer}</span>}
+                                    {skuShortOf(bill) > 0 && <span className="text-warn font-semibold">· ⚠ ยังไม่ใส่ SKU {num(skuShortOf(bill))}</span>}
                                   </div>
                                 </div>
                               </div>
@@ -491,6 +507,9 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                         <span className="text-[10px] text-success">SKU ที่ตัด:</span>
                                         {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
                                       </div>
+                                    )}
+                                    {isSale && !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0) && (
+                                      <AddSkuLine id={r.id} need={(r.qty ?? 0) - (soldSkus[r.id]?.length ?? 0)} onDone={refresh} />
                                     )}
                                   </li>
                                 ))}

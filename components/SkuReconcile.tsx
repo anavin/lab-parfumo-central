@@ -39,9 +39,14 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
     }).sort((a, b) => a.scent.localeCompare(b.scent, "th") || mlOf(a.size) - mlOf(b.size));
   }, [stock, skus]);
 
+  // "ยังไม่เก็บ" (collected 0 แต่ระบบมี) = ยังสแกนไม่ถึง ไม่ใช่ "ของต่าง" → นับแยก ไม่รวมใน diff/net
+  const isUncollected = (r: Row) => r.collected === 0 && r.system > 0;
   const stats = useMemo(() => {
     let match = 0, diff = 0, uncollected = 0, net = 0;
-    for (const r of rows) { net += r.diff; r.diff === 0 ? match++ : diff++; if (r.collected === 0 && r.system > 0) uncollected++; }
+    for (const r of rows) {
+      if (isUncollected(r)) { uncollected++; continue; }
+      if (r.diff === 0) match++; else { diff++; net += r.diff; }
+    }
     return { match, diff, uncollected, net, total: rows.length };
   }, [rows]);
 
@@ -49,9 +54,9 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
     const t = qText.trim().toLowerCase();
     return rows.filter((r) => {
       const passFilter = filter === "all" ? true
-        : filter === "match" ? r.diff === 0
-        : filter === "uncollected" ? (r.collected === 0 && r.system > 0)
-        : r.diff !== 0;
+        : filter === "match" ? (r.diff === 0 && !isUncollected(r))
+        : filter === "uncollected" ? isUncollected(r)
+        : (r.diff !== 0 && !isUncollected(r));   // "ต่างกัน" = นับแล้วและไม่ตรง (ไม่รวมที่ยังไม่เก็บ)
       if (!passFilter) return false;
       return !t || r.scent.toLowerCase().includes(t) || r.size.toLowerCase().includes(t) || r.barcode.toLowerCase().includes(t);
     });
@@ -86,14 +91,15 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
           <div className="text-2xl font-bold tabular-nums text-success mt-0.5">{num(stats.match)}</div>
         </div>
         <div className="rounded-xl border border-line bg-surface p-3">
-          <div className="text-xs text-muted">ต่างกัน</div>
+          <div className="text-xs text-muted">ต่างกัน <span className="text-muted-soft">(นับแล้ว)</span></div>
           <div className="text-2xl font-bold tabular-nums text-danger mt-0.5">{num(stats.diff)}</div>
         </div>
         <div className="rounded-xl border border-line bg-surface p-3">
-          <div className="text-xs text-muted">ส่วนต่างรวม</div>
+          <div className="text-xs text-muted">ส่วนต่าง <span className="text-muted-soft">(เฉพาะที่นับแล้ว)</span></div>
           <div className={"text-2xl font-bold tabular-nums mt-0.5 " + (stats.net < 0 ? "text-danger" : stats.net > 0 ? "text-warn" : "text-ink")}>
             {stats.net > 0 ? "+" : ""}{num(stats.net)}
           </div>
+          {stats.uncollected > 0 && <div className="text-[11px] text-muted mt-0.5">ยังไม่เก็บอีก {num(stats.uncollected)} (ไม่นับรวม)</div>}
         </div>
       </div>
 
@@ -107,6 +113,14 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
           <input value={qText} onChange={(e) => setQText(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด"
             className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:border-brand w-52" />
         </div>
+      </div>
+
+      <div className="mb-2 rounded-lg bg-canvas/60 border border-line-soft px-3 py-2 text-[11px] text-muted leading-relaxed">
+        <b className="text-ink">อ่าน & ทำยังไง:</b>{" "}
+        <span className="text-success font-medium">ตรง</span> = ไม่ต้องทำอะไร ·{" "}
+        <span className="text-danger font-medium">ขาด</span> = SKU น้อยกว่าระบบ → ไปนับ/ตรวจชั้น หรือใส่ SKU ที่ขายแล้วให้ครบ ·{" "}
+        <span className="text-warn font-medium">เกิน</span> = SKU มากกว่าระบบ → ตรวจใบเบิก/นับซ้ำ หรือใช้ "ซิงก์ SKU" ที่หน้าสต็อกหน้าร้าน ·{" "}
+        <span className="text-muted font-medium">ยังไม่เก็บ</span> = ยังสแกนนับไม่ถึง (ไม่ใช่ของหาย) → ไปเก็บ SKU ให้ครบ
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line">
@@ -139,11 +153,6 @@ export function SkuReconcile({ stock, skus, branch }: { stock: StockRow[]; skus:
         </table>
       </div>
 
-      <div className="mt-2 text-[11px] text-muted leading-relaxed">
-        <b className="text-ink">อ่านยังไง:</b> ระบบ = สต๊อกที่ควรมี (ใบเบิก−ขาย) · เก็บ SKU = ที่สแกนนับจริง ·
-        <span className="text-danger"> ขาด</span> = หาย/ยังเก็บ SKU ไม่ครบ ·
-        <span className="text-warn"> เกิน</span> = SKU มากกว่าสต๊อกระบบ (สต๊อกระบบน้อยไป/นับเกิน)
-      </div>
     </div>
   );
 }
