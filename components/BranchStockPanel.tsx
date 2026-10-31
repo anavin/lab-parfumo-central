@@ -19,14 +19,16 @@ export function BranchStockPanel({ rows, branchName, skusByBc = {}, defaultOpen 
   const [term, setTerm] = useState("");
 
   // only what's actually in stock (received via requisition / adjusted in), by name —
-  // hide the 0/phantom rows (items sold but never received into this branch)
+  // โชว์เมื่อมีคงเหลือ > 0 "หรือ" ยังมี SKU ค้างในระบบ (ขายหมดแต่ SKU ไม่ตัด = ต้องติด Flag ให้เห็น)
+  // ซ่อนเทสเตอร์ + ถุง (ไม่ใช่สต๊อกสินค้า)
   const stocked = useMemo(
-    () => rows.filter((r) => (Number(r.remaining) || 0) > 0 && !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""))   // ซ่อนเทสเตอร์ + ถุง (ไม่ใช่สต๊อกสินค้า)
+    () => rows.filter((r) => ((Number(r.remaining) || 0) > 0 || (skusByBc[r.barcode] || []).length > 0)
+        && !/try\s*me/i.test(r.scent || "") && !/ถุง/.test(r.scent || ""))
       .sort((a, b) =>
         (isBag(a.scent) ? 1 : 0) - (isBag(b.scent) ? 1 : 0)         // ถุงกระดาษไว้ท้ายสุด
         || (a.scent || "").localeCompare(b.scent || "", "th")       // แล้วเรียงตามกลิ่น
         || mlOf(a.size) - mlOf(b.size)),                            // ในกลิ่นเดียวกันเรียงเล็ก→ใหญ่
-    [rows]);
+    [rows, skusByBc]);
   const list = useMemo(() => {
     const t = term.trim().toLowerCase();
     return stocked.filter((r) => !t || r.scent?.toLowerCase().includes(t) || r.barcode?.toLowerCase().includes(t)
