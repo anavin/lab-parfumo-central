@@ -72,7 +72,9 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
 
   if (!rows.length) return (
     <div className="rounded-xl border border-line bg-surface p-10 text-center text-sm text-muted">
-      ยังไม่มีข้อมูลที่เก็บ{branch ? ` ของ${branchName(branch)}` : ""} — ให้เก็บที่หน้า นับสต๊อก → แท็บ “เก็บข้อมูลใหม่” ก่อน
+      ยังไม่มีข้อมูลที่เก็บ{branch ? ` ของ${branchName(branch)}` : ""} — ไปเก็บก่อนที่{" "}
+      <a href="/stock/counts" className="text-brand-dark font-semibold underline">หน้า “ตรวจนับสต๊อก”</a>{" "}
+      → แท็บ <b className="text-ink">“เก็บข้อมูลใหม่”</b> (สแกนบาร์โค้ด แล้วยิงเก็บ SKU ทีละขวด)
     </div>
   );
 

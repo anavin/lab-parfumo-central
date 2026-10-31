@@ -152,7 +152,14 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
   }, [rows, approved]);
   const totalPendingBills = people.reduce((s, [, c]) => s + c, 0);
 
-  const days = groupDays(rows.filter(match));
+  // "เฉพาะบิลที่ต้องตรวจ" = มีข้อสังเกต (anomaly) หรือยังใส่ SKU ไม่ครบ
+  const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const needsAttention = (b: Bill) => billAnomalies(b).length > 0 || skuShortOf(b) > 0;
+  const allDays = groupDays(rows.filter(match));
+  const attentionCount = useMemo(() => allDays.reduce((s, d) => s + d.bills.filter(needsAttention).length, 0), [allDays]);
+  const days = onlyFlagged
+    ? allDays.map((d) => ({ ...d, bills: d.bills.filter(needsAttention) })).filter((d) => d.bills.length > 0)
+    : allDays;
   const approvedDays = groupDays(approved.filter(match));
 
   // Bill number = chronological rank within its day (earliest = #1), computed across
@@ -263,6 +270,12 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-ink hover:bg-canvas"><X className="w-4 h-4" /></button>
             )}
           </div>
+          {attentionCount > 0 && (
+            <button onClick={() => setOnlyFlagged((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors ${onlyFlagged ? "bg-warn text-white border-warn" : "bg-surface text-warn-dark border-warn/40 hover:bg-warn-soft"}`}>
+              <AlertTriangle className="w-3.5 h-3.5" /> เฉพาะบิลที่ต้องตรวจ <span className="tabular-nums">{num(attentionCount)}</span>
+            </button>
+          )}
           {people.length > 1 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 text-xs text-muted mr-0.5"><Users className="w-3.5 h-3.5" /> พนักงานขาย:</span>
@@ -285,7 +298,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
         <div className="card px-4 py-16 text-center text-muted"><CheckCheck className="w-8 h-8 mx-auto mb-2 text-success" /><div className="text-sm">ไม่มีรายการรอตรวจสอบ</div></div>
       ) : days.length === 0 ? (
         <div className="card px-4 py-14 text-center text-muted"><Search className="w-7 h-7 mx-auto mb-2 opacity-50" /><div className="text-sm">ไม่พบบิลที่ตรงกับตัวกรอง</div>
-          <button onClick={() => { setWho(""); setQtext(""); }} className="mt-3 text-xs text-brand-dark font-medium hover:underline">ล้างตัวกรอง</button></div>
+          <button onClick={() => { setWho(""); setQtext(""); setOnlyFlagged(false); }} className="mt-3 text-xs text-brand-dark font-medium hover:underline">ล้างตัวกรอง</button></div>
       ) : (
       <div className="space-y-6">
       {/* summary of what's shown */}
