@@ -114,8 +114,8 @@ function BillTime({ bill, onSaved }: { bill: Bill; onSaved: () => void }) {
   );
 }
 
-export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {}, closedDays = [] }:
-  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; closedDays?: string[] }) {
+export function ReviewQueue({ rows, approved = [], attachments = {}, payments = {}, closedDays = [], soldSkus = {} }:
+  { rows: SubmissionRow[]; approved?: SubmissionRow[]; attachments?: Record<string, BillAttachment[]>; payments?: Record<string, BillTender[]>; closedDays?: string[]; soldSkus?: Record<number, string[]> }) {
   const router = useRouter();
   const closedSet = useMemo(() => new Set(closedDays), [closedDays]);
   // this bill sits on a cash day the admin already closed → editing/unapproving it won't
@@ -350,6 +350,12 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 <Pencil className="w-4 h-4" />
                               </button>
                             </div>
+                            {isSale && (soldSkus[r.id]?.length ?? 0) > 0 && (
+                              <div className="flex flex-wrap items-center gap-1 mt-0.5 ml-6">
+                                <span className="text-[10px] text-success">SKU ที่ตัด:</span>
+                                {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
+                              </div>
+                            )}
                             {editId === r.id && (
                               <RowEditor row={r} pending={pending} savedTenders={payments[bill.ref]}
                                 onCancel={() => setEditId(null)}
@@ -462,7 +468,8 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                             <div className="px-3.5 py-2.5">
                               <ul className="space-y-1.5">
                                 {bill.rows.map((r, ri) => (
-                                  <li key={r.id} className="flex items-center gap-2 text-sm">
+                                  <li key={r.id} className="text-sm">
+                                    <div className="flex items-center gap-2">
                                     <span className="w-4 h-4 shrink-0 rounded-full bg-canvas text-muted text-[10px] font-semibold tabular-nums flex items-center justify-center">{ri + 1}</span>
                                     {isSale ? (
                                       <>
@@ -472,6 +479,13 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                       </>
                                     ) : (
                                       <span className="flex-1 text-ink">ลูกค้า {num(r.customers ?? 0)} ราย · ไทย {num(r.thai ?? 0)} · ต่างชาติ {num(r.foreign_cnt ?? 0)}</span>
+                                    )}
+                                    </div>
+                                    {isSale && (soldSkus[r.id]?.length ?? 0) > 0 && (
+                                      <div className="flex flex-wrap items-center gap-1 mt-0.5 ml-6">
+                                        <span className="text-[10px] text-success">SKU ที่ตัด:</span>
+                                        {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
+                                      </div>
                                     )}
                                   </li>
                                 ))}

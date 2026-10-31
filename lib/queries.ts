@@ -488,6 +488,20 @@ export async function shelfCaptureReview(branch: string | null): Promise<ShelfRe
   catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
+/** SKU codes sold on each submission line (for /review) — sku_units linked by sold_submission_id.
+ *  Only sales that scanned a SKU at the counter have these; non-scanned sales return nothing. */
+export async function soldSkusForSubmissions(ids: number[]): Promise<Record<number, string[]>> {
+  const uniq = [...new Set((ids || []).filter((n) => Number.isFinite(n)))];
+  if (!uniq.length) return {};
+  try {
+    const rows = await q<{ sid: number; sku: string }>(
+      `select sold_submission_id sid, sku from sku_units where sold_submission_id = any($1) order by sku`, [uniq]);
+    const map: Record<number, string[]> = {};
+    for (const r of rows) (map[r.sid] ??= []).push(r.sku);
+    return map;
+  } catch (e: any) { if (e?.code === "42P01") return {}; throw e; }
+}
+
 export type ReceivedSkuRow = { sku: string; barcode: string | null; scent: string | null; size: string | null; status: string; received_at: string };
 /** Serialized SKUs that actually entered stock under one requisition (po_id) — what to verify on
  *  receive. status reflects current state (in_stock / sold / returned / lost). Empty pre-0036. */
