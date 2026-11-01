@@ -1,9 +1,10 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Scissors, Undo2 } from "lucide-react";
+import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Scissors, Undo2, Download } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
+import { downloadCsv } from "@/lib/csv";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
 import { reconcileSkusToStock, undoGuessedSkuCuts } from "@/lib/actions/shelf-capture";
 
@@ -58,6 +59,19 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
     if (!t) return rows;
     return rows.filter((r) => r.scent.toLowerCase().includes(t) || r.barcode.includes(t) || r.skus.some((s) => s.toLowerCase().includes(t)) || r.liveSkus.some((s) => s.toLowerCase().includes(t)));
   }, [rows, qText]);
+
+  // Export ตารางเทียบ (ตามที่กรองอยู่) เป็น CSV — เปิดใน Excel ได้ภาษาไทยไม่เพี้ยน
+  const exportCsv = () => {
+    if (!shown.length) return;
+    const header = ["สาขา", "กลิ่น", "ไซซ์", "บาร์โค้ด", "นับได้", "ยอดระบบ", "ต่าง", "SKU คงเหลือ", "ขายวันนี้", "SKU ที่เหลือจริง"];
+    const body = shown.map((r) => [
+      branch ? branchName(branch) : "", r.scent, r.size, r.barcode,
+      r.captured, r.remaining, r.captured - r.remaining, r.skuInStock, r.soldToday,
+      r.liveSkus.join(" "),
+    ]);
+    const d = captureDate || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+    downloadCsv(`shelf-stock_${branch || "all"}_${d}.csv`, [header, ...body]);
+  };
 
   const apply = async () => {
     if (!branch || busy) return;
@@ -183,11 +197,18 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
         </div>
       )}
 
-      {/* search */}
-      <div className="relative">
-        <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-        <input value={qText} onChange={(e) => setQText(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด / SKU"
-          className="w-full sm:w-72 pl-8 pr-3 py-2 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:border-brand" />
+      {/* search + export */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-0 sm:flex-none">
+          <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input value={qText} onChange={(e) => setQText(e.target.value)} placeholder="ค้นหากลิ่น / บาร์โค้ด / SKU"
+            className="w-full sm:w-72 pl-8 pr-3 py-2 text-sm rounded-lg border border-line bg-surface text-ink focus:outline-none focus:border-brand" />
+        </div>
+        <button onClick={exportCsv} disabled={!shown.length}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface text-ink text-sm font-medium px-3 py-2 hover:bg-canvas disabled:opacity-50 shrink-0"
+          title="ดาวน์โหลดตารางนี้เป็นไฟล์ CSV (เปิดใน Excel ได้)">
+          <Download className="w-4 h-4" /> Export CSV
+        </button>
       </div>
 
       {/* table */}
