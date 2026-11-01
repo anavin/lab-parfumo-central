@@ -33,7 +33,11 @@ export function DraftSalesReview({ lines, branch, month, months, real }:
     setBusy(true);
     const r = await snapshotSalesDraft(month, branch);
     setBusy(false);
-    if (r.ok) router.refresh(); else alert(r.error || "ไม่สำเร็จ");
+    if (r.ok) {
+      if (!r.count) alert(`ดึงได้ 0 รายการ สำหรับเดือน ${thMonth(month)} (${branchName(branch)})\n\nเดือนนี้อาจยังไม่มีข้อมูลขาย — หรือถ้ายอดจริงด้านบน “ไม่ใช่ 0” แต่ยังดึงได้ 0 แสดงว่ายังไม่ได้รัน migration 0040 บน Supabase`);
+      else alert(`ดึงยอดจริงมาเป็นฉบับร่างแล้ว ${r.count} รายการ`);
+      router.refresh();
+    } else alert(r.error || "ไม่สำเร็จ");
   };
 
   const draftTotal = useMemo(() => lines.reduce((s, l) => s + Number(l.total || 0), 0), [lines]);
