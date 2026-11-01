@@ -31,6 +31,7 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
     { key: "requisitions", href: "/requisitions", label: "ใบเบิกสินค้า" },
     { key: "shipments", href: "/shipments", label: "ส่ง / คืนสินค้า" },
     { key: "sales", href: "/sales", label: "การขาย" },
+    { key: "sales", href: "/sales/sku", label: "ขายรายชิ้น (SKU)", icon: Barcode },
   ]},
   { title: "คลัง & การเงิน", items: [
     { key: "stock", href: "/stock", label: "สต๊อกคงเหลือ" },

@@ -466,6 +466,37 @@ export async function salesAfterDate(branch: string, dateYMD: string): Promise<M
   catch (e: any) { if (e?.code === "42P01") return new Map(); throw e; }
 }
 
+export type SoldSkuRow = {
+  sold_date: string; sold_time: string | null; scent: string | null; size: string | null;
+  sku: string; receipt_no: string | null; branch: string | null; guessed: boolean;
+  ba: string | null; total: number | null; payment_channel: string | null; nation: string | null;
+};
+/** Sold SKU units within a Bangkok date range (inclusive), newest first — one row per bottle.
+ *  LEFT JOINs the sale submission for price/staff/channel where the cut was linked to a bill.
+ *  `guessed` = cut with no bill (FIFO/manual guess). branch null = all branches. */
+export async function soldSkuHistory(branch: string | null, fromYMD: string, toYMD: string): Promise<SoldSkuRow[]> {
+  const args: (string)[] = [fromYMD, toYMD];
+  const where = branch ? `and coalesce(u.sold_branch, u.branch) = upper($3)` : ``;
+  if (branch) args.push(normalizeBranch(branch));
+  const sql = `
+    select
+      (u.sold_at at time zone 'Asia/Bangkok')::date::text          as sold_date,
+      to_char(u.sold_at at time zone 'Asia/Bangkok', 'HH24:MI')    as sold_time,
+      u.scent, u.size, u.sku,
+      u.sold_receipt_no                                            as receipt_no,
+      coalesce(u.sold_branch, u.branch)                            as branch,
+      (u.sold_submission_id is null and u.sold_receipt_no is null) as guessed,
+      sub.ba, sub.total::float as total, sub.payment_channel, sub.nation
+    from sku_units u
+    left join submissions sub on sub.id = u.sold_submission_id
+    where u.status = 'sold' and u.sold_at is not null
+      and (u.sold_at at time zone 'Asia/Bangkok')::date between $1 and $2
+      ${where}
+    order by u.sold_at desc, u.sku`;
+  try { return await q<SoldSkuRow>(sql, args); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Latest capture date (Bangkok, YYYY-MM-DD) for a branch — prefills the "ยอด ณ วันที่นับ" toggle. */
 export async function shelfCaptureDate(branch: string | null): Promise<string | null> {
   const sql = `select to_char(max(captured_at) at time zone 'Asia/Bangkok', 'YYYY-MM-DD') d
