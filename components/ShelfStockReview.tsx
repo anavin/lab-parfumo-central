@@ -1,12 +1,12 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Scissors, Undo2, Download } from "lucide-react";
+import { Search, ChevronDown, UploadCloud, Loader2, Barcode, Undo2, Download } from "lucide-react";
 import { num } from "@/lib/format";
 import { branchName } from "@/lib/branches";
 import { downloadCsv } from "@/lib/csv";
 import { applyCapturesToSystem } from "@/lib/actions/stock-count";
-import { reconcileSkusToStock, undoGuessedSkuCuts } from "@/lib/actions/shelf-capture";
+import { undoGuessedSkuCuts } from "@/lib/actions/shelf-capture";
 
 export type ShelfRow = { barcode: string; scent: string; size: string; captured: number; remaining: number; skuInStock: number; soldToday: number; skus: string[]; liveSkus: string[] };
 export type MissingRow = { barcode: string; scent: string; size: string; remaining: number };
@@ -25,19 +25,9 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
   const [asOf, setAsOf] = useState(true);   // คิดยอด ณ วันที่นับ (กันบวกยอดขายวันนี้กลับ)
   const [zeroMissing, setZeroMissing] = useState(false);   // ตั้งสินค้าที่ไม่ได้นับเป็น 0
   const [syncBusy, setSyncBusy] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);   // ข้อความของ "วิธี A" (ซิงก์)
-  const [undoMsg, setUndoMsg] = useState<string | null>(null);   // ข้อความของ "วิธี B" (คืน) — แยกกันไม่ให้โผล่ผิดการ์ด
+  const [undoMsg, setUndoMsg] = useState<string | null>(null);   // ข้อความของ "คืน SKU ที่ตัดแบบเดา"
   const missingTotal = useMemo(() => missing.reduce((s, m) => s + m.remaining, 0), [missing]);
 
-  // ตัด SKU ส่วนเกิน (in_stock เกินยอดคงเหลือจริง) = ขายไปแล้วยังไม่ตัด (ผีเก่า + ขายวันนี้)
-  const syncSkus = async () => {
-    if (!branch || syncBusy) return;
-    if (!confirm(`ซิงก์ SKU ให้ = ยอดคงเหลือทุกสินค้า?\n\n• ส่วนเกิน ${num(phantomTotal)} ตัว → ตัดออก (เก่าสุดก่อน)\n• ส่วนขาด ${num(restoreTotal)} ตัว → คืนจากตัวที่เดาตัด\n\nตัด serial เท่านั้น ไม่กระทบยอดคงเหลือ · ขายจริงที่ผูกบิลไม่ถูกแตะ · 4ml ข้าม`)) return;
-    setSyncBusy(true); setSyncMsg(null);
-    const r = await reconcileSkusToStock(branch); setSyncBusy(false);
-    if (r.ok) { setSyncMsg(`✓ ตัด ${num(r.cleared || 0)} · คืน ${num(r.restored || 0)} · เหลือ in_stock ${num(r.kept || 0)}`); router.refresh(); }
-    else setSyncMsg(`✗ ${r.error ?? "ไม่สำเร็จ"}`);
-  };
   // คืน SKU ที่ตัดแบบเดา (ไม่ผูกบิล) → กลับ in_stock เพื่อไปใส่ SKU จริงรายบิล
   const undoCuts = async () => {
     if (!branch || syncBusy) return;
@@ -133,37 +123,20 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
         </div>
       )}
 
-      {/* STEP 2: จัดการ SKU ให้ตรงยอด — โชว์เฉพาะเมื่อ SKU ยังไม่ตรง · เลือกวิธีใดวิธีหนึ่ง */}
-      {canApply && (phantomTotal > 0 || restoreTotal > 0 || guessedCut > 0) && (
+      {/* STEP 2: คืน SKU ที่ตัดแบบเดา → ไปใส่ SKU จริงรายบิล (ไม่มีการเดาตัดอัตโนมัติแล้ว) */}
+      {canApply && guessedCut > 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50/40 p-3 space-y-2.5">
           <div>
-            <div className="text-sm font-semibold text-amber-800">2 · จัดการ SKU ให้ตรงยอด</div>
-            <div className="text-[12px] text-amber-700">ทำ “อัปเดตเข้าระบบ” (ข้อ 1) ก่อน แล้วเลือก <b>วิธีใดวิธีหนึ่ง</b> ให้ SKU ตรงกับยอดคงเหลือ — ไม่ต้องทำทั้งคู่</div>
+            <div className="text-sm font-semibold text-amber-800">2 · คืน SKU ที่ตัดแบบเดา</div>
+            <div className="text-[12px] text-amber-700">ทำ “อัปเดตเข้าระบบ” (ข้อ 1) ก่อน แล้วคืน SKU ที่ตัดแบบเดากลับ แล้วไปใส่ SKU จริงทีละบิลเองที่ /review หรือหน้าขาย</div>
           </div>
 
-          {/* วิธี A — ซิงก์อัตโนมัติ */}
-          {(phantomTotal > 0 || restoreTotal > 0) && (
-            <div className="rounded-lg border border-amber-200 bg-surface p-2.5">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-ink">วิธี A — ซิงก์อัตโนมัติให้ตรงยอด <span className="font-normal text-muted">(เร็ว · ระบบเดา serial ให้)</span></div>
-                  <div className="text-[12px] text-muted">{phantomTotal > 0 && <>เกิน <b>{num(phantomTotal)}</b> → ตัดออก</>}{phantomTotal > 0 && restoreTotal > 0 && " · "}{restoreTotal > 0 && <>ขาด <b>{num(restoreTotal)}</b> → คืนจากที่เดาตัดวันนี้</>} → ให้ SKU = ยอดคงเหลือทุกสินค้า</div>
-                </div>
-                <button onClick={syncSkus} disabled={syncBusy || !branch}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold px-4 py-2.5 hover:bg-amber-700 disabled:opacity-50">
-                  {syncBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />} ซิงก์ให้ตรงยอด
-                </button>
-              </div>
-              {syncMsg && <div className="mt-2 text-[13px] rounded-lg px-3 py-2 bg-canvas border border-line text-ink">{syncMsg}</div>}
-            </div>
-          )}
-
-          {/* วิธี B — คืนที่เดาตัด เพื่อใส่ SKU จริงรายบิล */}
+          {/* คืนที่เดาตัด เพื่อใส่ SKU จริงรายบิล */}
           {guessedCut > 0 && (
             <div className="rounded-lg border border-amber-200 bg-surface p-2.5">
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-ink">วิธี B — คืน SKU ที่ตัดแบบเดา (วันนี้) เพื่อใส่เอง <span className="font-normal text-muted">(แม่นสุด · serial ตรงตัว)</span></div>
+                  <div className="text-[13px] font-semibold text-ink">คืน SKU ที่ตัดแบบเดา (วันนี้) เพื่อใส่เอง <span className="font-normal text-muted">(แม่นสุด · serial ตรงตัว)</span></div>
                   <div className="text-[12px] text-muted">วันนี้มี SKU ตัดแบบเดา/ตัดเอง (ไม่ผูกบิล) <b>{num(guessedCut)}</b> ตัว → คืนกลับ in_stock แล้วไปใส่ SKU จริงรายบิลที่ /review หรือหน้าขาย · ของเก่าเมื่อวานไม่ถูกแตะ</div>
                 </div>
                 <button onClick={undoCuts} disabled={syncBusy || !branch}
@@ -175,7 +148,7 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
             </div>
           )}
 
-          <p className="text-[11px] text-amber-700/80">ทั้งสองวิธีแตะ serial เท่านั้น ไม่กระทบยอดคงเหลือ และไม่แตะบิลที่ขายจริง · วิธี B แม่นกว่าเพราะใส่ SKU จริงทีละบิล</p>
+          <p className="text-[11px] text-amber-700/80">แตะ serial เท่านั้น ไม่กระทบยอดคงเหลือ และไม่แตะบิลที่ขายจริง · ระบบไม่เดาตัด SKU อัตโนมัติ — ต้องใส่ SKU จริงทีละบิลเอง</p>
         </div>
       )}
 
