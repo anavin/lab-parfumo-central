@@ -497,6 +497,40 @@ export async function soldSkuHistory(branch: string | null, fromYMD: string, toY
   catch (e: any) { if (e?.code === "42P01") return []; throw e; }
 }
 
+// ===== ยอดขาย CTW (ฉบับร่าง) — อ่านจาก sales_draft เท่านั้น (ไม่ใช่ยอดขายจริง) =====
+export type DraftLine = {
+  id: number; receipt_no: string | null; sale_date: string | null; sale_time: string | null; ba: string | null;
+  item: string | null; barcode: string | null; size: string | null; qty: number; unit_price: number;
+  discount: number; total: number; payment_channel: string | null; nation: string | null;
+};
+export async function salesDraftLines(month: string, branch: string): Promise<DraftLine[]> {
+  const b = normalizeBranch(branch);
+  const sql = `select id, receipt_no, sale_date::text sale_date, sale_time::text sale_time, ba, item, barcode, size,
+      qty::float qty, unit_price::float unit_price, discount::float discount, total::float total, payment_channel, nation
+    from sales_draft where draft_month=$1 and ${SOLD_BRANCH}=$2
+    order by sale_date, receipt_no nulls last, id`;
+  try { return await q<DraftLine>(sql, [month, b]); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+/** ยอดขายจริงของเดือน (อ้างอิง อ่านอย่างเดียว) — คิดตามช่วงวันที่เหมือน snapshot */
+export async function salesRealMonthTotal(month: string, branch: string): Promise<{ total: number; qty: number; bills: number }> {
+  const b = normalizeBranch(branch);
+  const sql = `select coalesce(sum(total),0)::float total, coalesce(sum(qty),0)::float qty,
+      count(distinct receipt_no)::int bills
+    from sales where sale_date >= ($1 || '-01')::date and sale_date < (($1 || '-01')::date + interval '1 month')
+      and ${SOLD_BRANCH}=$2`;
+  try { const [r] = await q<{ total: number; qty: number; bills: number }>(sql, [month, b]); return r || { total: 0, qty: 0, bills: 0 }; }
+  catch (e: any) { if (e?.code === "42P01") return { total: 0, qty: 0, bills: 0 }; throw e; }
+}
+/** เดือนที่มีข้อมูลขาย (YYYY-MM) ของสาขา — ไว้ทำตัวเลือกเดือน */
+export async function salesMonthsForBranch(branch: string): Promise<string[]> {
+  const b = normalizeBranch(branch);
+  const sql = `select distinct to_char(sale_date,'YYYY-MM') m from sales
+    where sale_date is not null and ${SOLD_BRANCH}=$1 order by m desc limit 36`;
+  try { const rows = await q<{ m: string }>(sql, [b]); return rows.map((r) => r.m); }
+  catch (e: any) { if (e?.code === "42P01") return []; throw e; }
+}
+
 /** Latest capture date (Bangkok, YYYY-MM-DD) for a branch — prefills the "ยอด ณ วันที่นับ" toggle. */
 export async function shelfCaptureDate(branch: string | null): Promise<string | null> {
   const sql = `select to_char(max(captured_at) at time zone 'Asia/Bangkok', 'YYYY-MM-DD') d

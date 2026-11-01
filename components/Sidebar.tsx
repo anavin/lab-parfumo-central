@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks, FileUp, PackageCheck, Tag,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks, FileUp, PackageCheck, Tag, FileEdit,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -19,7 +19,7 @@ type Group = { title: string; items: Item[] };
 const ICON: Record<PermKey, any> = {
   dashboard: LayoutDashboard, requisitions: ClipboardList, shipments: Truck, sales: Receipt,
   stock: Package, products: FlaskConical, cash: Wallet, review: ClipboardCheck,
-  users: Users, audit: ScrollText, trash: Trash2, my_sales: Store,
+  users: Users, audit: ScrollText, trash: Trash2, my_sales: Store, sales_draft: FileEdit,
 };
 // key = สิทธิ์หลัก (ใช้เลือกไอคอน/จัดกลุ่ม) · needs = ต้องมี "ครบทุกตัว" ถึงจะโชว์ (สำหรับหน้าที่ layout+page gate ซ้อนกัน)
 const MENU: { title: string; items: { key: PermKey; href: string; label: string; icon?: any; needs?: PermKey[] }[] }[] = [
@@ -44,6 +44,7 @@ const MENU: { title: string; items: { key: PermKey; href: string; label: string;
     { key: "cash", href: "/cash", label: "เงินสด" },
   ]},
   { title: "ผู้ดูแล", items: [
+    { key: "sales_draft", href: "/sales/draft", label: "ยอดขาย CTW (ฉบับร่าง)", icon: FileEdit },
     { key: "users", href: "/users", label: "จัดการผู้ใช้" },
     { key: "audit", href: "/audit", label: "บันทึกกิจกรรม" },
     { key: "trash", href: "/trash", label: "ถังขยะ" },

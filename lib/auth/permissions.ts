@@ -6,7 +6,8 @@ import type { User } from "./constants";
 
 export type PermKey =
   | "dashboard" | "requisitions" | "shipments" | "sales" | "stock"
-  | "products" | "cash" | "review" | "users" | "audit" | "trash" | "my_sales";
+  | "products" | "cash" | "review" | "users" | "audit" | "trash" | "my_sales"
+  | "sales_draft";
 
 export type PermMeta = { key: PermKey; label: string; href: string; group: string };
 
@@ -20,6 +21,7 @@ export const PERMISSIONS: PermMeta[] = [
   { key: "products",     label: "สินค้า",           href: "/products",     group: "คลัง & การเงิน" },
   { key: "cash",         label: "เงินสด",           href: "/cash",         group: "คลัง & การเงิน" },
   { key: "review",       label: "ตรวจสอบยอดขาย",    href: "/review",       group: "ผู้ดูแล" },
+  { key: "sales_draft",  label: "ยอดขาย CTW (ฉบับร่าง)", href: "/sales/draft", group: "ผู้ดูแล" },
   { key: "users",        label: "จัดการผู้ใช้",      href: "/users",        group: "ผู้ดูแล" },
   { key: "audit",        label: "บันทึกกิจกรรม",    href: "/audit",        group: "ผู้ดูแล" },
   { key: "trash",        label: "ถังขยะ",           href: "/trash",        group: "ผู้ดูแล" },
