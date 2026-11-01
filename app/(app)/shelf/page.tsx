@@ -18,8 +18,16 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
   const branch = sp.branch === "all" ? null : (isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH);
 
   const captureDate = await shelfCaptureDate(branch);   // e.g. "2026-10-30" (วันที่นับ)
-  // sold AFTER the capture date = today's (post-count) sales — to mark & to subtract in "ยอด ณ วันที่นับ"
-  const soldAfter = branch && captureDate ? await salesAfterDate(branch, captureDate) : new Map<string, number>();
+  // "ขายวันนี้" = เฉพาะวันนี้ (เวลาไทย) → salesAfterDate(เมื่อวาน) เพราะ query ใช้ sale_date > $2 → เหลือแต่วันนี้
+  // soldAfterCapture = ยอดขายหลังวันนับ (ไว้โชว์ว่าจะถูกหักเท่าไรตอนรีเซ็ตแบบ "ยอด ณ วันที่นับ")
+  const bkkTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  const _yd = new Date(bkkTodayStr + "T00:00:00Z"); _yd.setUTCDate(_yd.getUTCDate() - 1);
+  const bkkYesterday = _yd.toISOString().slice(0, 10);
+  const [soldTodayByBc, soldAfterCap] = await Promise.all([
+    branch ? salesAfterDate(branch, bkkYesterday) : Promise.resolve(new Map<string, number>()),
+    branch && captureDate ? salesAfterDate(branch, captureDate) : Promise.resolve(new Map<string, number>()),
+  ]);
+  const soldAfterCapture = Array.from(soldAfterCap.values()).reduce((s, v) => s + Math.round(Number(v) || 0), 0);
   const [caps, live, skus] = await Promise.all([
     shelfCaptureReview(branch), stockLive(branch), skuUnits(branch),
   ]);
@@ -40,7 +48,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
     captured: c.captured,
     remaining: remByBc.get(c.barcode) ?? 0,
     skuInStock: skuInByBc.get(c.barcode) ?? 0,
-    soldToday: Math.round(Number(soldAfter.get(c.barcode) || 0)),
+    soldToday: Math.round(Number(soldTodayByBc.get(c.barcode) || 0)),
     skus: Array.isArray(c.skus) ? c.skus.filter(Boolean) : [],
     liveSkus: liveSkusByBc.get(c.barcode) ?? [],
   }));
@@ -77,7 +85,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Promis
       <PageHeader icon={Store} title="สต็อกหน้าร้าน"
         subtitle={`เช็คข้อมูลที่เก็บ${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} แล้วอัปเข้าระบบให้ใช้ข้อมูลชุดเดียวกัน`} />
       <div className="mb-4"><BranchTabs withAll defaultValue={DEFAULT_BRANCH} /></div>
-      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} phantomTotal={phantomTotal} restoreTotal={restoreTotal} guessedCut={guessedCut} />
+      <ShelfStockReview rows={rows} branch={branch} canApply={can(user, "requisitions")} captureDate={captureDate} missing={missing} phantomTotal={phantomTotal} restoreTotal={restoreTotal} guessedCut={guessedCut} soldAfterCapture={soldAfterCapture} />
       {branch && inStockSkus.length > 0 && (
         <div className="mt-4"><SkuCutPanel skus={inStockSkus} branch={branch} /></div>
       )}

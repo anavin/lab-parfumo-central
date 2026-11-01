@@ -15,7 +15,7 @@ const thDate = (ymd: string | null) => { if (!ymd) return ""; const [y, m, d] = 
 
 // หน้า "สต็อกหน้าร้าน": เช็คข้อมูลที่เก็บ (นับได้ต่อสินค้า + SKU) เทียบกับระบบปัจจุบัน
 // แล้วกดปุ่มเดียว "อัปเดตเข้าระบบทั้งหมด" ให้ทั้งระบบใช้ข้อมูลชุดเดียวกัน (ลง SKU + ปรับยอด)
-export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [], phantomTotal = 0, restoreTotal = 0, guessedCut = 0 }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[]; phantomTotal?: number; restoreTotal?: number; guessedCut?: number }) {
+export function ShelfStockReview({ rows, branch, canApply, captureDate, missing = [], phantomTotal = 0, restoreTotal = 0, guessedCut = 0, soldAfterCapture = 0 }: { rows: ShelfRow[]; branch: string | null; canApply: boolean; captureDate: string | null; missing?: MissingRow[]; phantomTotal?: number; restoreTotal?: number; guessedCut?: number; soldAfterCapture?: number }) {
   const router = useRouter();
   const [qText, setQText] = useState("");
   const [open, setOpen] = useState<string | null>(null);   // expanded barcode
@@ -109,7 +109,7 @@ export function ShelfStockReview({ rows, branch, canApply, captureDate, missing 
           {captureDate && (
             <label className="mt-2 flex items-center gap-2 text-[12px] text-ink cursor-pointer select-none">
               <input type="checkbox" checked={asOf} onChange={(e) => setAsOf(e.target.checked)} className="accent-brand w-4 h-4" />
-              คิดยอด <b>ณ วันที่นับ ({thDate(captureDate)})</b> — หักยอดขายหลังวันนับออก เพื่อไม่ให้ยอดขายวันนี้ถูกบวกกลับ {stats.soldToday > 0 && <span className="text-amber-700">(ขายหลังวันนับ {num(stats.soldToday)} ชิ้น)</span>}
+              คิดยอด <b>ณ วันที่นับ ({thDate(captureDate)})</b> — หักยอดขายหลังวันนับออก เพื่อไม่ให้ยอดขายหลังนับถูกบวกกลับ {soldAfterCapture > 0 && <span className="text-amber-700">(ขายหลังวันนับ {num(soldAfterCapture)} ชิ้น จะถูกหัก)</span>}
             </label>
           )}
           {missing.length > 0 && (
