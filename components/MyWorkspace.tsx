@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { beep } from "@/lib/feedback";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus, ChevronDown, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, XCircle, ScanLine, Minus, Receipt as ReceiptIcon, X, Store, Camera, ImagePlus, ChevronDown, AlertTriangle, Loader2, Undo2 } from "lucide-react";
 // The full product catalog, fetched ONCE (GET JSON — WebView-safe; server actions
 // don't run on the SUNMI WebView) and cached, so barcode scans resolve instantly
 // instead of hitting the network per scan (slow on LTE).
@@ -21,7 +21,7 @@ async function lookupBarcode(code: string): Promise<any | null> {
   const bare = code.replace(/^0+/, "");
   return map.get(code) ?? map.get(bare) ?? map.get("0" + code) ?? map.get("00" + code) ?? null;
 }
-import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment, addMyBillItems, addSkuToSale } from "@/lib/actions/submissions";
+import { submitBill, updateMySale, deleteMySubmission, addBillAttachments, deleteBillAttachment, addMyBillItems, addSkuToSale, resubmitRejected } from "@/lib/actions/submissions";
 import { checkSku } from "@/lib/actions/sku";
 import { isGiveawaySize } from "@/lib/product-class";
 import { BarcodeScanner, type ScanResult } from "@/components/BarcodeScanner";
@@ -251,6 +251,11 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
   const delPhoto = (id: number) => start(async () => {
     try { await deleteBillAttachment(id); refresh(); } catch (e: any) { onActionError(e); }
   });
+  // ส่งบิลที่ถูกตีกลับ กลับเข้าคิวตรวจใหม่ → กลายเป็น pending แล้วแก้ไข/เพิ่มรายการ/สแกน SKU ได้ตามปกติ
+  const resubmit = (rows: SubmissionRow[]) => start(async () => {
+    try { const r = await resubmitRejected(rows.map((x) => x.id)); if (r.ok) refresh(); else alert(r.error ?? "ส่งกลับไม่สำเร็จ"); }
+    catch (e: any) { onActionError(e); }
+  });
 
   const busy = bill !== null || edit !== null;
 
@@ -319,7 +324,7 @@ export function MyWorkspace({ date, today, fullName, rows, attachments = {}, pay
       ) : (
         <div className="space-y-3">
           {bills.map((b, i) => <BillGroupCard key={b.key} index={billRank.get(b.key) ?? (bills.length - i)} rows={b.rows} pending={pending}
-            onEdit={editRow} onDelete={setDel} photos={attachments[b.rows[0].receipt_no || ""] || []}
+            onEdit={editRow} onDelete={setDel} onResubmit={resubmit} photos={attachments[b.rows[0].receipt_no || ""] || []}
             onAddPhotos={addPhotos} onDeletePhoto={delPhoto} soldSkus={soldSkus} skuBarcodes={skuBarcodes} />)}
         </div>
       )}
@@ -1038,8 +1043,8 @@ function AddToBill({ refId, disabled }: { refId: string; disabled?: boolean }) {
 }
 
 // one bill = the item lines a customer bought together
-function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], onAddPhotos, onDeletePhoto, soldSkus = {}, skuBarcodes = [] }: {
-  index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; pending: boolean;
+function BillGroupCard({ index, rows, onEdit, onDelete, onResubmit, pending, photos = [], onAddPhotos, onDeletePhoto, soldSkus = {}, skuBarcodes = [] }: {
+  index: number; rows: SubmissionRow[]; onEdit: (r: SubmissionRow) => void; onDelete: (r: SubmissionRow) => void; onResubmit?: (rows: SubmissionRow[]) => void; pending: boolean;
   photos?: BillAttachment[]; onAddPhotos?: (ref: string, imgs: string[]) => void; onDeletePhoto?: (id: number) => void;
   soldSkus?: Record<number, string[]>; skuBarcodes?: string[];
 }) {
@@ -1117,7 +1122,18 @@ function BillGroupCard({ index, rows, onEdit, onDelete, pending, photos = [], on
           {canEditPhotos && onAddPhotos && <AddPhotoInline refId={ref} count={photos.length} pending={pending} onAdd={onAddPhotos} />}
         </div>
       )}
-      {note && <div className="text-xs text-danger mt-1.5">เหตุผลที่ตีกลับ: {note}</div>}
+      {status === "rejected" && (
+        <div className="mt-2 rounded-lg border border-danger/30 bg-danger-soft/50 px-3 py-2">
+          <div className="text-xs text-danger font-medium">บิลนี้ถูกตีกลับ{note ? ` — ${note}` : ""}</div>
+          <div className="text-[11px] text-muted mt-0.5">กด “แก้ไข & ส่งใหม่” เพื่อนำกลับเข้าคิวตรวจ แล้วแก้รายการ/ราคา/แนบสลิป แล้วให้แอดมินตรวจอีกครั้ง</div>
+          {onResubmit && (
+            <button onClick={() => onResubmit(rows)} disabled={pending}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark disabled:opacity-50">
+              <Undo2 className="w-4 h-4" /> แก้ไข &amp; ส่งใหม่
+            </button>
+          )}
+        </div>
+      )}
       {ref && (
         <div className="mt-2 pt-2 border-t border-line/60 flex justify-end">
           <a href={`/receipt/${encodeURIComponent(ref)}`} target="_blank" rel="noopener"

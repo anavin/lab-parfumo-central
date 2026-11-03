@@ -639,6 +639,26 @@ export async function rejectSubmission(id: number, note?: string) {
   revalidatePath("/review"); revalidatePath("/my");
 }
 
+/** คนขาย: ส่งบิลที่ถูก "ตีกลับ" กลับเข้าคิวตรวจใหม่ (rejected → pending) เพื่อแก้ไข/ยืนยันอีกครั้ง.
+ *  เฉพาะแถวของตัวเอง + สถานะ rejected เท่านั้น. พอเป็น pending แล้วจะแก้ไข/เพิ่มรายการ/สแกน SKU ได้ตามปกติ. */
+export async function resubmitRejected(ids: number[]): Promise<{ ok: boolean; n?: number; error?: string }> {
+  const user = await requirePermission("my_sales");
+  const list = (ids || []).filter((n) => Number.isInteger(n));
+  if (!list.length) return { ok: false, error: "ไม่มีรายการ" };
+  try {
+    const r = await q<{ id: number }>(
+      `update submissions set status='pending', reviewed_by=null, reviewed_at=null, review_note=null, updated_at=now()
+       where id = any($1) and created_by = $2 and status = 'rejected' returning id`, [list, user.id]);
+    if (!r.length) return { ok: false, error: "ไม่พบบิลที่ตีกลับของคุณ" };
+    await logAudit("update", "submission", null, `ส่งบิลที่ถูกตีกลับกลับเข้าตรวจใหม่ (${r.length} รายการ)`);
+    revalidatePath("/my"); revalidatePath("/review");
+    return { ok: true, n: r.length };
+  } catch (e: any) {
+    console.error("[resubmitRejected]", e);
+    return { ok: false, error: "ส่งกลับไม่สำเร็จ ลองใหม่อีกครั้ง" };
+  }
+}
+
 export async function approveMany(ids: number[]) {
   const admin = await requirePermission("review");
   let ok = 0;
