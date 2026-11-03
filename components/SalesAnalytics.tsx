@@ -242,23 +242,23 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
           {heat && (
             <Panel title="ช่วงเวลาที่ขายดี (วัน × ชั่วโมง)" sub="เข้ม= ยอดขายสูง · ไว้จัดกะพนักงาน / โปรช่วงเงียบ">
               <div className="overflow-x-auto">
-                <table className="border-collapse" style={{ minWidth: (heat.hoursAxis.length + 1) * 34 }}>
+                <table className="w-full table-fixed border-collapse" style={{ minWidth: heat.hoursAxis.length * 34 + 44 }}>
                   <thead>
                     <tr>
-                      <th className="sticky left-0 bg-surface" />
-                      {heat.hoursAxis.map((h) => <th key={h} className="text-[10px] text-muted font-medium pb-1 w-8 text-center tabular-nums">{h}</th>)}
+                      <th className="w-11 sticky left-0 bg-surface" />
+                      {heat.hoursAxis.map((h) => <th key={h} className="text-[11px] text-muted font-medium pb-1.5 text-center tabular-nums">{h}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {heat.rows.map((r) => (
                       <tr key={r.dow}>
-                        <td className="sticky left-0 bg-surface pr-2 text-[11px] text-muted font-medium whitespace-nowrap">{DOW_TH[r.dow].slice(0, 2)}</td>
+                        <td className="w-11 sticky left-0 bg-surface pr-2 text-[12px] text-muted font-medium whitespace-nowrap">{DOW_TH[r.dow].slice(0, 2)}</td>
                         {r.cells.map((c, i) => {
                           const t = heat.max ? c.revenue / heat.max : 0;
                           return (
                             <td key={i} className="p-0.5">
-                              <div className="h-7 rounded flex items-center justify-center text-[8.5px] tabular-nums"
-                                style={{ backgroundColor: c.revenue > 0 ? `rgb(var(--brand) / ${0.12 + t * 0.88})` : "rgb(var(--canvas))", color: t > 0.5 ? "white" : "rgb(var(--muted))" }}
+                              <div className="h-11 rounded-md flex items-center justify-center text-[10px] tabular-nums transition-colors"
+                                style={{ backgroundColor: c.revenue > 0 ? `rgb(var(--brand) / ${0.1 + t * 0.9})` : "rgb(var(--canvas))", color: t > 0.5 ? "white" : "rgb(var(--muted))" }}
                                 title={`${DOW_TH[r.dow]} ${heat.hoursAxis[i]}:00 · ${baht(c.revenue)} · ${num(c.bills)} บิล`}>
                                 {c.revenue > 0 ? compactBaht(c.revenue) : ""}
                               </div>
@@ -270,7 +270,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
                   </tbody>
                 </table>
               </div>
-              <div className="text-[10.5px] text-muted mt-2">ตัวเลข = ยอดขาย (ย่อ) · เลขบนสุด = ชั่วโมง (24 ชม.)</div>
+              <div className="text-[10.5px] text-muted mt-2">ตัวเลข = ยอดขาย (ย่อ) · เลขบนสุด = ชั่วโมง (24 ชม.) · เลื่อนแนวนอนได้บนจอเล็ก</div>
             </Panel>
           )}
 
