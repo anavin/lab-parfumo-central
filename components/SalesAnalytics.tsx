@@ -90,6 +90,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
       { k: "7 วัน", f: ago(6), t: today },
       { k: "30 วัน", f: ago(29), t: today },
       { k: "ปีนี้", f: today.slice(0, 4) + "-01-01", t: today },
+      { k: "ปีที่แล้ว", f: `${+today.slice(0, 4) - 1}-01-01`, t: `${+today.slice(0, 4) - 1}-12-31` },
     ];
   }, []);
   const activePreset = presets.find((p) => p.f === from && p.t === to)?.k;
@@ -238,8 +239,9 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
             </Panel>
           </div>
 
-          {/* ── heatmap hour × weekday ── */}
+          {/* ── heatmap hour × weekday (full-bleed) ── */}
           {heat && (
+            <div className="relative left-1/2 -translate-x-1/2 w-screen px-4 sm:px-6 lg:px-8">
             <Panel title="ช่วงเวลาที่ขายดี (วัน × ชั่วโมง)" sub="เข้ม= ยอดขายสูง · ไว้จัดกะพนักงาน / โปรช่วงเงียบ">
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed border-collapse" style={{ minWidth: heat.hoursAxis.length * 34 + 44 }}>
@@ -272,6 +274,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
               </div>
               <div className="text-[10.5px] text-muted mt-2">ตัวเลข = ยอดขาย (ย่อ) · เลขบนสุด = ชั่วโมง (24 ชม.) · เลื่อนแนวนอนได้บนจอเล็ก</div>
             </Panel>
+            </div>
           )}
 
           {/* ── staff ── */}
