@@ -19,16 +19,18 @@ export type StaffRow = { staff: string; revenue: number; qty: number; bills: num
 export type DailyRow = { d: string; revenue: number; bills: number; qty: number };
 export type ChannelRow = { channel: string; revenue: number; n: number };
 export type NationRow = { nation: string; revenue: number; bills: number };
+export type StaffDailyRow = { d: string; staff: string; revenue: number; bills: number; qty: number };
 
 export type SalesAnalytics = {
   kpis: AnalyticsKpis;
   scents: ScentRow[]; sizes: SizeRow[]; hours: HourRow[]; weekdays: WeekdayRow[];
   staff: StaffRow[]; daily: DailyRow[]; payments: ChannelRow[]; nations: NationRow[];
+  staffDaily: StaffDailyRow[];
 };
 
 const EMPTY: SalesAnalytics = {
   kpis: { revenue: 0, qty: 0, bills: 0, items_per_bill: 0, aov: 0, per_item: 0, discount: 0, gross: 0, discount_rate: 0, days: 0, per_day: 0 },
-  scents: [], sizes: [], hours: [], weekdays: [], staff: [], daily: [], payments: [], nations: [],
+  scents: [], sizes: [], hours: [], weekdays: [], staff: [], daily: [], payments: [], nations: [], staffDaily: [],
 };
 
 /** วิเคราะห์การขายจากตาราง `sales` (ที่อนุมัติแล้ว) ในช่วงวันที่ + สาขา.
@@ -42,7 +44,7 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
   const BILLs = `coalesce(nullif(s.receipt_no,''), s.order_no, 's'||s.id::text)`;
 
   try {
-    const [[k], scents, sizes, hours, weekdays, staff, daily, payments, nations] = await Promise.all([
+    const [[k], scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily] = await Promise.all([
       q<{ revenue: number; qty: number; bills: number; discount: number; days: number }>(
         `select coalesce(sum(total),0)::float revenue, coalesce(sum(qty),0)::float qty,
                 count(distinct ${BILL})::int bills, coalesce(sum(discount),0)::float discount,
@@ -80,6 +82,11 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
       q<NationRow>(
         `select coalesce(nullif(nation,''),'ไม่ระบุ') nation, sum(total)::float revenue, count(distinct ${BILL})::int bills
          from sales where ${W} group by 1 order by revenue desc nulls last`, a),
+      q<StaffDailyRow>(
+        `select sale_date::text d, coalesce(nullif(u.full_name,''), nullif(s.ba,''), 'ไม่ระบุ') staff,
+                sum(s.total)::float revenue, count(distinct ${BILLs})::int bills, sum(s.qty)::float qty
+         from sales s left join users u on u.id = s.created_by
+         where ${Ws} group by 1, 2 order by d`, a),
     ]);
 
     // รวมสัญชาติที่สะกดต่างกันให้เป็นค่าเดียว (normalize) — ค่าว่างใน SQL = 'ไม่ระบุ' คงไว้
@@ -102,7 +109,7 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
       discount_rate: gross ? discount / gross : 0,
       per_day: days ? revenue / days : 0,
     };
-    return { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations: nationsNorm };
+    return { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations: nationsNorm, staffDaily };
   } catch (e: any) {
     if (e?.code === "42P01") return EMPTY;   // ตาราง sales/products ยังไม่มี (เครื่อง dev ใหม่)
     throw e;

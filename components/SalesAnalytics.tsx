@@ -15,7 +15,21 @@ const thDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${+d
 
 export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch: string | null; from: string; to: string }) {
   const router = useRouter(); const pathname = usePathname(); const sp = useSearchParams();
-  const { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations } = data;
+  const { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily } = data;
+
+  // ตารางรายวัน × พนักงาน — แถว = วัน, คอลัมน์ = พนักงาน, ช่อง = ยอดบาท
+  const matrix = useMemo(() => {
+    const staffNames = staff.map((s) => s.staff);                 // เรียงตามยอดรวม (มาก→น้อย) อยู่แล้ว
+    const cell = new Map<string, number>();
+    for (const r of staffDaily) cell.set(`${r.d}__${r.staff}`, r.revenue);
+    const rows = daily.map((d) => {
+      const vals = staffNames.map((n) => cell.get(`${d.d}__${n}`) || 0);
+      const best = Math.max(0, ...vals);
+      return { d: d.d, vals, total: d.revenue, best };
+    });
+    const colTotals = staffNames.map((n) => staff.find((s) => s.staff === n)?.revenue || 0);
+    return { staffNames, rows, colTotals };
+  }, [staff, staffDaily, daily]);
 
   const go = (params: Record<string, string>) => {
     const p = new URLSearchParams(sp.toString());
@@ -68,6 +82,8 @@ export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch:
     sec("ช่องทางชำระ", ["ช่องทาง", "ยอด(บาท)", "รายการ"], payments.map((p) => [p.channel, Math.round(p.revenue), p.n]));
     sec("สัญชาติ", ["สัญชาติ", "ยอด(บาท)", "บิล"], nations.map((n) => [natLabel(n.nation), Math.round(n.revenue), n.bills]));
     sec("รายวัน", ["วันที่", "ยอด(บาท)", "บิล", "ชิ้น"], daily.map((d) => [d.d, Math.round(d.revenue), d.bills, Math.round(d.qty)]));
+    sec("รายวัน × พนักงาน (บาท)", ["วันที่", ...matrix.staffNames, "รวม/วัน"],
+      matrix.rows.map((r) => [r.d, ...r.vals.map((v) => Math.round(v)), Math.round(r.total)]));
     downloadCsv(`วิเคราะห์การขาย_${branch || "all"}_${from}_${to}.csv`, R);
   };
 
@@ -166,6 +182,45 @@ export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch:
               </table>
             </div>
           </Panel>
+
+          {/* ── daily × staff matrix ── */}
+          {matrix.staffNames.length > 0 && (
+            <Panel title="ยอดขายรายวัน × พนักงาน" sub="แต่ละวันใครขายได้เท่าไหร่ (บาท) · ตัวหนา = คนขายดีสุดของวัน">
+              <div className="overflow-auto max-h-[460px] rounded-lg border border-line-soft">
+                <table className="w-full text-[13px] border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                      <th className="sticky left-0 bg-canvas text-left font-semibold px-3 py-2 border-b border-line">วันที่</th>
+                      {matrix.staffNames.map((n) => (
+                        <th key={n} className="text-right font-semibold px-3 py-2 border-b border-line whitespace-nowrap max-w-[120px] truncate" title={n}>{n}</th>
+                      ))}
+                      <th className="text-right font-semibold px-3 py-2 border-b border-line bg-canvas">รวม/วัน</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matrix.rows.map((r) => (
+                      <tr key={r.d} className="border-b border-line-soft hover:bg-canvas/60">
+                        <td className="sticky left-0 bg-surface px-3 py-1.5 whitespace-nowrap text-ink tabular-nums">{thDate(r.d)}</td>
+                        {r.vals.map((v, i) => (
+                          <td key={i} className={`text-right px-3 py-1.5 tabular-nums ${v === 0 ? "text-line" : v === r.best ? "font-bold text-ink" : "text-muted"}`}>
+                            {v === 0 ? "–" : num(v)}
+                          </td>
+                        ))}
+                        <td className="text-right px-3 py-1.5 tabular-nums font-semibold text-ink bg-canvas/40">{num(r.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="sticky bottom-0">
+                    <tr className="bg-canvas font-semibold text-ink border-t-2 border-line">
+                      <td className="sticky left-0 bg-canvas px-3 py-2">รวม</td>
+                      {matrix.colTotals.map((v, i) => <td key={i} className="text-right px-3 py-2 tabular-nums">{num(v)}</td>)}
+                      <td className="text-right px-3 py-2 tabular-nums">{num(kpis.revenue)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Panel>
+          )}
 
           {/* ── payment + nation ── */}
           <div className="grid lg:grid-cols-2 gap-4">
