@@ -5,7 +5,7 @@
 import type { User } from "./constants";
 
 export type PermKey =
-  | "dashboard" | "requisitions" | "shipments" | "sales" | "stock"
+  | "dashboard" | "analytics" | "requisitions" | "shipments" | "sales" | "stock"
   | "products" | "cash" | "review" | "users" | "audit" | "trash" | "my_sales"
   | "sales_draft";
 
@@ -14,6 +14,7 @@ export type PermMeta = { key: PermKey; label: string; href: string; group: strin
 // Order here drives the sidebar + the "landing page" pick after login.
 export const PERMISSIONS: PermMeta[] = [
   { key: "dashboard",    label: "แดชบอร์ด",        href: "/",             group: "ภาพรวม" },
+  { key: "analytics",    label: "วิเคราะห์การขาย",  href: "/analytics",    group: "ภาพรวม" },
   { key: "requisitions", label: "ใบเบิกสินค้า",     href: "/requisitions", group: "ปฏิบัติการ" },
   { key: "shipments",    label: "ส่ง / คืนสินค้า",  href: "/shipments",    group: "ปฏิบัติการ" },
   { key: "sales",        label: "การขาย",           href: "/sales",        group: "ปฏิบัติการ" },
@@ -47,9 +48,9 @@ export const ROLE_LABEL: Record<string, string> =
 // custom `permissions` override.
 export const ROLE_PRESETS: Record<RoleKey, PermKey[] | ["*"]> = {
   admin: ["*"],
-  manager: ["dashboard", "requisitions", "shipments", "sales", "stock", "products", "cash", "review"],
+  manager: ["dashboard", "analytics", "requisitions", "shipments", "sales", "stock", "products", "cash", "review"],
   operations: ["dashboard", "requisitions", "shipments", "sales", "stock", "products", "cash"],
-  viewer: ["dashboard", "sales", "stock"],
+  viewer: ["dashboard", "analytics", "sales", "stock"],
   staff: ["my_sales"],
 };
 

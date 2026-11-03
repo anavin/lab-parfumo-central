@@ -33,7 +33,7 @@ import { Select } from "@/components/ui/Select";
 import { compressImage } from "@/lib/img";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
 import { branchOptions, DEFAULT_BRANCH } from "@/lib/branches";
-import { NATION_BUTTONS, natLabel } from "@/lib/nation";
+import { NATION_BUTTONS, natLabel, normalizeNation, NATION_SUGGESTIONS } from "@/lib/nation";
 import { SplitTenders } from "@/components/SplitTenders";
 import { useBarcodeScanner } from "@/lib/useBarcodeScanner";
 import { baht, num } from "@/lib/format";
@@ -349,9 +349,15 @@ function NationPicker({ value, onChange, invalid, big }: { value: string; onChan
         <button type="button" onClick={() => { setOtherOpen(true); onChange(""); }} className={btn(otherActive)}>✏️ อื่นๆ</button>
       </div>
       {otherActive && (
-        <input autoFocus value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="ระบุสัญชาติ เช่น ญี่ปุ่น เกาหลี อินเดีย"
-          className="mt-2 w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
+        <>
+          <input autoFocus value={value} onChange={(e) => onChange(e.target.value)}
+            onBlur={(e) => { const n = normalizeNation(e.target.value); if (n !== value) onChange(n); }}
+            list="nation-suggest" autoComplete="off"
+            placeholder="ระบุสัญชาติ เช่น ญี่ปุ่น เกาหลี อินเดีย"
+            className="mt-2 w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-surface text-ink focus:outline-none focus:border-brand" />
+          <datalist id="nation-suggest">{NATION_SUGGESTIONS.map((s) => <option key={s} value={s} />)}</datalist>
+          <p className="mt-1 text-[11px] text-muted">พิมพ์ 2–3 ตัวแล้วเลือกจากรายการ — ระบบจะรวมคำที่สะกดต่างกันให้อัตโนมัติ</p>
+        </>
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Truck, Receipt, Package, FlaskConical, Wallet, Users, LogOut,
-  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks, FileUp, PackageCheck, Tag, FileEdit,
+  ScrollText, Trash2, Menu, X, ClipboardCheck, Store, Barcode, Boxes, ListChecks, FileUp, PackageCheck, Tag, FileEdit, BarChart3,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -17,7 +17,7 @@ type Group = { title: string; items: Item[] };
 
 // One icon per permission key; groups mirror PERMISSIONS[].group.
 const ICON: Record<PermKey, any> = {
-  dashboard: LayoutDashboard, requisitions: ClipboardList, shipments: Truck, sales: Receipt,
+  dashboard: LayoutDashboard, analytics: BarChart3, requisitions: ClipboardList, shipments: Truck, sales: Receipt,
   stock: Package, products: FlaskConical, cash: Wallet, review: ClipboardCheck,
   users: Users, audit: ScrollText, trash: Trash2, my_sales: Store, sales_draft: FileEdit,
 };
@@ -25,6 +25,7 @@ const ICON: Record<PermKey, any> = {
 const MENU: { title: string; items: { key: PermKey; href: string; label: string; icon?: any; needs?: PermKey[] }[] }[] = [
   { title: "ภาพรวม", items: [
     { key: "dashboard", href: "/", label: "แดชบอร์ด" },
+    { key: "analytics", href: "/analytics", label: "วิเคราะห์การขาย" },
     { key: "review", href: "/review", label: "ตรวจสอบยอดขาย" },
   ]},
   { title: "ปฏิบัติการ", items: [
