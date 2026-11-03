@@ -38,21 +38,24 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
   // อัตราเปลี่ยนเทียบช่วงก่อน (null = ช่วงก่อนไม่มียอด เทียบ % ไม่ได้)
   const delta = (cur: number, prv: number): number | null => (prv > 0 ? (cur - prv) / prv : null);
 
-  // เมทริกซ์ กลิ่น × ขนาด (ช่อง = จำนวนชิ้น)
+  // เมทริกซ์ กลิ่น × ขนาด (ช่อง = จำนวนชิ้น) · เรียงกลิ่น/ขนาดตาม "ยอดขาย"
   const ssm = useMemo(() => {
-    const sizeTot = new Map<string, number>(), scentTot = new Map<string, number>(), cell = new Map<string, number>();
+    const sizeRev = new Map<string, number>(), scentRev = new Map<string, number>();
+    const scentQty = new Map<string, number>(), cell = new Map<string, number>();
     for (const r of scentSize) {
-      sizeTot.set(r.size, (sizeTot.get(r.size) || 0) + r.qty);
-      scentTot.set(r.scent, (scentTot.get(r.scent) || 0) + r.qty);
+      sizeRev.set(r.size, (sizeRev.get(r.size) || 0) + r.revenue);
+      scentRev.set(r.scent, (scentRev.get(r.scent) || 0) + r.revenue);
+      scentQty.set(r.scent, (scentQty.get(r.scent) || 0) + r.qty);
       cell.set(`${r.scent}__${r.size}`, (cell.get(`${r.scent}__${r.size}`) || 0) + r.qty);
     }
-    const sizes = [...sizeTot.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
-    const scentsTop = [...scentTot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([s]) => s);
+    const sizes = [...sizeRev.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
+    const scentsTop = [...scentRev.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([s]) => s);
+    const colTot = new Map<string, number>();
     const rows = scentsTop.map((sc) => {
-      const vals = sizes.map((sz) => cell.get(`${sc}__${sz}`) || 0);
-      return { scent: sc, vals, total: scentTot.get(sc) || 0, best: Math.max(0, ...vals) };
+      const vals = sizes.map((sz) => { const v = cell.get(`${sc}__${sz}`) || 0; colTot.set(sz, (colTot.get(sz) || 0) + v); return v; });
+      return { scent: sc, vals, total: scentQty.get(sc) || 0, best: Math.max(0, ...vals) };
     });
-    return { sizes, rows, colTotals: sizes.map((sz) => sizeTot.get(sz) || 0), grand: [...scentTot.values()].reduce((a, b) => a + b, 0) };
+    return { sizes, rows, colTotals: sizes.map((sz) => colTot.get(sz) || 0), grand: rows.reduce((a, r) => a + r.total, 0) };
   }, [scentSize]);
 
   // ตารางรายวัน × พนักงาน — แถว = วัน, คอลัมน์ = พนักงาน, ช่อง = ยอดบาท
@@ -91,6 +94,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
       { k: "30 วัน", f: ago(29), t: today },
       { k: "ปีนี้", f: today.slice(0, 4) + "-01-01", t: today },
       { k: "ปีที่แล้ว", f: `${+today.slice(0, 4) - 1}-01-01`, t: `${+today.slice(0, 4) - 1}-12-31` },
+      { k: "ทั้งหมด", f: "2000-01-01", t: today },
     ];
   }, []);
   const activePreset = presets.find((p) => p.f === from && p.t === to)?.k;
@@ -239,9 +243,8 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
             </Panel>
           </div>
 
-          {/* ── heatmap hour × weekday (full-bleed) ── */}
+          {/* ── heatmap hour × weekday ── */}
           {heat && (
-            <div className="relative left-1/2 -translate-x-1/2 w-screen px-4 sm:px-6 lg:px-8">
             <Panel title="ช่วงเวลาที่ขายดี (วัน × ชั่วโมง)" sub="เข้ม= ยอดขายสูง · ไว้จัดกะพนักงาน / โปรช่วงเงียบ">
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed border-collapse" style={{ minWidth: heat.hoursAxis.length * 34 + 44 }}>
@@ -274,7 +277,6 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
               </div>
               <div className="text-[10.5px] text-muted mt-2">ตัวเลข = ยอดขาย (ย่อ) · เลขบนสุด = ชั่วโมง (24 ชม.) · เลื่อนแนวนอนได้บนจอเล็ก</div>
             </Panel>
-            </div>
           )}
 
           {/* ── staff ── */}
