@@ -52,6 +52,16 @@ const KPI_COLS = `coalesce(sum(total),0)::float revenue, coalesce(sum(qty),0)::f
                   count(distinct ${BILL})::int bills, coalesce(sum(discount),0)::float discount,
                   count(distinct sale_date)::int days`;
 
+/** รัน query หลายตัวแบบจำกัดจำนวนพร้อมกัน — prod pool เล็ก (max 3) ยิงพรวดเดียวจะคอขวด/ทามเอาต์.
+ *  size=2 เว้นคอนเนกชันไว้ให้คำขออื่น. คืนผลลัพธ์ตามลำดับเดิมของ tasks. */
+async function runLimited(tasks: (() => Promise<any>)[], size = 2): Promise<any[]> {
+  const out = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => { while (next < tasks.length) { const i = next++; out[i] = await tasks[i](); } };
+  await Promise.all(Array.from({ length: Math.min(size, tasks.length) }, worker));
+  return out;
+}
+
 /** KPI อย่างเดียว (query เดียว) — ใช้ดึง "ช่วงก่อนหน้า" มาเทียบ โดยไม่ต้องดึงทั้งชุด. */
 export async function analyticsKpis(branch: string | null, from: string, to: string): Promise<AnalyticsKpis> {
   const a: (string | null)[] = [from, to, branch];
@@ -74,52 +84,56 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
   const BILLs = `coalesce(nullif(s.receipt_no,''), s.order_no, 's'||s.id::text)`;
 
   try {
-    const [[k], scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize] = await Promise.all([
-      q<{ revenue: number; qty: number; bills: number; discount: number; days: number }>(
+    const [kRows, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize] = await runLimited([
+      () => q<{ revenue: number; qty: number; bills: number; discount: number; days: number }>(
         `select ${KPI_COLS} from sales where ${W}`, a),
-      q<ScentRow>(
+      () => q<ScentRow>(
         `select coalesce(nullif(p.scent,''), nullif(s.item,''), 'ไม่ระบุ') scent,
                 sum(s.qty)::float qty, sum(s.total)::float revenue, count(distinct ${BILLs})::int bills
          from sales s left join products p on p.id = s.product_id
          where ${Ws} group by 1 order by revenue desc nulls last limit 20`, a),
-      q<SizeRow>(
+      () => q<SizeRow>(
         `select coalesce(nullif(size,''),'ไม่ระบุ') size, sum(qty)::float qty,
                 sum(total)::float revenue, count(distinct ${BILL})::int bills
          from sales where ${W} group by 1 order by revenue desc nulls last`, a),
-      q<HourRow>(
-        `select extract(hour from sale_time)::int hour, sum(total)::float revenue,
+      () => q<HourRow>(
+        `select extract(hour from sale_time)::int as "hour", sum(total)::float revenue,
                 sum(qty)::float qty, count(distinct ${BILL})::int bills
          from sales where ${W} and sale_time is not null group by 1 order by 1`, a),
-      q<WeekdayRow>(
+      () => q<WeekdayRow>(
         `select extract(dow from sale_date)::int dow, sum(total)::float revenue,
                 sum(qty)::float qty, count(distinct ${BILL})::int bills
          from sales where ${W} group by 1 order by 1`, a),
-      q<StaffRow>(
+      () => q<StaffRow>(
         `select coalesce(nullif(u.full_name,''), nullif(s.ba,''), 'ไม่ระบุ') staff,
                 sum(s.total)::float revenue, sum(s.qty)::float qty, count(distinct ${BILLs})::int bills,
                 (sum(s.total) / nullif(count(distinct ${BILLs}),0))::float aov
          from sales s left join users u on u.id = s.created_by
          where ${Ws} group by 1 order by revenue desc nulls last`, a),
-      q<DailyRow>(
+      () => q<DailyRow>(
         `select sale_date::text d, sum(total)::float revenue, count(distinct ${BILL})::int bills, sum(qty)::float qty
          from sales where ${W} group by sale_date order by sale_date`, a),
-      q<ChannelRow>(
+      () => q<ChannelRow>(
         `select coalesce(nullif(payment_channel,''),'ไม่ระบุ') channel, sum(total)::float revenue, count(*)::int n
          from sales where ${W} group by 1 order by revenue desc nulls last`, a),
-      q<NationRow>(
+      () => q<NationRow>(
         `select coalesce(nullif(nation,''),'ไม่ระบุ') nation, sum(total)::float revenue, count(distinct ${BILL})::int bills
          from sales where ${W} group by 1 order by revenue desc nulls last`, a),
-      q<StaffDailyRow>(
+      () => q<StaffDailyRow>(
         `select sale_date::text d, coalesce(nullif(u.full_name,''), nullif(s.ba,''), 'ไม่ระบุ') staff,
                 sum(s.total)::float revenue, count(distinct ${BILLs})::int bills, sum(s.qty)::float qty
          from sales s left join users u on u.id = s.created_by
          where ${Ws} group by 1, 2 order by d`, a),
-      q<ScentSizeRow>(
+      () => q<ScentSizeRow>(
         `select coalesce(nullif(p.scent,''), nullif(s.item,''), 'ไม่ระบุ') scent,
                 coalesce(nullif(s.size,''),'ไม่ระบุ') size, sum(s.qty)::float qty, sum(s.total)::float revenue
          from sales s left join products p on p.id = s.product_id
          where ${Ws} group by 1, 2`, a),
-    ]);
+    ], 2) as [
+      { revenue: number; qty: number; bills: number; discount: number; days: number }[],
+      ScentRow[], SizeRow[], HourRow[], WeekdayRow[], StaffRow[], DailyRow[], ChannelRow[], NationRow[], StaffDailyRow[], ScentSizeRow[],
+    ];
+    const k = kRows[0];
 
     // รวมสัญชาติที่สะกดต่างกันให้เป็นค่าเดียว (normalize) — ค่าว่างใน SQL = 'ไม่ระบุ' คงไว้
     const natMap = new Map<string, NationRow>();

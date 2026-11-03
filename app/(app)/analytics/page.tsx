@@ -29,10 +29,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const pFrom = new Date(pTo); pFrom.setUTCDate(pFrom.getUTCDate() - (len - 1));
   const prevFrom = pFrom.toISOString().slice(0, 10), prevTo = pTo.toISOString().slice(0, 10);
 
-  const [data, prev] = await Promise.all([
-    salesAnalytics(branch, from, to),
-    analyticsKpis(branch, prevFrom, prevTo),
-  ]);
+  // ทำทีละช่วง (prod pool เล็ก) — หลัก ก่อน แล้วค่อยช่วงเทียบ
+  const data = await salesAnalytics(branch, from, to);
+  const prev = await analyticsKpis(branch, prevFrom, prevTo);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
