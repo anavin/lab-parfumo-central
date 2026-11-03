@@ -10,6 +10,15 @@ import type { SalesAnalytics as Data, AnalyticsKpis, DeadStockRow } from "@/lib/
 
 const ymd = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const DOW_TH = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"];
+
+// normalize ขนาด: ดึงเลข ml ออกมาเป็นค่ามาตรฐาน "N ml." (รวม 50 ML./50ml/50 ml. ให้เป็นอันเดียว) · ไม่ใช่ ml → null
+const mlSize = (raw?: string | null): string | null => {
+  const m = String(raw || "").match(/(\d+(?:\.\d+)?)\s*ml\b/i);
+  return m ? `${Number(m[1])} ml.` : null;
+};
+const SIZE_ORDER = ["50 ml.", "30 ml.", "10 ml.", "4 ml."];
+// ไม่ใช่น้ำหอม (ถุงผ้า/กระเป๋า/CYOC/เทสเตอร์/บรรจุภัณฑ์) — กรองออกจากตารางกลิ่น×ขนาด
+const NON_PERFUME = /try\s*me|cloth|\bbag\b|cyoc|pouch|ถุง|กระเป๋า|ผ้า/i;
 const pct = (n: number) => `${(n * 100).toFixed(n >= 0.1 ? 0 : 1)}%`;
 const thDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${+d}/${+m}`; };
 
@@ -43,12 +52,20 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
     const sizeRev = new Map<string, number>(), scentRev = new Map<string, number>();
     const scentQty = new Map<string, number>(), cell = new Map<string, number>();
     for (const r of scentSize) {
-      sizeRev.set(r.size, (sizeRev.get(r.size) || 0) + r.revenue);
+      const size = mlSize(r.size);
+      if (!size || NON_PERFUME.test(r.scent)) continue;      // เฉพาะน้ำหอมที่มีขนาด ml เท่านั้น
+      sizeRev.set(size, (sizeRev.get(size) || 0) + r.revenue);
       scentRev.set(r.scent, (scentRev.get(r.scent) || 0) + r.revenue);
       scentQty.set(r.scent, (scentQty.get(r.scent) || 0) + r.qty);
-      cell.set(`${r.scent}__${r.size}`, (cell.get(`${r.scent}__${r.size}`) || 0) + r.qty);
+      cell.set(`${r.scent}__${size}`, (cell.get(`${r.scent}__${size}`) || 0) + r.qty);
     }
-    const sizes = [...sizeRev.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
+    const sizes = [...sizeRev.keys()].sort((a, b) => {
+      const ia = SIZE_ORDER.indexOf(a), ib = SIZE_ORDER.indexOf(b);
+      if (ia >= 0 && ib >= 0) return ia - ib;               // 50 → 30 → 10 → 4
+      if (ia >= 0) return -1;
+      if (ib >= 0) return 1;
+      return (sizeRev.get(b) || 0) - (sizeRev.get(a) || 0); // ขนาดอื่นที่ไม่รู้จัก เรียงตามยอด
+    });
     const scentsTop = [...scentRev.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([s]) => s);
     const colTot = new Map<string, number>();
     const rows = scentsTop.map((sc) => {
