@@ -1,5 +1,6 @@
 import { q } from "./db";
 import { normalizeNation } from "./nation";
+import { stockLive } from "./queries";
 
 // สาขาที่ขายจริง (EVENT_SCS นับเป็น SCS) — ใช้กรองสาขาให้ตรงกับที่อื่นในระบบ
 const BR = `upper(case when source='EVENT_SCS' then 'SCS' else coalesce(nullif(source,''),'CTW') end)`;
@@ -21,17 +22,19 @@ export type ChannelRow = { channel: string; revenue: number; n: number };
 export type NationRow = { nation: string; revenue: number; bills: number };
 export type StaffDailyRow = { d: string; staff: string; revenue: number; bills: number; qty: number };
 export type ScentSizeRow = { scent: string; size: string; qty: number; revenue: number };
+export type HeatCell = { dow: number; hour: number; revenue: number; bills: number };
+export type DeadStockRow = { barcode: string; scent: string; size: string; remaining: number; soldPeriod: number; lastSold: string | null; daysIdle: number | null };
 
 export type SalesAnalytics = {
   kpis: AnalyticsKpis;
   scents: ScentRow[]; sizes: SizeRow[]; hours: HourRow[]; weekdays: WeekdayRow[];
   staff: StaffRow[]; daily: DailyRow[]; payments: ChannelRow[]; nations: NationRow[];
-  staffDaily: StaffDailyRow[]; scentSize: ScentSizeRow[];
+  staffDaily: StaffDailyRow[]; scentSize: ScentSizeRow[]; heatmap: HeatCell[];
 };
 
 const EMPTY: SalesAnalytics = {
   kpis: { revenue: 0, qty: 0, bills: 0, items_per_bill: 0, aov: 0, per_item: 0, discount: 0, gross: 0, discount_rate: 0, days: 0, per_day: 0 },
-  scents: [], sizes: [], hours: [], weekdays: [], staff: [], daily: [], payments: [], nations: [], staffDaily: [], scentSize: [],
+  scents: [], sizes: [], hours: [], weekdays: [], staff: [], daily: [], payments: [], nations: [], staffDaily: [], scentSize: [], heatmap: [],
 };
 
 // คำนวณ KPI ที่ต่อยอด (เฉลี่ย ฯลฯ) จากตัวเลขดิบ — ใช้ร่วมทั้งช่วงหลักและช่วงเทียบ
@@ -84,7 +87,7 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
   const BILLs = `coalesce(nullif(s.receipt_no,''), s.order_no, 's'||s.id::text)`;
 
   try {
-    const [kRows, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize] = await runLimited([
+    const [kRows, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize, heatmap] = await runLimited([
       () => q<{ revenue: number; qty: number; bills: number; discount: number; days: number }>(
         `select ${KPI_COLS} from sales where ${W}`, a),
       () => q<ScentRow>(
@@ -129,9 +132,13 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
                 coalesce(nullif(s.size,''),'ไม่ระบุ') size, sum(s.qty)::float qty, sum(s.total)::float revenue
          from sales s left join products p on p.id = s.product_id
          where ${Ws} group by 1, 2`, a),
+      () => q<HeatCell>(
+        `select extract(dow from sale_date)::int dow, extract(hour from sale_time)::int as "hour",
+                sum(total)::float revenue, count(distinct ${BILL})::int bills
+         from sales where ${W} and sale_time is not null group by 1, 2`, a),
     ], 2) as [
       { revenue: number; qty: number; bills: number; discount: number; days: number }[],
-      ScentRow[], SizeRow[], HourRow[], WeekdayRow[], StaffRow[], DailyRow[], ChannelRow[], NationRow[], StaffDailyRow[], ScentSizeRow[],
+      ScentRow[], SizeRow[], HourRow[], WeekdayRow[], StaffRow[], DailyRow[], ChannelRow[], NationRow[], StaffDailyRow[], ScentSizeRow[], HeatCell[],
     ];
     const k = kRows[0];
 
@@ -145,9 +152,52 @@ export async function salesAnalytics(branch: string | null, from: string, to: st
     const nationsNorm = [...natMap.values()].sort((x, y) => y.revenue - x.revenue);
 
     const kpis = deriveKpis(k);
-    return { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations: nationsNorm, staffDaily, scentSize };
+    return { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations: nationsNorm, staffDaily, scentSize, heatmap };
   } catch (e: any) {
     if (e?.code === "42P01") return EMPTY;   // ตาราง sales/products ยังไม่มี (เครื่อง dev ใหม่)
+    throw e;
+  }
+}
+
+/** สินค้าขายช้า/ไม่ขยับ — ของที่ยังมีสต๊อก (remaining>0) เรียงจาก "ขายได้น้อย/ไม่ขายนานสุด" ก่อน.
+ *  soldPeriod = ขายได้ในช่วงที่เลือก · lastSold = ขายล่าสุด (นับทุกช่วง) · daysIdle = ไม่ขายมากี่วัน. */
+export async function deadStock(branch: string | null, from: string, to: string, limit = 40): Promise<DeadStockRow[]> {
+  try {
+    const live = await stockLive(branch);                       // ของคงเหลือต่อบาร์โค้ด (สาขาที่เลือก/รวม)
+    const onHand = live.filter((r) => (Number(r.remaining) || 0) > 0);
+    if (!onHand.length) return [];
+    // ยอดขายต่อบาร์โค้ด: ในช่วง + วันขายล่าสุด (ทุกช่วง) ของสาขาที่เลือก
+    const rows = await q<{ barcode: string; sold_period: number; last_sold: string | null }>(
+      `select barcode,
+              coalesce(sum(qty) filter (where sale_date between $2 and $3),0)::float sold_period,
+              max(sale_date)::text last_sold
+       from sales
+       where barcode is not null and sale_date is not null
+         and ($1::text is null or ${BR} = upper($1))
+       group by barcode`, [branch, from, to]);
+    const byBc = new Map(rows.map((r) => [r.barcode, r]));
+    const today = new Date();
+    const daysBetween = (iso: string | null) => {
+      if (!iso) return null;
+      const d = Math.round((today.getTime() - new Date(iso + "T00:00:00Z").getTime()) / 86400000);
+      return d < 0 ? 0 : d;
+    };
+    return onHand
+      .map((r) => {
+        const s = byBc.get(r.barcode);
+        return {
+          barcode: r.barcode, scent: r.scent, size: r.size, remaining: Math.round(Number(r.remaining) || 0),
+          soldPeriod: Math.round(Number(s?.sold_period) || 0),
+          lastSold: s?.last_sold ?? null, daysIdle: daysBetween(s?.last_sold ?? null),
+        };
+      })
+      // ช้าสุดก่อน: ขายในช่วงน้อยสุด → ไม่ขายนานสุด → ของค้างเยอะสุด
+      .sort((x, y) => x.soldPeriod - y.soldPeriod
+        || (y.daysIdle ?? 9e9) - (x.daysIdle ?? 9e9)
+        || y.remaining - x.remaining)
+      .slice(0, limit);
+  } catch (e: any) {
+    if (e?.code === "42P01") return [];
     throw e;
   }
 }

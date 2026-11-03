@@ -6,17 +6,34 @@ import { baht, num, compactBaht } from "@/lib/format";
 import { natLabel } from "@/lib/nation";
 import { branchName } from "@/lib/branches";
 import { downloadCsv } from "@/lib/csv";
-import type { SalesAnalytics as Data, AnalyticsKpis } from "@/lib/analytics";
+import type { SalesAnalytics as Data, AnalyticsKpis, DeadStockRow } from "@/lib/analytics";
 
 const ymd = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const DOW_TH = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"];
 const pct = (n: number) => `${(n * 100).toFixed(n >= 0.1 ? 0 : 1)}%`;
 const thDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${+d}/${+m}`; };
 
-export function SalesAnalytics({ data, prev, prevRange, branch, from, to }:
-  { data: Data; prev: AnalyticsKpis; prevRange: { from: string; to: string }; branch: string | null; from: string; to: string }) {
+export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }:
+  { data: Data; prev: AnalyticsKpis; prevRange: { from: string; to: string }; dead: DeadStockRow[]; branch: string | null; from: string; to: string }) {
   const router = useRouter(); const pathname = usePathname(); const sp = useSearchParams();
-  const { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize } = data;
+  const { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize, heatmap } = data;
+
+  // heatmap เวลา×วัน: grid[dow][hour] = revenue
+  const heat = useMemo(() => {
+    const cell = new Map<string, { revenue: number; bills: number }>();
+    let hLo = 23, hHi = 0, max = 0;
+    for (const c of heatmap) {
+      cell.set(`${c.dow}_${c.hour}`, { revenue: c.revenue, bills: c.bills });
+      if (c.revenue > 0) { hLo = Math.min(hLo, c.hour); hHi = Math.max(hHi, c.hour); max = Math.max(max, c.revenue); }
+    }
+    if (max === 0) return null;
+    const hoursAxis: number[] = [];
+    for (let h = hLo; h <= hHi; h++) hoursAxis.push(h);
+    const rows = [1, 2, 3, 4, 5, 6, 0].map((dow) => ({
+      dow, cells: hoursAxis.map((h) => cell.get(`${dow}_${h}`) || { revenue: 0, bills: 0 }),
+    }));
+    return { hoursAxis, rows, max };
+  }, [heatmap]);
 
   // อัตราเปลี่ยนเทียบช่วงก่อน (null = ช่วงก่อนไม่มียอด เทียบ % ไม่ได้)
   const delta = (cur: number, prv: number): number | null => (prv > 0 ? (cur - prv) / prv : null);
@@ -107,6 +124,10 @@ export function SalesAnalytics({ data, prev, prevRange, branch, from, to }:
       matrix.rows.map((r) => [r.d, ...r.vals.map((v) => Math.round(v)), Math.round(r.total)]));
     sec("กลิ่น × ขนาด (ชิ้น)", ["กลิ่น", ...ssm.sizes, "รวม"],
       ssm.rows.map((r) => [r.scent, ...r.vals.map((v) => Math.round(v)), Math.round(r.total)]));
+    if (heat) sec("ช่วงเวลาขายดี วัน×ชม. (บาท)", ["วัน", ...heat.hoursAxis.map((h) => `${h}:00`)],
+      heat.rows.map((r) => [DOW_TH[r.dow], ...r.cells.map((c) => Math.round(c.revenue))]));
+    sec("สินค้าขายช้า/ไม่ขยับ", ["กลิ่น", "ขนาด", "คงเหลือ", "ขายในช่วง", "ไม่ขายมา(วัน)", "บาร์โค้ด"],
+      dead.map((r) => [r.scent, r.size, r.remaining, r.soldPeriod, r.daysIdle ?? "ยังไม่เคยขาย", r.barcode]));
     downloadCsv(`วิเคราะห์การขาย_${branch || "all"}_${from}_${to}.csv`, R);
   };
 
@@ -217,6 +238,42 @@ export function SalesAnalytics({ data, prev, prevRange, branch, from, to }:
             </Panel>
           </div>
 
+          {/* ── heatmap hour × weekday ── */}
+          {heat && (
+            <Panel title="ช่วงเวลาที่ขายดี (วัน × ชั่วโมง)" sub="เข้ม= ยอดขายสูง · ไว้จัดกะพนักงาน / โปรช่วงเงียบ">
+              <div className="overflow-x-auto">
+                <table className="border-collapse" style={{ minWidth: (heat.hoursAxis.length + 1) * 34 }}>
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 bg-surface" />
+                      {heat.hoursAxis.map((h) => <th key={h} className="text-[10px] text-muted font-medium pb-1 w-8 text-center tabular-nums">{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {heat.rows.map((r) => (
+                      <tr key={r.dow}>
+                        <td className="sticky left-0 bg-surface pr-2 text-[11px] text-muted font-medium whitespace-nowrap">{DOW_TH[r.dow].slice(0, 2)}</td>
+                        {r.cells.map((c, i) => {
+                          const t = heat.max ? c.revenue / heat.max : 0;
+                          return (
+                            <td key={i} className="p-0.5">
+                              <div className="h-7 rounded flex items-center justify-center text-[8.5px] tabular-nums"
+                                style={{ backgroundColor: c.revenue > 0 ? `rgb(var(--brand) / ${0.12 + t * 0.88})` : "rgb(var(--canvas))", color: t > 0.5 ? "white" : "rgb(var(--muted))" }}
+                                title={`${DOW_TH[r.dow]} ${heat.hoursAxis[i]}:00 · ${baht(c.revenue)} · ${num(c.bills)} บิล`}>
+                                {c.revenue > 0 ? compactBaht(c.revenue) : ""}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="text-[10.5px] text-muted mt-2">ตัวเลข = ยอดขาย (ย่อ) · เลขบนสุด = ชั่วโมง (24 ชม.)</div>
+            </Panel>
+          )}
+
           {/* ── staff ── */}
           <Panel title="ยอดขายตามพนักงาน" sub="ใครขายได้เท่าไหร่ · เฉลี่ยต่อบิล">
             <div className="overflow-x-auto">
@@ -294,6 +351,35 @@ export function SalesAnalytics({ data, prev, prevRange, branch, from, to }:
               <BarList rows={nations.map((n) => ({ label: natLabel(n.nation), value: n.revenue, sub: `${num(n.bills)} บิล` }))} total={kpis.revenue} showPct />
             </Panel>
           </div>
+
+          {/* ── dead / slow stock ── */}
+          {dead.length > 0 && (
+            <Panel title="สินค้าขายช้า / ไม่ขยับ" sub={`ของค้างสต๊อก${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} · ขายน้อย/ไม่ขายนานสุดก่อน`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted border-b border-line">
+                    <th className="pb-2 font-semibold">กลิ่น</th>
+                    <th className="pb-2 w-16 font-semibold">ขนาด</th>
+                    <th className="pb-2 w-24 text-right font-semibold">คงเหลือ</th>
+                    <th className="pb-2 w-28 text-right font-semibold">ขายในช่วง</th>
+                    <th className="pb-2 w-32 text-right font-semibold">ไม่ขายมา</th>
+                  </tr></thead>
+                  <tbody>
+                    {dead.map((r) => (
+                      <tr key={r.barcode} className="border-b border-line-soft">
+                        <td className="py-2 text-ink max-w-[220px] truncate" title={r.scent}>{r.scent}</td>
+                        <td className="py-2 text-muted">{r.size}</td>
+                        <td className="py-2 text-right tabular-nums font-semibold text-ink">{num(r.remaining)}</td>
+                        <td className={`py-2 text-right tabular-nums ${r.soldPeriod === 0 ? "text-danger font-semibold" : "text-muted"}`}>{r.soldPeriod === 0 ? "ไม่ขายเลย" : num(r.soldPeriod)}</td>
+                        <td className="py-2 text-right tabular-nums text-muted">{r.daysIdle === null ? "ยังไม่เคยขาย" : `${num(r.daysIdle)} วัน`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="text-[10.5px] text-muted mt-2">แสดงสูงสุด 40 รายการ · “ขายในช่วง” นับตามช่วงวันที่ที่เลือก · “ไม่ขายมา” นับจากวันขายล่าสุดถึงวันนี้</div>
+            </Panel>
+          )}
         </>
       )}
     </div>

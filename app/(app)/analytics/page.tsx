@@ -1,6 +1,6 @@
 import { BarChart3 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/auth/require-user";
-import { salesAnalytics, analyticsKpis } from "@/lib/analytics";
+import { salesAnalytics, analyticsKpis, deadStock } from "@/lib/analytics";
 import { isBranch, DEFAULT_BRANCH, branchName } from "@/lib/branches";
 import { PageHeader } from "@/components/ui";
 import { BranchTabs } from "@/components/BranchTabs";
@@ -29,16 +29,17 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const pFrom = new Date(pTo); pFrom.setUTCDate(pFrom.getUTCDate() - (len - 1));
   const prevFrom = pFrom.toISOString().slice(0, 10), prevTo = pTo.toISOString().slice(0, 10);
 
-  // ทำทีละช่วง (prod pool เล็ก) — หลัก ก่อน แล้วค่อยช่วงเทียบ
+  // ทำทีละช่วง (prod pool เล็ก) — หลัก ก่อน แล้วค่อยช่วงเทียบ + สินค้าขายช้า
   const data = await salesAnalytics(branch, from, to);
   const prev = await analyticsKpis(branch, prevFrom, prevTo);
+  const dead = await deadStock(branch, from, to);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={BarChart3} title="วิเคราะห์การขาย"
         subtitle={`ทุกมุมของยอดขาย${branch ? ` · ${branchName(branch)}` : " · ทุกสาขา"} — กลิ่น / ขนาด / เวลา / วัน / พนักงาน`} />
       <div className="mb-3"><BranchTabs withAll defaultValue={DEFAULT_BRANCH} /></div>
-      <SalesAnalytics data={data} prev={prev} prevRange={{ from: prevFrom, to: prevTo }} branch={branch} from={from} to={to} />
+      <SalesAnalytics data={data} prev={prev} prevRange={{ from: prevFrom, to: prevTo }} dead={dead} branch={branch} from={from} to={to} />
     </div>
   );
 }
