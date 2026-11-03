@@ -199,7 +199,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
           {/* ── scent × size matrix ── */}
           {ssm.sizes.length > 0 && ssm.rows.length > 0 && (
             <Panel title={`กลิ่น × ขนาด · ${ssm.rows.length} กลิ่น`} sub="จำนวนชิ้นที่ขาย · ตัวหนา = ขนาดที่ขายดีสุดของกลิ่นนั้น">
-              <div className="overflow-auto max-h-[85vh] rounded-lg border border-line-soft">
+              <div className="overflow-x-auto rounded-lg border border-line-soft">
                 <table className="w-full text-[13px] border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-canvas text-[11px] uppercase tracking-wide text-muted">
@@ -221,7 +221,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="sticky bottom-0">
+                  <tfoot>
                     <tr className="bg-canvas font-semibold text-ink border-t-2 border-line">
                       <td className="sticky left-0 bg-canvas px-3 py-2">รวม</td>
                       {ssm.colTotals.map((v, i) => <td key={i} className="text-right px-3 py-2 tabular-nums">{num(v)}</td>)}
