@@ -6,16 +6,37 @@ import { baht, num, compactBaht } from "@/lib/format";
 import { natLabel } from "@/lib/nation";
 import { branchName } from "@/lib/branches";
 import { downloadCsv } from "@/lib/csv";
-import type { SalesAnalytics as Data } from "@/lib/analytics";
+import type { SalesAnalytics as Data, AnalyticsKpis } from "@/lib/analytics";
 
 const ymd = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 const DOW_TH = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์"];
 const pct = (n: number) => `${(n * 100).toFixed(n >= 0.1 ? 0 : 1)}%`;
 const thDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${+d}/${+m}`; };
 
-export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch: string | null; from: string; to: string }) {
+export function SalesAnalytics({ data, prev, prevRange, branch, from, to }:
+  { data: Data; prev: AnalyticsKpis; prevRange: { from: string; to: string }; branch: string | null; from: string; to: string }) {
   const router = useRouter(); const pathname = usePathname(); const sp = useSearchParams();
-  const { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily } = data;
+  const { kpis, scents, sizes, hours, weekdays, staff, daily, payments, nations, staffDaily, scentSize } = data;
+
+  // อัตราเปลี่ยนเทียบช่วงก่อน (null = ช่วงก่อนไม่มียอด เทียบ % ไม่ได้)
+  const delta = (cur: number, prv: number): number | null => (prv > 0 ? (cur - prv) / prv : null);
+
+  // เมทริกซ์ กลิ่น × ขนาด (ช่อง = จำนวนชิ้น)
+  const ssm = useMemo(() => {
+    const sizeTot = new Map<string, number>(), scentTot = new Map<string, number>(), cell = new Map<string, number>();
+    for (const r of scentSize) {
+      sizeTot.set(r.size, (sizeTot.get(r.size) || 0) + r.qty);
+      scentTot.set(r.scent, (scentTot.get(r.scent) || 0) + r.qty);
+      cell.set(`${r.scent}__${r.size}`, (cell.get(`${r.scent}__${r.size}`) || 0) + r.qty);
+    }
+    const sizes = [...sizeTot.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
+    const scentsTop = [...scentTot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([s]) => s);
+    const rows = scentsTop.map((sc) => {
+      const vals = sizes.map((sz) => cell.get(`${sc}__${sz}`) || 0);
+      return { scent: sc, vals, total: scentTot.get(sc) || 0, best: Math.max(0, ...vals) };
+    });
+    return { sizes, rows, colTotals: sizes.map((sz) => sizeTot.get(sz) || 0), grand: [...scentTot.values()].reduce((a, b) => a + b, 0) };
+  }, [scentSize]);
 
   // ตารางรายวัน × พนักงาน — แถว = วัน, คอลัมน์ = พนักงาน, ช่อง = ยอดบาท
   const matrix = useMemo(() => {
@@ -84,6 +105,8 @@ export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch:
     sec("รายวัน", ["วันที่", "ยอด(บาท)", "บิล", "ชิ้น"], daily.map((d) => [d.d, Math.round(d.revenue), d.bills, Math.round(d.qty)]));
     sec("รายวัน × พนักงาน (บาท)", ["วันที่", ...matrix.staffNames, "รวม/วัน"],
       matrix.rows.map((r) => [r.d, ...r.vals.map((v) => Math.round(v)), Math.round(r.total)]));
+    sec("กลิ่น × ขนาด (ชิ้น)", ["กลิ่น", ...ssm.sizes, "รวม"],
+      ssm.rows.map((r) => [r.scent, ...r.vals.map((v) => Math.round(v)), Math.round(r.total)]));
     downloadCsv(`วิเคราะห์การขาย_${branch || "all"}_${from}_${to}.csv`, R);
   };
 
@@ -118,15 +141,18 @@ export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch:
       ) : (
         <>
           {/* ── KPIs ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <Kpi label="ยอดขายรวม" value={baht(kpis.revenue)} primary />
-            <Kpi label="จำนวนบิล" value={num(kpis.bills)} />
-            <Kpi label="จำนวนชิ้น" value={num(kpis.qty)} />
-            <Kpi label="เฉลี่ย/บิล" value={baht(kpis.aov)} />
-            <Kpi label="เฉลี่ย/ชิ้น" value={baht(kpis.per_item)} />
-            <Kpi label="ชิ้น/บิล" value={kpis.items_per_bill.toFixed(2)} />
-            <Kpi label={`ส่วนลดรวม (${pct(kpis.discount_rate)})`} value={baht(kpis.discount)} />
-            <Kpi label={`เฉลี่ย/วัน (${num(kpis.days)} วัน)`} value={baht(kpis.per_day)} />
+          <div>
+            <div className="text-[11px] text-muted mb-1.5">▲▼ เทียบช่วงก่อนหน้า ({thDate(prevRange.from)}–{thDate(prevRange.to)})</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <Kpi label="ยอดขายรวม" value={baht(kpis.revenue)} delta={delta(kpis.revenue, prev.revenue)} primary />
+              <Kpi label="จำนวนบิล" value={num(kpis.bills)} delta={delta(kpis.bills, prev.bills)} />
+              <Kpi label="จำนวนชิ้น" value={num(kpis.qty)} delta={delta(kpis.qty, prev.qty)} />
+              <Kpi label="เฉลี่ย/บิล" value={baht(kpis.aov)} delta={delta(kpis.aov, prev.aov)} />
+              <Kpi label="เฉลี่ย/ชิ้น" value={baht(kpis.per_item)} delta={delta(kpis.per_item, prev.per_item)} />
+              <Kpi label="ชิ้น/บิล" value={kpis.items_per_bill.toFixed(2)} delta={delta(kpis.items_per_bill, prev.items_per_bill)} />
+              <Kpi label={`ส่วนลดรวม (${pct(kpis.discount_rate)})`} value={baht(kpis.discount)} />
+              <Kpi label={`เฉลี่ย/วัน (${num(kpis.days)} วัน)`} value={baht(kpis.per_day)} delta={delta(kpis.per_day, prev.per_day)} />
+            </div>
           </div>
 
           {/* ── daily trend ── */}
@@ -143,6 +169,43 @@ export function SalesAnalytics({ data, branch, from, to }: { data: Data; branch:
               <BarList rows={sizes.map((s) => ({ label: s.size, value: s.revenue, sub: `${num(s.qty)} ชิ้น` }))} total={kpis.revenue} showPct />
             </Panel>
           </div>
+
+          {/* ── scent × size matrix ── */}
+          {ssm.sizes.length > 0 && ssm.rows.length > 0 && (
+            <Panel title="กลิ่น × ขนาด" sub="จำนวนชิ้นที่ขาย · ตัวหนา = ขนาดที่ขายดีสุดของกลิ่นนั้น">
+              <div className="overflow-auto max-h-[460px] rounded-lg border border-line-soft">
+                <table className="w-full text-[13px] border-collapse">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-canvas text-[11px] uppercase tracking-wide text-muted">
+                      <th className="sticky left-0 bg-canvas text-left font-semibold px-3 py-2 border-b border-line">กลิ่น</th>
+                      {ssm.sizes.map((s) => <th key={s} className="text-right font-semibold px-3 py-2 border-b border-line whitespace-nowrap">{s}</th>)}
+                      <th className="text-right font-semibold px-3 py-2 border-b border-line bg-canvas">รวม</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ssm.rows.map((r) => (
+                      <tr key={r.scent} className="border-b border-line-soft hover:bg-canvas/60">
+                        <td className="sticky left-0 bg-surface px-3 py-1.5 text-ink max-w-[180px] truncate" title={r.scent}>{r.scent}</td>
+                        {r.vals.map((v, i) => (
+                          <td key={i} className={`text-right px-3 py-1.5 tabular-nums ${v === 0 ? "text-line" : v === r.best ? "font-bold text-ink" : "text-muted"}`}>
+                            {v === 0 ? "–" : num(v)}
+                          </td>
+                        ))}
+                        <td className="text-right px-3 py-1.5 tabular-nums font-semibold text-ink bg-canvas/40">{num(r.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="sticky bottom-0">
+                    <tr className="bg-canvas font-semibold text-ink border-t-2 border-line">
+                      <td className="sticky left-0 bg-canvas px-3 py-2">รวม</td>
+                      {ssm.colTotals.map((v, i) => <td key={i} className="text-right px-3 py-2 tabular-nums">{num(v)}</td>)}
+                      <td className="text-right px-3 py-2 tabular-nums">{num(ssm.grand)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Panel>
+          )}
 
           {/* ── hour + weekday ── */}
           <div className="grid lg:grid-cols-2 gap-4">
@@ -252,12 +315,26 @@ function fillWeekdays(weekdays: Data["weekdays"]): Data["weekdays"] {
   return [1, 2, 3, 4, 5, 6, 0].map((dow) => map.get(dow) ?? { dow, revenue: 0, qty: 0, bills: 0 });
 }
 
-function Kpi({ label, value, primary = false }: { label: string; value: string; primary?: boolean }) {
+function Kpi({ label, value, primary = false, delta }: { label: string; value: string; primary?: boolean; delta?: number | null }) {
   return (
     <div className={`rounded-xl border p-3 ${primary ? "border-brand/40 bg-brand-soft/15" : "border-line bg-surface"}`}>
-      <div className="text-[11px] text-muted leading-tight">{label}</div>
-      <div className={`font-bold tabular-nums mt-0.5 ${primary ? "text-2xl text-ink" : "text-xl text-ink"}`}>{value}</div>
+      <div className="text-[11px] text-muted leading-tight truncate">{label}</div>
+      <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
+        <div className={`font-bold tabular-nums ${primary ? "text-2xl text-ink" : "text-xl text-ink"}`}>{value}</div>
+        {delta !== undefined && <DeltaChip d={delta} />}
+      </div>
     </div>
+  );
+}
+
+function DeltaChip({ d }: { d: number | null }) {
+  if (d === null) return <span className="text-[10px] text-muted whitespace-nowrap">ใหม่</span>;
+  if (Math.abs(d) < 0.005) return <span className="text-[10.5px] text-muted whitespace-nowrap tabular-nums">0%</span>;
+  const up = d > 0;
+  return (
+    <span className={`text-[10.5px] font-semibold whitespace-nowrap tabular-nums ${up ? "text-success" : "text-danger"}`}>
+      {up ? "▲" : "▼"} {Math.abs(d * 100).toFixed(0)}%
+    </span>
   );
 }
 
@@ -286,7 +363,7 @@ function BarList({ rows, total, showPct = false }: { rows: { label: string; valu
             {r.sub && <div className="text-[10.5px] text-muted truncate">{r.sub}</div>}
           </div>
           <div className="flex-1 h-5 rounded-md bg-canvas overflow-hidden">
-            <div className="h-full bg-brand/85 rounded-md" style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }} />
+            <div className="h-full rounded-md bg-gradient-to-r from-brand/60 to-brand transition-[width] duration-500" style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }} />
           </div>
           <div className="w-24 text-right shrink-0">
             <div className="text-[13px] font-semibold tabular-nums text-ink">{num(r.value)}</div>
@@ -305,14 +382,15 @@ function ColChart({ items, unit }: { items: { label: string; value: number; sub?
   const peak = items.reduce((a, b) => (b.value > a.value ? b : a), items[0]);
   return (
     <div className="overflow-x-auto">
-      <div className="flex items-end gap-1.5 h-40 min-w-full" style={{ minWidth: items.length * 22 }}>
+      <div className="flex items-end gap-1.5 h-40 min-w-full border-b border-line-soft" style={{ minWidth: items.length * 22 }}>
         {items.map((it, i) => {
           const h = Math.max(2, (it.value / max) * 100);
           const isPeak = it.value === peak.value && it.value > 0;
           return (
             <div key={it.label + i} className="flex-1 flex flex-col items-center justify-end h-full group min-w-[14px]">
-              <div className="text-[9px] text-muted tabular-nums mb-0.5 opacity-0 group-hover:opacity-100 whitespace-nowrap">{unit === "baht" ? compactBaht(it.value) : num(it.value)}</div>
-              <div className={`w-full rounded-t ${isPeak ? "bg-brand" : "bg-brand/40"}`} style={{ height: `${h}%` }}
+              <div className="text-[9px] text-ink font-medium tabular-nums mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{unit === "baht" ? compactBaht(it.value) : num(it.value)}</div>
+              <div className={`w-full rounded-t-md transition-all duration-500 ${isPeak ? "bg-gradient-to-t from-brand to-brand-dark shadow-sm" : "bg-gradient-to-t from-brand/25 to-brand/55 group-hover:from-brand/40 group-hover:to-brand/70"}`}
+                style={{ height: `${h}%` }}
                 title={`${it.label} · ${unit === "baht" ? baht(it.value) : num(it.value)}${it.sub ? ` · ${it.sub}` : ""}`} />
             </div>
           );
