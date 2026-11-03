@@ -47,7 +47,7 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
       cell.set(`${r.scent}__${r.size}`, (cell.get(`${r.scent}__${r.size}`) || 0) + r.qty);
     }
     const sizes = [...sizeTot.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
-    const scentsTop = [...scentTot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([s]) => s);
+    const scentsTop = [...scentTot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([s]) => s);
     const rows = scentsTop.map((sc) => {
       const vals = sizes.map((sz) => cell.get(`${sc}__${sz}`) || 0);
       return { scent: sc, vals, total: scentTot.get(sc) || 0, best: Math.max(0, ...vals) };
@@ -194,8 +194,8 @@ export function SalesAnalytics({ data, prev, prevRange, dead, branch, from, to }
 
           {/* ── scent × size matrix ── */}
           {ssm.sizes.length > 0 && ssm.rows.length > 0 && (
-            <Panel title="กลิ่น × ขนาด" sub="จำนวนชิ้นที่ขาย · ตัวหนา = ขนาดที่ขายดีสุดของกลิ่นนั้น">
-              <div className="overflow-auto max-h-[460px] rounded-lg border border-line-soft">
+            <Panel title={`กลิ่น × ขนาด · ${ssm.rows.length} กลิ่น`} sub="จำนวนชิ้นที่ขาย · ตัวหนา = ขนาดที่ขายดีสุดของกลิ่นนั้น">
+              <div className="overflow-auto max-h-[85vh] rounded-lg border border-line-soft">
                 <table className="w-full text-[13px] border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-canvas text-[11px] uppercase tracking-wide text-muted">
