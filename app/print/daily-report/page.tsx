@@ -1,5 +1,5 @@
 import { requirePermission } from "@/lib/auth/require-user";
-import { dailyReport, dailySaleRows } from "@/lib/queries";
+import { dailyReport, dailySaleRows, soldSkusByReceiptBarcode } from "@/lib/queries";
 import { DailyReportSheet } from "@/components/DailyReportSheet";
 import { PrintNow } from "@/components/PrintNow";
 
@@ -26,6 +26,7 @@ export default async function DailyReportPrintPage({ searchParams }: { searchPar
   const showDetail = sp.detail !== "0";
 
   const [data, rows] = await Promise.all([dailyReport(date, source, null), dailySaleRows(date, source)]);
+  const skuMap = await soldSkusByReceiptBarcode(rows.map((r) => r.receipt_no || "").filter(Boolean));
   const generatedAt = new Date().toLocaleString("th-TH", {
     day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Bangkok",
   });
@@ -34,7 +35,7 @@ export default async function DailyReportPrintPage({ searchParams }: { searchPar
     <div className="min-h-screen bg-white text-black" style={{ fontFamily: "'IBM Plex Sans Thai','Sarabun',sans-serif" }}>
       <div className="mx-auto w-full max-w-[820px] px-4 py-4">
         <div className="mb-4"><PrintNow title={`${source}-Daily-Report-${date}`} /></div>
-        <DailyReportSheet date={date} source={source} data={data} rows={rows} showDetail={showDetail} generatedAt={generatedAt} />
+        <DailyReportSheet date={date} source={source} data={data} rows={rows} showDetail={showDetail} generatedAt={generatedAt} skuMap={skuMap} />
       </div>
     </div>
   );

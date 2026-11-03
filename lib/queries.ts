@@ -567,6 +567,21 @@ export async function shelfCaptureReview(branch: string | null): Promise<ShelfRe
 
 /** SKU codes sold on each submission line (for /review) — sku_units linked by sold_submission_id.
  *  Only sales that scanned a SKU at the counter have these; non-scanned sales return nothing. */
+/** SKU ที่ขายไปในแต่ละบิล แยกตาม (เลขบิล + บาร์โค้ด) — ไว้โชว์ SKU ต่อรายการในรายงานประจำวัน.
+ *  คืน map key `${receipt}__${barcode}` → รายการ SKU (เรียงแล้ว). */
+export async function soldSkusByReceiptBarcode(receiptNos: string[]): Promise<Record<string, string[]>> {
+  const uniq = [...new Set((receiptNos || []).filter((s) => s && s.trim()))];
+  if (!uniq.length) return {};
+  try {
+    const rows = await q<{ receipt_no: string; barcode: string | null; sku: string }>(
+      `select sold_receipt_no receipt_no, barcode, sku from sku_units
+       where sold_receipt_no = any($1) and status='sold' order by sku`, [uniq]);
+    const map: Record<string, string[]> = {};
+    for (const r of rows) (map[`${r.receipt_no}__${r.barcode ?? ""}`] ??= []).push(r.sku);
+    return map;
+  } catch (e: any) { if (e?.code === "42P01") return {}; throw e; }
+}
+
 export async function soldSkusForSubmissions(ids: number[]): Promise<Record<number, string[]>> {
   const uniq = [...new Set((ids || []).filter((n) => Number.isFinite(n)))];
   if (!uniq.length) return {};
@@ -1454,7 +1469,7 @@ export async function monthlySalesTotals(source: string | null = null, limit = 1
 }
 
 export type DaySaleRow = {
-  id: number; src: string; receipt_no: string | null; item: string | null; size: string | null;
+  id: number; src: string; receipt_no: string | null; item: string | null; size: string | null; barcode: string | null;
   qty: number; unit_price: number; discount: number; total: number;
   payment_channel: string | null; nation: string | null; sale_time: string | null;
   author: string; created_by: number | null; entry_date: string;
@@ -1465,14 +1480,14 @@ export type DaySaleRow = {
  *  daily report summary and the printable per-bill detail, so both include old data. */
 export async function dailySaleRows(date: string, source: string, userId: number | null = null): Promise<DaySaleRow[]> {
   return q<DaySaleRow>(`
-    select s.id, 'sale'::text src, s.receipt_no, s.item, s.size,
+    select s.id, 'sale'::text src, s.receipt_no, s.item, s.size, s.barcode,
            s.qty::float qty, s.unit_price::float unit_price, coalesce(s.discount,0)::float discount, s.total::float total,
            s.payment_channel, s.nation, s.sale_time::text sale_time,
            coalesce(u.full_name, nullif(s.ba,''), '') author, s.created_by, s.sale_date::text entry_date
     from sales s left join users u on u.id = s.created_by
     where s.sale_date = $1 and s.source = $2 and ($3::bigint is null or s.created_by = $3)
     union all
-    select s.id, 'sub'::text src, s.receipt_no, s.item, s.size,
+    select s.id, 'sub'::text src, s.receipt_no, s.item, s.size, s.barcode,
            s.qty::float, s.unit_price::float, coalesce(s.discount,0)::float, s.total::float,
            s.payment_channel, s.nation, s.sale_time::text,
            coalesce(u.full_name,'') author, s.created_by, s.entry_date::text

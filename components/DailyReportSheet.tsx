@@ -37,8 +37,9 @@ const KV = ({ k, v }: { k: string; v: string }) => (
   </div>
 );
 
-export function DailyReportSheet({ date, source, data, rows, showDetail = true, generatedAt }: {
+export function DailyReportSheet({ date, source, data, rows, showDetail = true, generatedAt, skuMap = {} }: {
   date: string; source: string; data: ReportData | null; rows: DaySaleRow[]; showDetail?: boolean; generatedAt: string;
+  skuMap?: Record<string, string[]>;   // key `${receipt_no}__${barcode}` → SKU ที่ขาย
 }) {
   const bills = groupBills(rows);
   const srcLabel = branchName(source);
@@ -140,11 +141,17 @@ export function DailyReportSheet({ date, source, data, rows, showDetail = true, 
                         <ul className="text-[11px] text-neutral-700 space-y-0.5">
                           {b.rows.map((r) => {
                             const g = (r.total ?? 0) + (r.discount ?? 0);
+                            const skus = skuMap[`${r.receipt_no ?? ""}__${r.barcode ?? ""}`] ?? [];
                             return (
-                              <li key={r.id} className="flex items-baseline gap-2">
-                                <span className="flex-1 min-w-0 truncate text-black">{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</span>
-                                <span className="w-24 text-right tabular-nums text-neutral-500">เต็ม ฿{nf(g)}</span>
-                                <span className="w-20 text-right tabular-nums text-neutral-500">ลด ฿{nf(r.discount ?? 0)}</span>
+                              <li key={r.id}>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="flex-1 min-w-0 truncate text-black">{Math.round(r.qty ?? 0)}× {r.item}{r.size ? ` ${r.size}` : ""}</span>
+                                  <span className="w-24 text-right tabular-nums text-neutral-500">เต็ม ฿{nf(g)}</span>
+                                  <span className="w-20 text-right tabular-nums text-neutral-500">ลด ฿{nf(r.discount ?? 0)}</span>
+                                </div>
+                                {skus.length > 0 && (
+                                  <div className="text-[10px] text-neutral-500 font-mono leading-tight">SKU: {skus.join(", ")}</div>
+                                )}
                               </li>
                             );
                           })}

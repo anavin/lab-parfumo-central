@@ -1,7 +1,7 @@
 "use server";
 import { requireUser, requireAnyPermission } from "@/lib/auth/require-user";
 import { can } from "@/lib/auth/permissions";
-import { dailyReport, dailySaleRows, dailySalesByMonth, getDailyCash, saveDailyCash } from "@/lib/queries";
+import { dailyReport, dailySaleRows, dailySalesByMonth, getDailyCash, saveDailyCash, soldSkusByReceiptBarcode } from "@/lib/queries";
 import { DEFAULT_BRANCH, resolveBranch } from "@/lib/branches";
 
 // a user who may see branch-wide (not just their own) sales/bills
@@ -26,6 +26,13 @@ export async function getDailyBills(date: string, source: string) {
   const user = await requireUser();
   if (!isPrivileged(user)) throw new Error("ไม่มีสิทธิ์ดูข้อมูลรวมของสาขา");
   return dailySaleRows(date, source);
+}
+
+/** SKU ที่ขายในแต่ละบิลของวัน (key `${receipt}__${barcode}`) — ไว้โชว์ในรายงานประจำวัน. */
+export async function getDailyBillSkus(receiptNos: string[]): Promise<Record<string, string[]>> {
+  const user = await requireUser();
+  if (!isPrivileged(user)) return {};
+  return soldSkusByReceiptBarcode(receiptNos);
 }
 
 /** Load a branch's shop drawer for a day (opening carries forward per branch). */

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
 import { Printer, FileText, ChevronDown } from "lucide-react";
-import { getDailyReport, getDailyBills } from "@/lib/actions/report";
+import { getDailyReport, getDailyBills, getDailyBillSkus } from "@/lib/actions/report";
 import type { DailyReport as ReportData, DaySaleRow } from "@/lib/queries";
 import { DailyReportSheet } from "@/components/DailyReportSheet";
 
@@ -20,6 +20,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
   const setOpen = onOpenChange ?? setOpenI;
   const [data, setData] = useState<ReportData | null>(null);
   const [rows, setRows] = useState<DaySaleRow[]>([]);
+  const [skuMap, setSkuMap] = useState<Record<string, string[]>>({});
   const [showDetail, setShowDetail] = useState(true);
   const [pending, start] = useTransition();
 
@@ -28,7 +29,8 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
       try {
         const [rep, rs] = await Promise.all([getDailyReport(date, defaultSource, false), getDailyBills(date, defaultSource)]);
         setData(rep); setRows(rs);
-      } catch { setData(null); setRows([]); }
+        try { setSkuMap(await getDailyBillSkus(rs.map((r) => r.receipt_no || "").filter(Boolean))); } catch { setSkuMap({}); }
+      } catch { setData(null); setRows([]); setSkuMap({}); }
     });
   }, [date, defaultSource, revision]);
 
@@ -69,7 +71,7 @@ export function DailyReportPrint({ defaultSource = "CTW", revision, date: datePr
           {/* preview — identical markup to the print page */}
           {pending && !data
             ? <div className="py-12 text-center text-sm text-muted">กำลังโหลด…</div>
-            : <DailyReportSheet date={date} source={defaultSource} data={data} rows={rows} showDetail={showDetail} generatedAt={generatedAt} />}
+            : <DailyReportSheet date={date} source={defaultSource} data={data} rows={rows} showDetail={showDetail} generatedAt={generatedAt} skuMap={skuMap} />}
         </div>
       )}
     </div>
