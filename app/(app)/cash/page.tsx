@@ -16,25 +16,19 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const branch = isBranch(sp.branch) ? sp.branch! : DEFAULT_BRANCH;
   // independent reads — run them together instead of five sequential round-trips
-  const [drawer, cashSlips, rows, [agg]] = await Promise.all([
+  const [drawer, cashSlips, rows] = await Promise.all([
     dailyCashLog(90, branch),
     cashAttachmentsByDate(branch),
     q<{ cash_date: string; description: string; amount: number; type: string }>(`
       select cash_date, description, amount::float, type
       from cash_entries order by cash_date desc nulls last, id desc limit 1000`),
-    q<{ total: number; n: number }>(
-      `select coalesce(sum(amount),0)::float total, count(*)::int n from cash_entries`),
   ]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" action={<ExportButton kind="cash" />} />
       <AddCash />
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <Stat label="เงินสดสะสม" value={baht(agg.total)} tone="success" />
-        <Stat label="จำนวนรายการ" value={String(agg.n)} />
-      </div>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mt-6 mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
         <BranchTabs />
       </div>
