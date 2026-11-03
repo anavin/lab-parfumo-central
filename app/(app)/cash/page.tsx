@@ -33,12 +33,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         <BranchTabs />
       </div>
       {drawer.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div className="mb-4 max-w-xs">
           <Stat label={`เงินสดหน้าร้านล่าสุด · ${branchName(branch)}`} value={baht(drawer[0].closing)} tone="success" />
-          <Stat label="นับจริงล่าสุด" value={drawer[0].counted == null ? "ยังไม่นับ" : baht(drawer[0].counted)} />
-          <Stat label="ผลต่างล่าสุด (เกิน/ขาด)"
-            value={drawer[0].variance == null ? "—" : (drawer[0].variance === 0 ? "ตรง" : `${drawer[0].variance > 0 ? "+" : "−"}${baht(Math.abs(drawer[0].variance))}`)}
-            tone={drawer[0].variance == null || drawer[0].variance === 0 ? undefined : (drawer[0].variance > 0 ? "brand" : "danger")} />
         </div>
       )}
       {drawer.length > 0 ? (
