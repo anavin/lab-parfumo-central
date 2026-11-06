@@ -403,10 +403,17 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
 
                       {bill.ref && <AddItemAdmin refId={bill.ref} pending={pending} onDone={refresh} />}
                       <SplitBreakdown tenders={payments[bill.ref]} />
-                      {(() => { const slips = photos.filter((p) => !(p.note || "").startsWith("sku|")); return <>
-                        {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
-                        <SkuPhotoResolve photos={photos} onDone={refresh} />
-                      </>; })()}
+                      {(() => {
+                        const slips = photos.filter((p) => !(p.note || "").startsWith("sku|"));
+                        // บาร์โค้ดที่ยัง "ต้องตัด SKU" (ตัดยังไม่ครบ) — ใช้ซ่อนรูปของสินค้าที่ตัดครบแล้ว
+                        const needBc = new Set(bill.rows
+                          .filter((r) => !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0))
+                          .map((r) => r.barcode as string));
+                        return <>
+                          {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
+                          <SkuPhotoResolve photos={photos} needBarcodes={needBc} onDone={refresh} />
+                        </>;
+                      })()}
 
                       {/* per-bill actions */}
                       <div className="flex gap-2 items-center justify-end mt-3 pt-2.5 border-t border-line">
@@ -528,10 +535,17 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 ))}
                               </ul>
                               <SplitBreakdown tenders={payments[bill.ref]} />
-                      {(() => { const slips = photos.filter((p) => !(p.note || "").startsWith("sku|")); return <>
-                        {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
-                        <SkuPhotoResolve photos={photos} onDone={refresh} />
-                      </>; })()}
+                      {(() => {
+                        const slips = photos.filter((p) => !(p.note || "").startsWith("sku|"));
+                        // บาร์โค้ดที่ยัง "ต้องตัด SKU" (ตัดยังไม่ครบ) — ใช้ซ่อนรูปของสินค้าที่ตัดครบแล้ว
+                        const needBc = new Set(bill.rows
+                          .filter((r) => !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0))
+                          .map((r) => r.barcode as string));
+                        return <>
+                          {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
+                          <SkuPhotoResolve photos={photos} needBarcodes={needBc} onDone={refresh} />
+                        </>;
+                      })()}
                               <div className="flex items-center justify-end mt-3 pt-2.5 border-t border-line">
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
                                   className="mr-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-muted text-sm font-medium hover:bg-canvas hover:text-ink disabled:opacity-50">
@@ -689,8 +703,14 @@ function AddItemAdmin({ refId, pending, onDone }: { refId: string; pending: bool
 
 // SKU photos waiting to be read & cut: a sticker that wouldn't scan at the counter was photographed.
 // The reviewer reads the SKU off the photo and types it → that serial is marked sold & linked to the bill.
-function SkuPhotoResolve({ photos, onDone }: { photos: BillAttachment[]; onDone: () => void }) {
-  const pending = photos.filter((p) => (p.note || "").startsWith("sku|"));
+function SkuPhotoResolve({ photos, needBarcodes, onDone }: { photos: BillAttachment[]; needBarcodes?: Set<string>; onDone: () => void }) {
+  // โชว์เฉพาะรูปของสินค้าที่ "ยังต้องตัด SKU" — ถ้าตัดครบแล้ว (ไม่ว่าทางไหน) ซ่อนกล่องนี้
+  const pending = photos.filter((p) => {
+    if (!(p.note || "").startsWith("sku|")) return false;
+    if (!needBarcodes) return true;
+    const bc = (p.note || "").split("|")[1] || "";
+    return bc ? needBarcodes.has(bc) : needBarcodes.size > 0;
+  });
   if (!pending.length) return null;
   return (
     <div className="mt-2 pt-2 border-t border-amber-300/70">
