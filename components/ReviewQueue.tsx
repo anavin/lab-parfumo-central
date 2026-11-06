@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { ReviewDayContext } from "@/components/review-day-context";
 import { Check, X, CheckCheck, Clock, Pencil, CalendarDays, RotateCcw, ChevronDown, ShieldCheck, Search, Users, Trash2, Plus, Receipt as ReceiptIcon, AlertTriangle, Undo2 } from "lucide-react";
 import { approveMany, trashMany, unapproveMany, updateSubmissionByAdmin, updateBillTime, addBillItemsByAdmin, rejectMany, resolveSkuPhoto, addSkuToSale } from "@/lib/actions/submissions";
-import { Barcode, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { baht, num } from "@/lib/format";
 import { PhotoStrip } from "@/components/BillPhotos";
 import { PAYMENTS, SPLIT2, isSplit, splitOk, resolveTenders } from "@/lib/payments";
@@ -380,15 +380,7 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                 <Pencil className="w-4 h-4" />
                               </button>
                             </div>
-                            {isSale && (soldSkus[r.id]?.length ?? 0) > 0 && (
-                              <div className="flex flex-wrap items-center gap-1 mt-0.5 ml-6">
-                                <span className="text-[10px] text-success">SKU ที่ตัด:</span>
-                                {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
-                              </div>
-                            )}
-                            {isSale && !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0) && (
-                              <AddSkuLine id={r.id} need={(r.qty ?? 0) - (soldSkus[r.id]?.length ?? 0)} onDone={refresh} />
-                            )}
+                            {isSale && <LineSku row={r} photos={photos} soldSkus={soldSkus} skuBcSet={skuBcSet} onDone={refresh} />}
                             {editId === r.id && (
                               <RowEditor row={r} pending={pending} savedTenders={payments[bill.ref]}
                                 onCancel={() => setEditId(null)}
@@ -404,15 +396,10 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                       {bill.ref && <AddItemAdmin refId={bill.ref} pending={pending} onDone={refresh} />}
                       <SplitBreakdown tenders={payments[bill.ref]} />
                       {(() => {
-                        const slips = photos.filter((p) => !(p.note || "").startsWith("sku|"));
-                        // บาร์โค้ดที่ยัง "ต้องตัด SKU" (ตัดยังไม่ครบ) — ใช้ซ่อนรูปของสินค้าที่ตัดครบแล้ว
-                        const needBc = new Set(bill.rows
-                          .filter((r) => !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0))
-                          .map((r) => r.barcode as string));
-                        return <>
-                          {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
-                          <SkuPhotoResolve photos={photos} needBarcodes={needBc} onDone={refresh} />
-                        </>;
+                        // รูปสลิป/หลักฐานจ่ายเงินเท่านั้น (รูป SKU ย้ายไปอยู่ใต้แต่ละรายการแล้ว)
+                        const slips = photos.filter((p) => { const n = p.note || ""; return !n.startsWith("sku|") && !n.startsWith("skudone|"); });
+                        if (!slips.length) return null;
+                        return <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>;
                       })()}
 
                       {/* per-bill actions */}
@@ -522,29 +509,16 @@ export function ReviewQueue({ rows, approved = [], attachments = {}, payments = 
                                       <span className="flex-1 text-ink">ลูกค้า {num(r.customers ?? 0)} ราย · ไทย {num(r.thai ?? 0)} · ต่างชาติ {num(r.foreign_cnt ?? 0)}</span>
                                     )}
                                     </div>
-                                    {isSale && (soldSkus[r.id]?.length ?? 0) > 0 && (
-                                      <div className="flex flex-wrap items-center gap-1 mt-0.5 ml-6">
-                                        <span className="text-[10px] text-success">SKU ที่ตัด:</span>
-                                        {soldSkus[r.id].map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
-                                      </div>
-                                    )}
-                                    {isSale && !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0) && (
-                                      <AddSkuLine id={r.id} need={(r.qty ?? 0) - (soldSkus[r.id]?.length ?? 0)} onDone={refresh} />
-                                    )}
+                                    {isSale && <LineSku row={r} photos={photos} soldSkus={soldSkus} skuBcSet={skuBcSet} onDone={refresh} />}
                                   </li>
                                 ))}
                               </ul>
                               <SplitBreakdown tenders={payments[bill.ref]} />
                       {(() => {
-                        const slips = photos.filter((p) => !(p.note || "").startsWith("sku|"));
-                        // บาร์โค้ดที่ยัง "ต้องตัด SKU" (ตัดยังไม่ครบ) — ใช้ซ่อนรูปของสินค้าที่ตัดครบแล้ว
-                        const needBc = new Set(bill.rows
-                          .filter((r) => !!r.barcode && skuBcSet.has(r.barcode) && !isGiveawaySize(r.size) && (soldSkus[r.id]?.length ?? 0) < (r.qty ?? 0))
-                          .map((r) => r.barcode as string));
-                        return <>
-                          {slips.length > 0 && <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>}
-                          <SkuPhotoResolve photos={photos} needBarcodes={needBc} onDone={refresh} />
-                        </>;
+                        // รูปสลิป/หลักฐานจ่ายเงินเท่านั้น (รูป SKU ย้ายไปอยู่ใต้แต่ละรายการแล้ว)
+                        const slips = photos.filter((p) => { const n = p.note || ""; return !n.startsWith("sku|") && !n.startsWith("skudone|"); });
+                        if (!slips.length) return null;
+                        return <div className="mt-2 pt-2 border-t border-line/60"><PhotoStrip photos={slips} size={52} /></div>;
                       })()}
                               <div className="flex items-center justify-end mt-3 pt-2.5 border-t border-line">
                                 <button onClick={() => unapproveBill(bill)} disabled={pending}
@@ -701,26 +675,62 @@ function AddItemAdmin({ refId, pending, onDone }: { refId: string; pending: bool
   );
 }
 
-// SKU photos waiting to be read & cut: a sticker that wouldn't scan at the counter was photographed.
-// The reviewer reads the SKU off the photo and types it → that serial is marked sold & linked to the bill.
-function SkuPhotoResolve({ photos, needBarcodes, onDone }: { photos: BillAttachment[]; needBarcodes?: Set<string>; onDone: () => void }) {
-  // โชว์เฉพาะรูปของสินค้าที่ "ยังต้องตัด SKU" — ถ้าตัดครบแล้ว (ไม่ว่าทางไหน) ซ่อนกล่องนี้
-  const pending = photos.filter((p) => {
-    if (!(p.note || "").startsWith("sku|")) return false;
-    if (!needBarcodes) return true;
-    const bc = (p.note || "").split("|")[1] || "";
-    return bc ? needBarcodes.has(bc) : needBarcodes.size > 0;
+const normSku = (s: string) => (s || "").replace(/\s/g, "").toUpperCase();
+
+// SKU ของรายการสินค้าหนึ่งบรรทัด — รวมรูป + สถานะ + ช่องกรอกไว้ใต้รายการนั้น
+//  ตัดครบแล้ว = เขียว (เลข SKU + รูปไว้ตรวจสอบ ซูมได้ ไม่มีช่องกรอก)
+//  ยังไม่ครบ  = เหลือง (รูป + ช่องกรอก/ปุ่มตัด หรือช่องพิมพ์ SKU ถ้าไม่มีรูป)
+// รูปจับคู่กับรายการด้วยบาร์โค้ด (note `sku|<barcode>`) และ SKU ที่ตัดแล้ว (note `skudone|<sku>`)
+function LineSku({ row, photos, soldSkus, skuBcSet, onDone }: {
+  row: SubmissionRow; photos: BillAttachment[]; soldSkus: Record<number, string[]>; skuBcSet: Set<string>; onDone: () => void;
+}) {
+  const bc = (row.barcode || "").trim();
+  if (!bc || !skuBcSet.has(bc) || isGiveawaySize(row.size)) return null;   // ไม่ใช่สินค้าที่มี SKU
+  const cut = soldSkus[row.id] ?? [];
+  const qty = row.qty ?? 0;
+  const covered = cut.length >= qty;
+  const cutSet = new Set(cut.map(normSku));
+  const donePhotos = photos.filter((p) => {
+    const n = p.note || "";
+    if (n.startsWith("skudone|")) return cutSet.has(normSku(n.split("|")[1] || ""));
+    if (n.startsWith("sku|")) return (n.split("|")[1] || "") === bc && covered;
+    return false;
   });
-  if (!pending.length) return null;
+  const pendingPhotos = covered ? [] : photos.filter((p) => (p.note || "").startsWith("sku|") && (p.note || "").split("|")[1] === bc);
+  if (cut.length === 0 && pendingPhotos.length === 0 && !covered) {
+    return <div className="ml-6 mt-1"><AddSkuLine id={row.id} need={qty - cut.length} onDone={onDone} /></div>;
+  }
   return (
-    <div className="mt-2 pt-2 border-t border-amber-300/70">
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 mb-1.5">
-        <Barcode className="w-4 h-4" /> SKU รอตัดสต๊อก (สแกนไม่ติด — อ่านจากรูปแล้วกรอก) · {num(pending.length)}
-      </div>
-      <div className="space-y-2">
-        {pending.map((p) => <SkuPhotoRow key={p.id} att={p} onDone={onDone} />)}
-      </div>
+    <div className="ml-6 mt-1 space-y-1.5">
+      {cut.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-success font-medium">SKU ที่ตัด:</span>
+          {cut.map((s) => <span key={s} className="font-mono text-[10px] bg-success-soft text-success rounded px-1.5 py-0.5">{s}</span>)}
+          {donePhotos.map((p) => <SkuPhotoDone key={p.id} att={p} />)}
+        </div>
+      )}
+      {!covered && pendingPhotos.map((p) => <SkuPhotoRow key={p.id} att={p} onDone={onDone} />)}
+      {!covered && pendingPhotos.length === 0 && cut.length > 0 && <AddSkuLine id={row.id} need={qty - cut.length} onDone={onDone} />}
     </div>
+  );
+}
+
+// รูป SKU ของบรรทัดที่ตัดครบแล้ว — โชว์ไว้ตรวจสอบย้อนหลัง (ซูมได้ ไม่มีช่องกรอก)
+function SkuPhotoDone({ att }: { att: BillAttachment }) {
+  const [view, setView] = useState(false);
+  const item = (att.note || "").split("|").slice(2).join("|") || "SKU";
+  const src = att.data ?? `/api/attachment/${att.id}`;
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={item} title="แตะดูรูป SKU (ไว้ตรวจสอบ)" className="w-7 h-7 rounded object-cover border border-success/40 cursor-zoom-in shrink-0" onClick={() => setView(true)} />
+      {view && (
+        <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4" onClick={() => setView(false)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={item} className="max-w-full max-h-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -789,7 +799,7 @@ function AddSkuLine({ id, need, onDone }: { id: number; need: number; onDone: ()
     if (r.ok) { setSku(""); setMsg(`✓ ${r.sku}`); onDone(); } else setMsg(`✗ ${r.error ?? ""}`);
   };
   return (
-    <div className="mt-1 ml-6">
+    <div>
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-warn bg-warn-soft rounded px-1.5 py-0.5"><AlertTriangle className="w-3 h-3" /> ยังไม่ใส่ SKU{need > 1 ? ` (ขาด ${num(need)})` : ""}</span>
         <input value={sku} onChange={(e) => { setSku(e.target.value); setMsg(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
