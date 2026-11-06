@@ -709,29 +709,42 @@ function SkuPhotoRow({ att, onDone }: { att: BillAttachment; onDone: () => void 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [view, setView] = useState(false);
+  const [done, setDone] = useState<string | null>(null);   // SKU ที่ตัดสำเร็จ → เขียว + ล็อก ห้ามกรอกซ้ำ
   const item = (att.note || "").split("|").slice(2).join("|") || "SKU";
   const src = att.data ?? `/api/attachment/${att.id}`;
   const cut = async () => {
-    if (!sku.trim()) return;
+    if (!sku.trim() || busy || done) return;
     setBusy(true); setErr(null);
     const r = await resolveSkuPhoto(att.id, sku.trim());
     setBusy(false);
-    if (r.ok) onDone(); else setErr(r.error ?? "ตัดไม่สำเร็จ");
+    if (r.ok) { setDone(r.sku ?? sku.trim().toUpperCase()); onDone(); } else setErr(r.error ?? "ตัดไม่สำเร็จ");
   };
+  // ตัดแล้ว = กรอบ/พื้นเขียว · ยังไม่ตัด = เหลือง (รอดำเนินการ)
+  const wrap = done ? "border-success/50 bg-success-soft/60" : "border-amber-300 bg-amber-50/60";
+  const imgBorder = done ? "border-success/50" : "border-amber-300";
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50/60 p-2">
+    <div className={`flex items-center gap-2 rounded-lg border p-2 transition-colors ${wrap}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="SKU" className="w-14 h-14 rounded-md object-cover border border-amber-300 cursor-zoom-in shrink-0" onClick={() => setView(true)} />
+      <img src={src} alt="SKU" className={`w-14 h-14 rounded-md object-cover border cursor-zoom-in shrink-0 ${imgBorder}`} onClick={() => setView(true)} />
       <div className="flex-1 min-w-0">
         <div className="text-[12px] text-ink truncate mb-1">{item}</div>
-        <div className="flex gap-1.5">
-          <input value={sku} onChange={(e) => { setSku(e.target.value); setErr(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); cut(); } }}
-            placeholder="อ่าน SKU จากรูป แล้วพิมพ์" className="flex-1 min-w-0 h-[36px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
-          <button onClick={cut} disabled={busy || !sku.trim()} className="shrink-0 h-[36px] px-3 rounded-lg bg-amber-600 text-white text-sm font-medium disabled:opacity-40 inline-flex items-center gap-1">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} ตัดสต๊อก
-          </button>
-        </div>
-        {err && <div className="text-[11px] text-danger mt-1">{err}</div>}
+        {done ? (
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-success">
+            <CheckCheck className="w-4 h-4 shrink-0" /> ตัดสต๊อกแล้ว
+            <span className="font-mono text-[12px] bg-success-soft text-success rounded px-1.5 py-0.5 truncate">{done}</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-1.5">
+              <input value={sku} onChange={(e) => { setSku(e.target.value); setErr(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); cut(); } }}
+                placeholder="อ่าน SKU จากรูป แล้วพิมพ์" className="flex-1 min-w-0 h-[36px] border border-line rounded-lg px-2.5 text-sm font-mono bg-surface focus:outline-none focus:border-brand" />
+              <button onClick={cut} disabled={busy || !sku.trim()} className="shrink-0 h-[36px] px-3 rounded-lg bg-amber-600 text-white text-sm font-medium disabled:opacity-40 inline-flex items-center gap-1">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} ตัดสต๊อก
+              </button>
+            </div>
+            {err && <div className="text-[11px] text-danger mt-1">{err}</div>}
+          </>
+        )}
       </div>
       {view && (
         <div className="fixed inset-0 z-[70] bg-black/85 flex items-center justify-center p-4" onClick={() => setView(false)}>

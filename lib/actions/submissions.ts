@@ -76,7 +76,7 @@ async function freeSkusForSubmission(id: number) {
 /** /review: a manager reads the SKU off a fallback photo and cuts that serial from stock, linking
  *  it to the bill the photo belongs to. Marks the photo resolved (note → 'skudone|<sku>') so it drops
  *  out of the pending list. Aggregate stock was already cut at the sale; this only resolves the serial. */
-export async function resolveSkuPhoto(attachmentId: number, skuInput: string): Promise<{ ok: boolean; error?: string }> {
+export async function resolveSkuPhoto(attachmentId: number, skuInput: string): Promise<{ ok: boolean; sku?: string; error?: string }> {
   await requirePermission("review");
   const sku = String(skuInput || "").trim();
   if (!sku) return { ok: false, error: "ไม่มีรหัส SKU" };
@@ -112,7 +112,7 @@ export async function resolveSkuPhoto(attachmentId: number, skuInput: string): P
     try { await q(`update bill_attachments set note = $2 where id = $1`, [attachmentId, `skudone|${upd[0].sku}`]); } catch (e: any) { if (e?.code !== "42703") throw e; }
     await logAudit("update", "submission", line.id, `ตัด SKU ${upd[0].sku} จากรูป (บิล ${att.bill_ref})`);
     revalidatePath("/review"); revalidatePath("/stock");
-    return { ok: true };
+    return { ok: true, sku: upd[0].sku };
   } catch (e: any) {
     if (e?.code === "42P01") return { ok: false, error: "ยังไม่ได้ติดตั้งระบบ SKU" };
     console.error("[resolveSkuPhoto]", e);
