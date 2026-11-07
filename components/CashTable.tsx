@@ -14,6 +14,7 @@ const columns: Column<Row>[] = [
 ];
 
 const inp = "px-2.5 py-1.5 rounded-lg border border-line bg-surface text-ink text-sm focus:outline-none focus:border-brand";
+const ymd = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
 export function CashTable({ rows }: { rows: Row[] }) {
   const [type, setType] = useState("");
@@ -39,6 +40,23 @@ export function CashTable({ rows }: { rows: Row[] }) {
   const active = !!(type || from || to || q);
   const reset = () => { setType(""); setFrom(""); setTo(""); setQ(""); };
 
+  // ปุ่มลัดช่วงเวลา (คิดเป็นเวลาไทย)
+  const presets = useMemo(() => {
+    const today = ymd(new Date());
+    const startOfMonth = today.slice(0, 8) + "01";
+    const lmEnd = new Date(today.slice(0, 8) + "01T00:00:00Z"); lmEnd.setUTCDate(0);
+    const lmStart = ymd(lmEnd).slice(0, 8) + "01";
+    const ago = (n: number) => { const x = new Date(today + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - n); return ymd(x); };
+    return [
+      { k: "เดือนนี้", f: startOfMonth, t: today },
+      { k: "เดือนก่อน", f: lmStart, t: ymd(lmEnd) },
+      { k: "7 วัน", f: ago(6), t: today },
+      { k: "30 วัน", f: ago(29), t: today },
+      { k: "ทั้งหมด", f: "", t: "" },
+    ];
+  }, []);
+  const activePreset = presets.find((p) => p.f === from && p.t === to)?.k;
+
   // ดาวน์โหลดจากเซิร์ฟเวอร์ตามตัวกรอง — ได้ครบทุกแถว (ไม่ติดลิมิต 1000 ที่โหลดมาแสดง) + เทียบวันที่ถูกต้อง
   const dlHref = useMemo(() => {
     const p = new URLSearchParams();
@@ -52,6 +70,16 @@ export function CashTable({ rows }: { rows: Row[] }) {
 
   return (
     <div className="space-y-3">
+      {/* ── ปุ่มลัดช่วงเวลา ── */}
+      <div className="flex flex-wrap gap-1.5">
+        {presets.map((p) => (
+          <button key={p.k} onClick={() => { setFrom(p.f); setTo(p.t); }}
+            className={`px-2.5 py-1.5 rounded-lg text-[12.5px] border transition-colors ${activePreset === p.k ? "bg-brand text-white border-brand" : "bg-surface text-ink border-line hover:bg-canvas"}`}>
+            {p.k}
+          </button>
+        ))}
+      </div>
+
       {/* ── ตัวกรอง ── */}
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-sm"><span className="block text-[11px] text-muted mb-0.5">ประเภท</span>
@@ -87,7 +115,7 @@ export function CashTable({ rows }: { rows: Row[] }) {
         <span className="block text-[11px] text-muted/80 mt-0.5">ตารางแสดงล่าสุด 1,000 รายการ · ปุ่ม Download ดึงครบทุกแถวตามตัวกรอง</span>
       </div>
 
-      <DataTable columns={columns} rows={filtered} rowKey={(_, i) => i} maxHeight="560px" empty={active ? "ไม่พบรายการตามเงื่อนไข" : "ยังไม่มีรายการเงินสด"} />
+      <DataTable columns={columns} rows={filtered} rowKey={(_, i) => i} maxHeight="340px" empty={active ? "ไม่พบรายการตามเงื่อนไข" : "ยังไม่มีรายการเงินสด"} />
     </div>
   );
 }
