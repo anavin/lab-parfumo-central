@@ -1,6 +1,9 @@
 "use client";
+import { useMemo, useState } from "react";
+import { Download, X } from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { baht, fmtDate } from "@/lib/format";
+import { downloadCsv } from "@/lib/csv";
 
 type Row = { cash_date: string; description: string; amount: number; type: string };
 
@@ -11,6 +14,79 @@ const columns: Column<Row>[] = [
   { key: "amount", header: "จำนวนเงิน", align: "right", sortValue: (r) => r.amount, render: (r) => <span className={`font-medium tabular-nums ${r.amount < 0 ? "text-danger" : ""}`}>{baht(r.amount)}</span> },
 ];
 
+const inp = "px-2.5 py-1.5 rounded-lg border border-line bg-surface text-ink text-sm focus:outline-none focus:border-brand";
+
 export function CashTable({ rows }: { rows: Row[] }) {
-  return <DataTable columns={columns} rows={rows} rowKey={(_, i) => i} maxHeight="560px" empty="ยังไม่มีรายการเงินสด" />;
+  const [type, setType] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [q, setQ] = useState("");
+
+  // ประเภทที่มีจริง (ไว้ทำดรอปดาวน์) — ค่าว่างแสดงเป็น "ไม่ระบุ"
+  const types = useMemo(() => [...new Set(rows.map((r) => r.type || "ไม่ระบุ"))].sort(), [rows]);
+
+  const filtered = useMemo(() => rows.filter((r) => {
+    if (type && (r.type || "ไม่ระบุ") !== type) return false;
+    if (from && (r.cash_date || "") < from) return false;
+    if (to && (r.cash_date || "") > to) return false;
+    if (q) {
+      const s = q.toLowerCase();
+      if (!(`${r.description || ""} ${r.type || ""}`).toLowerCase().includes(s)) return false;
+    }
+    return true;
+  }), [rows, type, from, to, q]);
+
+  const total = useMemo(() => filtered.reduce((s, r) => s + (Number(r.amount) || 0), 0), [filtered]);
+  const active = !!(type || from || to || q);
+  const reset = () => { setType(""); setFrom(""); setTo(""); setQ(""); };
+
+  const exportCsv = () => {
+    if (!filtered.length) return;
+    const header = ["วันที่", "รายละเอียด", "ประเภท", "จำนวนเงิน"];
+    const body = filtered.map((r) => [r.cash_date || "", r.description || "", r.type || "", Math.round(Number(r.amount) || 0)]);
+    body.push(["", "", "รวม", Math.round(total)]);
+    const tag = type || (from || to ? `${from || "เริ่ม"}_${to || "ล่าสุด"}` : "ทั้งหมด");
+    downloadCsv(`เงินสด_${tag}.csv`, [header, ...body]);
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* ── ตัวกรอง ── */}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-sm"><span className="block text-[11px] text-muted mb-0.5">ประเภท</span>
+          <select value={type} onChange={(e) => setType(e.target.value)} className={inp}>
+            <option value="">ทุกประเภท</option>
+            {types.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label className="text-sm"><span className="block text-[11px] text-muted mb-0.5">ตั้งแต่</span>
+          <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className={inp} />
+        </label>
+        <label className="text-sm"><span className="block text-[11px] text-muted mb-0.5">ถึง</span>
+          <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className={inp} />
+        </label>
+        <label className="text-sm flex-1 min-w-[160px]"><span className="block text-[11px] text-muted mb-0.5">ค้นหา</span>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="รายละเอียด / ประเภท" className={inp + " w-full"} />
+        </label>
+        {active && (
+          <button onClick={reset} className="inline-flex items-center gap-1 h-[34px] px-2.5 rounded-lg border border-line bg-surface text-sm text-muted hover:bg-canvas hover:text-ink">
+            <X className="w-3.5 h-3.5" /> ล้าง
+          </button>
+        )}
+        <button onClick={exportCsv} disabled={!filtered.length}
+          className="ml-auto inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-line bg-surface text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50">
+          <Download className="w-4 h-4" /> Download CSV
+        </button>
+      </div>
+
+      {/* ── สรุปผลลัพธ์ที่กรอง ── */}
+      <div className="text-xs text-muted">
+        แสดง <b className="text-ink tabular-nums">{filtered.length.toLocaleString()}</b>/{rows.length.toLocaleString()} รายการ
+        {" · "}รวม <b className={`tabular-nums ${total < 0 ? "text-danger" : "text-ink"}`}>{baht(total)}</b>
+        {active && " (ตามตัวกรอง)"}
+      </div>
+
+      <DataTable columns={columns} rows={filtered} rowKey={(_, i) => i} maxHeight="560px" empty={active ? "ไม่พบรายการตามเงื่อนไข" : "ยังไม่มีรายการเงินสด"} />
+    </div>
+  );
 }
