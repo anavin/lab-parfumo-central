@@ -115,7 +115,7 @@ export function CashTable({ rows }: { rows: Row[] }) {
         <span className="block text-[11px] text-muted/80 mt-0.5">ตารางแสดงล่าสุด 1,000 รายการ · ปุ่ม Download ดึงครบทุกแถวตามตัวกรอง</span>
       </div>
 
-      <DataTable columns={columns} rows={filtered} rowKey={(_, i) => i} maxHeight="340px" empty={active ? "ไม่พบรายการตามเงื่อนไข" : "ยังไม่มีรายการเงินสด"} />
+      <DataTable columns={columns} rows={filtered} rowKey={(_, i) => i} maxHeight="none" empty={active ? "ไม่พบรายการตามเงื่อนไข" : "ยังไม่มีรายการเงินสด"} />
     </div>
   );
 }
