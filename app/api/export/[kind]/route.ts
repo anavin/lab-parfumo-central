@@ -18,7 +18,7 @@ function toCsv(rows: any[], cols: Col[]): string {
   return "﻿" + head + "\n" + body + "\n";   // BOM so Excel reads Thai as UTF-8
 }
 
-const CONFIG: Record<string, { perm: PermKey; file: string; run: () => Promise<{ cols: Col[]; rows: any[] }> }> = {
+const CONFIG: Record<string, { perm: PermKey; file: string; run: (url: URL) => Promise<{ cols: Col[]; rows: any[] }> }> = {
   sales: {
     perm: "sales", file: "sales",
     run: async () => {
@@ -48,9 +48,21 @@ const CONFIG: Record<string, { perm: PermKey; file: string; run: () => Promise<{
   },
   cash: {
     perm: "cash", file: "cash",
-    run: async () => {
+    run: async (url) => {
+      // ตัวกรองจาก query string (เลือกก่อน Download) — เทียบวันที่แบบ ::date รวมปลายช่วง
+      const sp = url.searchParams;
+      const where: string[] = []; const args: any[] = [];
+      const from = sp.get("from"), to = sp.get("to"), type = sp.get("type"), term = (sp.get("q") || "").trim();
+      if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) { args.push(from); where.push(`cash_date >= $${args.length}::date`); }
+      if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) { args.push(to); where.push(`cash_date <= $${args.length}::date`); }
+      if (type) {
+        if (type === "ไม่ระบุ") where.push(`coalesce(nullif(type,''),'ไม่ระบุ') = 'ไม่ระบุ'`);
+        else { args.push(type); where.push(`type = $${args.length}`); }
+      }
+      if (term) { args.push(`%${term}%`); where.push(`(description ilike $${args.length} or type ilike $${args.length})`); }
+      const wsql = where.length ? `where ${where.join(" and ")}` : "";
       const rows = await q(`select cash_date, description, amount::float amount, type
-        from cash_entries order by cash_date desc nulls last, id desc`);
+        from cash_entries ${wsql} order by cash_date desc nulls last, id desc`, args);
       return { rows, cols: [
         { k: "cash_date", h: "วันที่" }, { k: "description", h: "รายละเอียด" }, { k: "amount", h: "จำนวนเงิน" }, { k: "type", h: "ประเภท" },
       ] };
@@ -58,7 +70,7 @@ const CONFIG: Record<string, { perm: PermKey; file: string; run: () => Promise<{
   },
 };
 
-export async function GET(_req: Request, { params }: { params: Promise<{ kind: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   const cfg = CONFIG[kind];
   if (!cfg) return new NextResponse("not found", { status: 404 });
@@ -66,7 +78,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ kind: s
   if (!user) return new NextResponse("unauthorized", { status: 401 });
   if (!can(user, cfg.perm)) return new NextResponse("forbidden", { status: 403 });
 
-  const { cols, rows } = await cfg.run();
+  const { cols, rows } = await cfg.run(new URL(req.url));
   const fname = `${cfg.file}-${new Date().toISOString().slice(0, 10)}.csv`;
   return new NextResponse(toCsv(rows, cols), {
     headers: {

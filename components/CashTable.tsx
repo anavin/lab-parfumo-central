@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { Download, X } from "lucide-react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { baht, fmtDate } from "@/lib/format";
-import { downloadCsv } from "@/lib/csv";
 
 type Row = { cash_date: string; description: string; amount: number; type: string };
 
@@ -40,14 +39,16 @@ export function CashTable({ rows }: { rows: Row[] }) {
   const active = !!(type || from || to || q);
   const reset = () => { setType(""); setFrom(""); setTo(""); setQ(""); };
 
-  const exportCsv = () => {
-    if (!filtered.length) return;
-    const header = ["วันที่", "รายละเอียด", "ประเภท", "จำนวนเงิน"];
-    const body = filtered.map((r) => [r.cash_date || "", r.description || "", r.type || "", Math.round(Number(r.amount) || 0)]);
-    body.push(["", "", "รวม", Math.round(total)]);
-    const tag = type || (from || to ? `${from || "เริ่ม"}_${to || "ล่าสุด"}` : "ทั้งหมด");
-    downloadCsv(`เงินสด_${tag}.csv`, [header, ...body]);
-  };
+  // ดาวน์โหลดจากเซิร์ฟเวอร์ตามตัวกรอง — ได้ครบทุกแถว (ไม่ติดลิมิต 1000 ที่โหลดมาแสดง) + เทียบวันที่ถูกต้อง
+  const dlHref = useMemo(() => {
+    const p = new URLSearchParams();
+    if (type) p.set("type", type);
+    if (from) p.set("from", from);
+    if (to) p.set("to", to);
+    if (q.trim()) p.set("q", q.trim());
+    const s = p.toString();
+    return `/api/export/cash${s ? `?${s}` : ""}`;
+  }, [type, from, to, q]);
 
   return (
     <div className="space-y-3">
@@ -73,10 +74,9 @@ export function CashTable({ rows }: { rows: Row[] }) {
             <X className="w-3.5 h-3.5" /> ล้าง
           </button>
         )}
-        <button onClick={exportCsv} disabled={!filtered.length}
-          className="ml-auto inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-line bg-surface text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50">
+        <a href={dlHref} className="ml-auto inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-line bg-surface text-sm font-medium text-ink hover:bg-canvas">
           <Download className="w-4 h-4" /> Download CSV
-        </button>
+        </a>
       </div>
 
       {/* ── สรุปผลลัพธ์ที่กรอง ── */}
@@ -84,6 +84,7 @@ export function CashTable({ rows }: { rows: Row[] }) {
         แสดง <b className="text-ink tabular-nums">{filtered.length.toLocaleString()}</b>/{rows.length.toLocaleString()} รายการ
         {" · "}รวม <b className={`tabular-nums ${total < 0 ? "text-danger" : "text-ink"}`}>{baht(total)}</b>
         {active && " (ตามตัวกรอง)"}
+        <span className="block text-[11px] text-muted/80 mt-0.5">ตารางแสดงล่าสุด 1,000 รายการ · ปุ่ม Download ดึงครบทุกแถวตามตัวกรอง</span>
       </div>
 
       <DataTable columns={columns} rows={filtered} rowKey={(_, i) => i} maxHeight="560px" empty={active ? "ไม่พบรายการตามเงื่อนไข" : "ยังไม่มีรายการเงินสด"} />

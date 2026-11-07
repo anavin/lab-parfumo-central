@@ -2,7 +2,6 @@ import { PageHeader, Stat, Card } from "@/components/ui";
 import { baht } from "@/lib/format";
 import { AddCash } from "@/components/EntryForms";
 import { Wallet } from "lucide-react";
-import { ExportButton } from "@/components/ExportButton";
 import { CashTable } from "@/components/CashTable";
 import { DrawerAdmin } from "@/components/DrawerAdmin";
 import { q } from "@/lib/db";
@@ -26,7 +25,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" action={<ExportButton kind="cash" />} />
+      <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" />
       <AddCash />
       <div className="mt-6 mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
