@@ -13,7 +13,7 @@ const columns: Column<Row>[] = [
   { key: "amount", header: "จำนวนเงิน", align: "right", sortValue: (r) => r.amount, render: (r) => <span className={`font-medium tabular-nums ${r.amount < 0 ? "text-danger" : ""}`}>{baht(r.amount)}</span> },
 ];
 
-const inp = "px-2.5 py-1.5 rounded-lg border border-line bg-surface text-ink text-sm focus:outline-none focus:border-brand";
+const inp = "h-9 px-2.5 rounded-lg border border-line bg-surface text-ink text-sm leading-none focus:outline-none focus:border-brand";
 const ymd = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
 export function CashTable({ rows }: { rows: Row[] }) {
@@ -98,11 +98,11 @@ export function CashTable({ rows }: { rows: Row[] }) {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="รายละเอียด / ประเภท" className={inp + " w-full"} />
         </label>
         {active && (
-          <button onClick={reset} className="inline-flex items-center gap-1 h-[34px] px-2.5 rounded-lg border border-line bg-surface text-sm text-muted hover:bg-canvas hover:text-ink">
+          <button onClick={reset} className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg border border-line bg-surface text-sm text-muted hover:bg-canvas hover:text-ink">
             <X className="w-3.5 h-3.5" /> ล้าง
           </button>
         )}
-        <a href={dlHref} className="ml-auto inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-line bg-surface text-sm font-medium text-ink hover:bg-canvas">
+        <a href={dlHref} className="ml-auto inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-line bg-surface text-sm font-medium text-ink hover:bg-canvas">
           <Download className="w-4 h-4" /> Download CSV
         </a>
       </div>
