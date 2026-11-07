@@ -32,7 +32,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         listLabel={`รายการเงินสด (${rows.length})`}
         daily={
           <>
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <AddCash />
+            <div className="mt-4 mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
               <BranchTabs />
             </div>
@@ -47,8 +48,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         }
         list={
           <>
-            <AddCash />
-            <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`} className="mt-4">
+            <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`}>
               <CashTable rows={rows} />
             </Card>
           </>
