@@ -3,6 +3,7 @@ import { baht } from "@/lib/format";
 import { AddCash } from "@/components/EntryForms";
 import { Wallet } from "lucide-react";
 import { CashTable } from "@/components/CashTable";
+import { CashTabs } from "@/components/CashTabs";
 import { DrawerAdmin } from "@/components/DrawerAdmin";
 import { q } from "@/lib/db";
 import { dailyCashLog, cashAttachmentsByDate } from "@/lib/queries";
@@ -27,27 +28,38 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" />
 
-      <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`} className="mb-6">
-        <CashTable rows={rows} />
-      </Card>
-
-      <AddCash />
-      <div className="mt-6 mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
-        <BranchTabs />
-      </div>
-      {drawer.length > 0 && (
-        <div className="mb-4 max-w-xs">
-          <Stat label={`เงินสดหน้าร้านล่าสุด · ${branchName(branch)}`} value={baht(drawer[0].closing)} tone="success" />
-        </div>
-      )}
-      {drawer.length > 0 ? (
-        <Card title="ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto" className="mb-6">
-          <DrawerAdmin rows={drawer} attachments={cashSlips} branch={branch} />
-        </Card>
-      ) : (
-        <Card className="mb-6"><div className="p-8 text-center text-muted text-sm">ยังไม่มีข้อมูลเงินสดหน้าร้านของ {branchName(branch)}</div></Card>
-      )}
+      <CashTabs
+        dailyLabel="เงินสดหน้าร้าน (รายวัน)"
+        listLabel={`รายการเงินสด (${rows.length})`}
+        daily={
+          <>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
+              <BranchTabs />
+            </div>
+            {drawer.length > 0 && (
+              <div className="mb-4 max-w-xs">
+                <Stat label={`เงินสดหน้าร้านล่าสุด · ${branchName(branch)}`} value={baht(drawer[0].closing)} tone="success" />
+              </div>
+            )}
+            {drawer.length > 0 ? (
+              <Card title="ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto">
+                <DrawerAdmin rows={drawer} attachments={cashSlips} branch={branch} />
+              </Card>
+            ) : (
+              <Card><div className="p-8 text-center text-muted text-sm">ยังไม่มีข้อมูลเงินสดหน้าร้านของ {branchName(branch)}</div></Card>
+            )}
+          </>
+        }
+        list={
+          <>
+            <AddCash />
+            <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`} className="mt-4">
+              <CashTable rows={rows} />
+            </Card>
+          </>
+        }
+      />
     </div>
   );
 }
