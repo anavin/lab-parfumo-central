@@ -26,6 +26,11 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
       <PageHeader icon={Wallet} title="เงินสด" subtitle="บันทึกเงินสดหน้าร้าน / เงินสดย่อย" />
+
+      <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`} className="mb-6">
+        <CashTable rows={rows} />
+      </Card>
+
       <AddCash />
       <div className="mt-6 mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
@@ -43,10 +48,6 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       ) : (
         <Card className="mb-6"><div className="p-8 text-center text-muted text-sm">ยังไม่มีข้อมูลเงินสดหน้าร้านของ {branchName(branch)}</div></Card>
       )}
-
-      <Card title={`รายการเงินสด (${rows.length}) · คลิกหัวคอลัมน์เพื่อเรียง`}>
-        <CashTable rows={rows} />
-      </Card>
     </div>
   );
 }
