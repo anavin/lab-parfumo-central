@@ -1,5 +1,4 @@
-import { PageHeader, Stat, Card } from "@/components/ui";
-import { baht } from "@/lib/format";
+import { PageHeader, Card } from "@/components/ui";
 import { AddCash } from "@/components/EntryForms";
 import { Wallet } from "lucide-react";
 import { CashTable } from "@/components/CashTable";
@@ -37,11 +36,6 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
               <h2 className="text-sm font-semibold text-ink">เงินสดหน้าร้าน (รายวัน) · {branchName(branch)}</h2>
               <BranchTabs />
             </div>
-            {drawer.length > 0 && (
-              <div className="mb-4 max-w-xs">
-                <Stat label={`เงินสดหน้าร้านล่าสุด · ${branchName(branch)}`} value={baht(drawer[0].closing)} tone="success" />
-              </div>
-            )}
             {drawer.length > 0 ? (
               <Card title="ตรวจสอบ & บันทึกเข้าระบบ" bodyClass="p-0 overflow-x-auto">
                 <DrawerAdmin rows={drawer} attachments={cashSlips} branch={branch} />
